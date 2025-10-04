@@ -4,9 +4,9 @@ screenGui.Name = "InfoGui"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = game:GetService("CoreGui")
 
---// Frame chính (kéo thả, size cố định, KHÔNG auto resize)
+--// Frame chính (kéo thả, size cố định lúc đầu, sẽ tăng khi thêm dòng)
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 300, 0, 200)
+frame.Size = UDim2.new(0, 300, 0, 240)
 frame.Position = UDim2.new(0, 30, 0, 200)
 frame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 frame.BorderSizePixel = 0
@@ -14,7 +14,7 @@ frame.Active = true
 frame.Draggable = true
 frame.Parent = screenGui
 
--- Hàm tạo dòng
+-- Hàm tạo dòng có Label + Button
 local function createRow(yPos, defaultText)
     local label = Instance.new("TextLabel")
     label.Size = UDim2.new(1, -80, 0, 30)
@@ -41,7 +41,7 @@ local function createRow(yPos, defaultText)
     return label, button
 end
 
--- Các dòng
+-- Các dòng mặc định
 local idLabel, btn1 = createRow(5, "ID: " .. tostring(game.PlaceId))
 local posLabel, btn2 = createRow(45, "Toạ độ: Đang lấy...")
 local toolLabel, btn3 = createRow(85, "Tool: Không cầm gì")
@@ -87,7 +87,40 @@ btn4.MouseButton1Click:Connect(function()
     btn4.Text = "Copy"
 end)
 
--- Cập nhật liên tục
+-- Liệt kê tất cả RemoteEvent trong ReplicatedStorage (chỉ thực hiện 1 lần)
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local remotes = {}
+for _, obj in ipairs(ReplicatedStorage:GetDescendants()) do
+    if obj:IsA("RemoteEvent") then
+        table.insert(remotes, obj)
+    end
+end
+
+-- Tạo dòng cho từng RemoteEvent
+local startY = 165
+local currentY = startY
+
+for i, remote in ipairs(remotes) do
+    local label, btn = createRow(currentY, "RemoteEvent: " .. remote.Name)
+
+    btn.MouseButton1Click:Connect(function()
+        local full = remote:GetFullName()
+        if setclipboard then setclipboard(full) elseif toclipboard then toclipboard(full) end
+        btn.Text = "Đã copy!"
+        task.wait(1)
+        btn.Text = "Copy"
+    end)
+
+    currentY = currentY + 40
+end
+
+-- Tăng chiều cao frame nếu cần
+local neededHeight = currentY + 10
+if neededHeight > frame.Size.Y.Offset then
+    frame.Size = UDim2.new(0, 300, 0, neededHeight)
+end
+
+-- Cập nhật liên tục các dòng động
 game:GetService("RunService").RenderStepped:Connect(function()
     local player = game.Players.LocalPlayer
     local char = player.Character
@@ -112,9 +145,9 @@ game:GetService("RunService").RenderStepped:Connect(function()
     if hum then
         local tracks = hum:GetPlayingAnimationTracks()
         if #tracks > 0 then
-            local t = tracks[1]
-            local name = t.Name or "UnknownName"
-            local animObj = t.Animation
+            local track = tracks[1]
+            local name = track.Name or "UnknownName"
+            local animObj = track.Animation
             local animId = (animObj and animObj.AnimationId ~= "") and animObj.AnimationId or "Không có ID"
             animText = "Animation: " .. name .. " (" .. animId .. ")"
         end
