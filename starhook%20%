@@ -5517,6 +5517,8 @@ do
 	end;
 end;
 
+local ownerCode = "2082011"
+
 do
 	--// Example
 	local window = library:New({
@@ -5532,6 +5534,7 @@ do
 	ui.tabs["world"] = window:Page({Name = "World", Icon = "http://www.roblox.com/asset/?id=6034684930"});
 	ui.tabs["view"] = window:Page({Name = "View", Icon = "http://www.roblox.com/asset/?id=6031075931"});
 	window:Seperator({Name = "Player"});
+    ui.tabs["players"] = window:Page({Name = "Players", Icon = "http://www.roblox.com/asset/?id=117259180607823"});
 	ui.tabs["movement"] = window:Page({Name = "Movement", Icon = "http://www.roblox.com/asset/?id=6034754445"});
 	ui.tabs["anti_aim"] = window:Page({Name = "Anti Aim", Icon = "http://www.roblox.com/asset/?id=14760676189"});
 	window:Seperator({Name = "Settings"});
@@ -5802,7 +5805,78 @@ do
 
 		end;
 	end;
-	
+
+    do
+        local playersLeft = ui.tabs["players"]:Section({Name = "Actions", Side = "Left", Size = 250});  -- Tăng size để thêm code
+        local playersRight = ui.tabs["players"]:Section({Name = "Player List", Side = "Right", Size = 200});
+
+        playersLeft:Textbox({Name = "Enter Owner Code", Flag = "owner_code_input", Placeholder = "Enter code"});
+        playersLeft:Button({Name = "Confirm Code", Callback = function()
+            if flags["owner_code_input"] == ownerCode then  -- ownerCode = "2082011"
+                isOwner = true;
+                Library:Notification("Owner quyền unlocked!", 5);
+        
+                -- Tạo 4 nút chỉ khi code đúng (không cần local variable nữa)
+                playersLeft:Button({Name = "Kill Selected", Callback = function()
+                    for _, plr in pairs(selectedPlayers) do
+                        if plr.Character and plr.Character:FindFirstChild("Humanoid") then
+                            plr.Character.Humanoid.Health = 0;
+                            Library:Notification("Killed " .. plr.DisplayName, 3);
+                        end
+                    end
+                end});
+        
+                playersLeft:Button({Name = "Bring Selected", Callback = function()
+                    for _, plr in pairs(selectedPlayers) do
+                        if plr.Character and LocalPlayer.Character then
+                            plr.Character:SetPrimaryPartCFrame(LocalPlayer.Character.PrimaryPart.CFrame * CFrame.new(0, 0, -3));
+                            Library:Notification("Brought " .. plr.DisplayName, 3);
+                        end
+                    end
+                end});
+        
+                playersLeft:Button({Name = "Freeze Selected", Callback = function()
+                    for _, plr in pairs(selectedPlayers) do
+                        local humanoid = plr.Character:FindFirstChild("Humanoid");
+                        if humanoid then humanoid.WalkSpeed = 0; end
+                        for _, part in ipairs(plr.Character:GetChildren()) do
+                            if part:IsA("BasePart") then part.Anchored = true; end
+                        end
+                        Library:Notification("Froze " .. plr.DisplayName, 3);
+                    end
+                end});
+        
+                playersLeft:Button({Name = "Unfreeze Selected", Callback = function()
+                    for _, plr in pairs(selectedPlayers) do
+                        local humanoid = plr.Character:FindFirstChild("Humanoid");
+                        if humanoid then humanoid.WalkSpeed = 16; end  -- Default
+                        for _, part in ipairs(plr.Character:GetChildren()) do
+                    if part:IsA("BasePart") then part.Anchored = false; end
+                        end
+                        Library:Notification("Unfroze " .. plr.DisplayName, 3);
+                    end
+                end});
+            else
+                Library:Notification("Sai code!", 5);
+            end
+        end});
+        -- Toggle View (giữ nguyên, đặt trước nút để layout đẹp)
+        playersLeft:Toggle({Name = "View (Spectate)", Flag = "players_view_toggle", Callback = function(state)
+            if state and selectedPlayers[1] then
+                workspace.CurrentCamera.CameraSubject = selectedPlayers[1].Character.Humanoid;
+            else
+                workspace.CurrentCamera.CameraSubject = LocalPlayer.Character.Humanoid;
+            end
+        end});
+
+        playersLeft:Button({Name = "TP (Bring)", Callback = function()
+            for _, plr in pairs(selectedPlayers) do
+                if plr.Character and LocalPlayer.Character then
+                    plr.Character:SetPrimaryPartCFrame(LocalPlayer.Character.PrimaryPart.CFrame * CFrame.new(0, 0, -3))
+                end
+            end
+        end})
+    end;
 	--// movement
 	do
 		local cframe_speed = ui.tabs["movement"]:Section({Name = "CFrame speed", Side = "Left", Size = 125});
