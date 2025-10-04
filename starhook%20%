@@ -2713,7 +2713,7 @@ local flags = Library.Flags;
 getfenv().LPH_NO_VIRTUALIZE = function(...) return ... end;
 
 --// window locals
-local default_color = Color3.fromRGB(0, 255, 200);
+local default_color = Color3.fromRGB(255, 158, 207);
 
 --// services
 local players = game:GetService("Players");
@@ -6299,7 +6299,7 @@ do
 			watermark:SetVisible(state);
 		end});
 
-		window:Colorpicker({Name = "Menu Accent", Flag = "MenuAccent", Default = default_color, Callback = function(state)
+		window:Colorpicker({Name = "Menu Accent", Flag = "MenuAccent", Default = Color3.fromRGB(255, 182, 193), Callback = function(state)
 			library:ChangeAccent(state);
 		end});
 
