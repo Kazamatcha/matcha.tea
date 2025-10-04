@@ -53,7 +53,7 @@ getgenv().Elysian = {
         ['Walkspeed'] = {
             ['Enabled'] = true,
             ['WalkSpeed'] = 200,
-            ['JumpPower'] = 80,
+            ['JumpPower'] = 55,
             ['DefaultWalkSpeed'] = 18,
             ['DefaultJumpPower'] = 55
         }
