@@ -13,6 +13,13 @@ end)
 local Drawing = loadstring(game:HttpGet("https://raw.githubusercontent.com/linemaster2/storage/main/Drawing.lua"))();
 
 local Library = {};
+local desync_setback = Instance.new("Part")
+desync_setback.Name = "Desync Setback"
+desync_setback.Parent = workspace
+desync_setback.Size = Vector3.new(2, 2, 1)
+desync_setback.CanCollide = false
+desync_setback.Anchored = true
+desync_setback.Transparency = 1
 do
 	Library = {
 		Open = true;
@@ -2771,6 +2778,16 @@ function signal.new()
 	return self
 end
 
+function resetCamera()
+    local local_player = game.Players.LocalPlayer
+    if local_player.Character then
+        local humanoid = local_player.Character:FindFirstChild("Humanoid")
+        if humanoid then
+            workspace.CurrentCamera.CameraSubject = humanoid
+        end
+    end
+end
+
 --- Fire the event with the given arguments. All handlers will be invoked. Handlers follow
 -- Roblox signal conventions.
 -- @param ... Variable arguments to pass to handler
@@ -4659,16 +4676,27 @@ do
                     local target_aim_teleport_strafe_distance = flags["rage_target_aim_teleport_strafe_distance"];
                     local target_aim_teleport_strafe_height = flags["rage_target_aim_teleport_strafe_height"];
 
-                    local cframe;
+					local rootPart = local_player.Character and local_player.Character:FindFirstChild("HumanoidRootPart");
+					if rootPart then
+                        local cframe;
+					    local old_cframe = rootPart.CFrame;
 
-                    if (target_aim_teleport_type == "Random") then
-                        cframe = target.Character.HumanoidRootPart.CFrame + custom_math.random_vector3(target_aim_teleport_randomization);
-                    elseif (target_aim_teleport_type == "Strafe") then
-                        local current_time = tick();
-                        cframe = CFrame.new(target.Character.HumanoidRootPart.Position) * CFrame.Angles(0, 2 * math.pi * current_time * target_aim_teleport_strafe_speed % (2 * math.pi), 0) * CFrame.new(0, target_aim_teleport_strafe_height, target_aim_teleport_strafe_distance);
-                    end;
+                        if (target_aim_teleport_type == "Random") then
+                            cframe = target.Character.HumanoidRootPart.CFrame + custom_math.random_vector3(target_aim_teleport_randomization);
+                        elseif (target_aim_teleport_type == "Strafe") then
+                            local current_time = tick();
+                            cframe = CFrame.new(target.Character.HumanoidRootPart.Position) * CFrame.Angles(0, 2 * math.pi * current_time * target_aim_teleport_strafe_speed % (2 * math.pi), 0) * CFrame.new(0, target_aim_teleport_strafe_height, target_aim_teleport_strafe_distance);
+                        end;
+                        workspace.CurrentCamera.CameraSubject = desync_setback;
+                        rootPart.CFrame = cframe;
 
-                    local_player.Character.HumanoidRootPart.CFrame = cframe;
+					    run_service.RenderStepped:Wait();
+
+				    	desync_setback.CFrame = old_cframe * CFrame.new(0, rootPart.Size.Y / 2 + 0.5, 0);
+					    rootPart.CFrame = old_cframe;
+					end;
+				else
+					resetCamera()
                 end;
             end);
 
@@ -4916,7 +4944,7 @@ do
 				local classics_types = flags["anti_aim_starhook_classics"];
 
 				if ((enabled or classics_enabled) and (keybind or classics_keybind) and (not (classics_keybind and classics_enabled and classics_types == "supercoolboi34 Destroyer") or (classics_keybind and classics_enabled and classics_types == "supercoolboi34 Destroyer"))) then
-					local hrp = local_player.Character.HumanoidRootPart;
+					local hrp = local_player.Character.HumanoidRootPart and local_player.Character:FindFirstChild("HumanoidRootPart");
 
 					local spoofed_cframe = hrp.CFrame;
 
@@ -4927,8 +4955,8 @@ do
 						["Static Target"] = is_targetting and locals.target_aim.target.Character.HumanoidRootPart.CFrame + Vector3.new(static_x, static_y, static_z) or hrp.CFrame,
 						["Local Random"] = hrp.CFrame + custom_math.random_vector3(randomization),
 						["Target Random"] = is_targetting and locals.target_aim.target.Character.HumanoidRootPart.CFrame + custom_math.random_vector3(randomization) or hrp.CFrame,
-						["Destroy Cheaters"] = hrp.CFrame + Vector3.new(0 / 0, 1, math.huge),
-						["supercoolboi34 Destroyer"] = locals.should_starhook_destroy and hrp.CFrame + Vector3.new(0 / 0, 1, math.huge) or hrp.CFrame
+						["Destroy Cheaters"] = hrp.CFrame + Vector3.new(11223344556677889900, 1, 1),
+						["supercoolboi34 Destroyer"] = locals.should_starhook_destroy and hrp.CFrame + Vector3.new(11223344556677889900, 1, 1) or hrp.CFrame
 					};
 					
 					local desync_type = (classics_enabled and classics_keybind and (classics_types == "Destroy Cheaters" and types["Destroy Cheaters"] or classics_types == "supercoolboi34 Destroyer" and types["supercoolboi34 Destroyer"] or types[classics_types])) or (enabled and keybind and types[c_sync_type]);
@@ -4967,12 +4995,14 @@ do
 							instances.c_sync_chams.Parent = nil;
 						end;
 					end;
-					
+					workspace.CurrentCamera.CameraSubject = desync_setback;
 					hrp.CFrame = desync_type;
 
 					run_service.RenderStepped:Wait();
+					desync_setback.CFrame = locals.original_position * CFrame.new(0, hrp.Size.Y / 2 + 0.5, 0)
 					hrp.CFrame = locals.original_position;
 				else
+				    resetCamera()
 					if instances.c_sync_chams.Parent ~= nil then
 						instances.c_sync_chams.Parent = nil;
 					end;
@@ -5778,7 +5808,7 @@ do
 		local cframe_speed = ui.tabs["movement"]:Section({Name = "CFrame speed", Side = "Left", Size = 125});
 		local cframe_fly = ui.tabs["movement"]:Section({Name = "Fly", Side = "Left", Size = 125});
         local cframe_walkspeed = ui.tabs["movement"]:Section({Name = "WalkSpeed", Side = "Left", Size = 125});
-		local misc = ui.tabs["movement"]:Section({Name = "Misc", Side = "Right", Size = 130});
+		local misc = ui.tabs["movement"]:Section({Name = "Misc", Side = "Right", Size = 150});
 		
 		--// speed
 		do
@@ -5875,7 +5905,13 @@ do
 				end;
 			end});
             misc:Toggle({Name = "RapidFire", Flag = "misc_rapidfire_enabled"});
-            
+            misc:Toggle({Name = "Anti Void", Flag = "misc_anti_void_enabled", Callback = function(state)
+	            if state then
+		            workspace.FallenPartsDestroyHeight = -math.huge
+	            else
+	            	workspace.FallenPartsDestroyHeight = -50
+	            end
+            end});
             misc:Toggle({Name = "No Slowdown", Flag = "misc_no_slowdown_enabled"});
 		end;
 	end;
