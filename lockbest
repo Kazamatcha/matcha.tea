@@ -111,6 +111,10 @@ local possibleRemotes = {
     "Remote",
     "Packages",
     "MainRemotes"
+    "Bullets"
+    "Event"
+    "EVENT"
+    "MainRemoteEvent"
 }  
 
 local tracer = Drawing.new("Line")
@@ -130,10 +134,26 @@ local function getMainRemote()
         return ReplicatedStorage.Remote
     end
 
+    if ReplicatedStorage:FindFirstChild("Event") then
+        return ReplicatedStorage.Event
+    end
+
+    if ReplicatedStorage:FindFirstChild("EVENT") then
+        return ReplicatedStorage.EVENT
+    end
+
+    if ReplicatedStorage:FindFirstChild("MainRemoteEvent") then
+        return ReplicatedStorage.MainRemoteEvent
+    end
+
     -- 3. MainRemotes.MainRemoteEvent
     local mainRemotes = ReplicatedStorage:FindFirstChild("MainRemotes")
     if mainRemotes and mainRemotes:FindFirstChild("MainRemoteEvent") then
         return mainRemotes.MainRemoteEvent
+    end
+
+    if ReplicatedStorage:FindFirstChild("Bullets") then
+        return ReplicatedStorage.Bullets
     end
 
     -- 4. Packages.Knit.Services.ToolService.RE.UpdateAim
