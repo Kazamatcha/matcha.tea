@@ -1,0 +1,123 @@
+--// ScreenGui
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "InfoGui"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = game:GetService("CoreGui")
+
+--// Frame chính (kéo thả, size cố định, KHÔNG auto resize)
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 300, 0, 200)
+frame.Position = UDim2.new(0, 30, 0, 200)
+frame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+frame.BorderSizePixel = 0
+frame.Active = true
+frame.Draggable = true
+frame.Parent = screenGui
+
+-- Hàm tạo dòng
+local function createRow(yPos, defaultText)
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, -80, 0, 30)
+    label.Position = UDim2.new(0, 10, 0, yPos)
+    label.BackgroundTransparency = 1
+    label.TextColor3 = Color3.fromRGB(255, 255, 255)
+    label.TextSize = 16
+    label.Font = Enum.Font.SourceSansBold
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.TextWrapped = true
+    label.Text = defaultText
+    label.Parent = frame
+
+    local button = Instance.new("TextButton")
+    button.Size = UDim2.new(0, 60, 0, 25)
+    button.Position = UDim2.new(1, -70, 0, yPos + 2)
+    button.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    button.TextColor3 = Color3.fromRGB(255, 255, 255)
+    button.TextSize = 14
+    button.Font = Enum.Font.SourceSansBold
+    button.Text = "Copy"
+    button.Parent = frame
+
+    return label, button
+end
+
+-- Các dòng
+local idLabel, btn1 = createRow(5, "ID: " .. tostring(game.PlaceId))
+local posLabel, btn2 = createRow(45, "Toạ độ: Đang lấy...")
+local toolLabel, btn3 = createRow(85, "Tool: Không cầm gì")
+local animLabel, btn4 = createRow(125, "Animation: Không có")
+
+-- Nút copy ID
+btn1.MouseButton1Click:Connect(function()
+    local txt = tostring(game.PlaceId)
+    if setclipboard then setclipboard(txt) elseif toclipboard then toclipboard(txt) end
+    btn1.Text = "Đã copy!"
+    task.wait(1)
+    btn1.Text = "Copy"
+end)
+
+-- Nút copy tọa độ
+btn2.MouseButton1Click:Connect(function()
+    local char = game.Players.LocalPlayer.Character
+    if char and char:FindFirstChild("HumanoidRootPart") then
+        local p = char.HumanoidRootPart.Position
+        local txt = string.format("%d, %d, %d", p.X, p.Y, p.Z)
+        if setclipboard then setclipboard(txt) elseif toclipboard then toclipboard(txt) end
+        btn2.Text = "Đã copy!"
+        task.wait(1)
+        btn2.Text = "Copy"
+    end
+end)
+
+-- Nút copy tool
+btn3.MouseButton1Click:Connect(function()
+    local txt = toolLabel.Text
+    if setclipboard then setclipboard(txt) elseif toclipboard then toclipboard(txt) end
+    btn3.Text = "Đã copy!"
+    task.wait(1)
+    btn3.Text = "Copy"
+end)
+
+-- Nút copy animation
+btn4.MouseButton1Click:Connect(function()
+    local txt = animLabel.Text
+    if setclipboard then setclipboard(txt) elseif toclipboard then toclipboard(txt) end
+    btn4.Text = "Đã copy!"
+    task.wait(1)
+    btn4.Text = "Copy"
+end)
+
+-- Cập nhật liên tục
+game:GetService("RunService").RenderStepped:Connect(function()
+    local player = game.Players.LocalPlayer
+    local char = player.Character
+
+    -- Tọa độ
+    if char and char:FindFirstChild("HumanoidRootPart") then
+        local p = char.HumanoidRootPart.Position
+        posLabel.Text = string.format("Toạ độ: %d, %d, %d", p.X, p.Y, p.Z)
+    end
+
+    -- Tool
+    local tool = char and char:FindFirstChildOfClass("Tool")
+    if tool then
+        toolLabel.Text = "Tool: " .. tool.Name
+    else
+        toolLabel.Text = "Tool: Không cầm gì"
+    end
+
+    -- Animation
+    local animText = "Animation: Không có"
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if hum then
+        local tracks = hum:GetPlayingAnimationTracks()
+        if #tracks > 0 then
+            local t = tracks[1]
+            local name = t.Name or "UnknownName"
+            local animObj = t.Animation
+            local animId = (animObj and animObj.AnimationId ~= "") and animObj.AnimationId or "Không có ID"
+            animText = "Animation: " .. name .. " (" .. animId .. ")"
+        end
+    end
+    animLabel.Text = animText
+end)
