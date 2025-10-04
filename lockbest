@@ -1165,52 +1165,7 @@ Run.Heartbeat:Connect(function()
             ping = 60 -- Giá trị mặc định nếu lỗi
         end
 
-        -- Gán predictionTime dựa trên ping (sử dụng giá trị từ closePredictions)
-        if ping > 450 then
-            predictionTime = 0.1850
-        elseif ping > 400 then
-            predictionTime = 0.1800
-        elseif ping > 350 then
-            predictionTime = 0.1750
-        elseif ping > 300 then
-            predictionTime = 0.1700
-        elseif ping > 280 then
-            predictionTime = 0.165771
-        elseif ping > 270 then
-            predictionTime = 0.16780
-        elseif ping > 260 then
-            predictionTime = 0.195566
-        elseif ping > 250 then
-            predictionTime = 0.175566
-        elseif ping > 240 then
-            predictionTime = 0.1651
-        elseif ping > 230 then
-            predictionTime = 0.16780
-        elseif ping > 220 then
-            predictionTime = 0.15692
-        elseif ping > 210 then
-            predictionTime = 0.165566
-        elseif ping > 200 then
-            predictionTime = 0.165566
-        elseif ping > 190 then
-            predictionTime = 0.16942
-        elseif ping > 180 then
-            predictionTime = 0.166547
-        elseif ping > 170 then
-            predictionTime = 0.19284
-        elseif ping > 160 then
-            predictionTime = 0.1923111
-        elseif ping > 150 then
-            predictionTime = 0.16
-        elseif ping > 140 then
-            predictionTime = 0.15
-        elseif ping > 130 then
-            predictionTime = 0.153
-        elseif ping > 120 then
-            predictionTime = 0.151
-        elseif ping > 110 then
-            predictionTime = 0.149
-        elseif ping > 100 then
+        if ping > 100 then
             predictionTime = 0.1475
         elseif ping > 90 then
             predictionTime = 0.1446
