@@ -5235,7 +5235,7 @@ do
     end;
 end;
 
-if (ESP) then
+do
 	local esp = {}; do
 		esp.players = {};
 	
@@ -6130,8 +6130,8 @@ do
 				end});
 			end;
 
-			if (ESP) then
-				local esp_section = ui.tabs["view"]:Section({Name = "ESP", Side = "Right", Size = 210});
+			do
+                local esp_section = ui.tabs["view"]:Section({Name = "ESP", Side = "Right", Size = 210});
 				--// esp section
 				do
 					esp_section:Toggle({Name = "Enabled", Flag = "visuals_esp_enabled"});
