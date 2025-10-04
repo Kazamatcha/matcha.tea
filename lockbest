@@ -1344,8 +1344,7 @@ RunService.Heartbeat:Connect(function()
                     rootPart.Position.Y + math.random(-444444, 444444),
                     rootPart.Position.Z + math.random(-44444, 44444)
                 )
-
-            desync.teleportCFrame = CFrame.new(teleportPosition) * teleportRotation
+            end
 
             if desync.mode ~= "Rotation" then
                 rootPart.CFrame = desync.teleportCFrame
