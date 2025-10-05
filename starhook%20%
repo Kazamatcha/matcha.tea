@@ -1,14 +1,4 @@
 
-game:GetService("RunService").Stepped:Connect(function()
-        local char = game.Players.LocalPlayer.Character
-        if char and char:FindFirstChild("Animate") then
-            char.Animate.idle.Animation1.AnimationId = "http://www.roblox.com/asset/?id=133806214992291"
-            char.Animate.idle.Animation2.AnimationId = "http://www.roblox.com/asset/?id=94970088341563"
-            char.Animate.run.RunAnim.AnimationId = "http://www.roblox.com/asset/?id=616163682"
-            char.Animate.jump.JumpAnim.AnimationId = "http://www.roblox.com/asset/?id=656117878"
-            char.Animate.fall.FallAnim.AnimationId = "http://www.roblox.com/asset/?id=707829716"
-        end
-end)
 
 local Drawing = loadstring(game:HttpGet("https://raw.githubusercontent.com/linemaster2/storage/main/Drawing.lua"))();
 
