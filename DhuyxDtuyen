@@ -930,18 +930,16 @@ end
 
 -- Thêm hàm tính prediction scalar dựa trên ping (standard cho Da Hood)
 local function GetPredFromPing(p)
-    if p < 20 then return 0.119
-    elseif p < 30 then return 0.122
-    elseif p < 40 then return 0.126
-    elseif p < 50 then return 0.130
-    elseif p < 60 then return 0.133
-    elseif p < 70 then return 0.136
-    elseif p < 80 then return 0.139
-    elseif p < 90 then return 0.143
-    elseif p < 100 then return 0.146
-    elseif p < 150 then return 0.150
-    elseif p < 200 then return 0.155
-    else return 0.165 + (p - 200) / 1000  -- Tăng dần cho ping cao
+    if p < 20 then return 0.10036
+    elseif p < 30 then return 0.1130
+    elseif p < 40 then return 0.13544
+    elseif p < 50 then return 0.1357
+    elseif p < 60 then return 0.13598
+    elseif p < 70 then return 0.13892
+    elseif p < 80 then return 0.1403
+    elseif p < 90 then return 0.1446
+    elseif p < 100 then return 0.1475,
+    else return 0.165 + (p - 100) / 1000  
     end
 end
 
