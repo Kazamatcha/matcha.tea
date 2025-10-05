@@ -852,13 +852,13 @@ do
 			LogoText.Size = UDim2.fromOffset(60, 90)
 			LogoText.Parent = Holder
 			LogoText.ZIndex = 53
-      LogoText.Position = UDim2.fromOffset(10, -20)
+            LogoText.Position = UDim2.fromOffset(10, -20)
 
-      local UIStroke = Instance.new("UIStroke")
-      UIStroke.Name = "UIStroke"
-      UIStroke.Color = Color3.fromRGB(50, 50, 50)
-      UIStroke.Thickness = 1
-      UIStroke.Parent = LogoText
+            local UIStroke = Instance.new("UIStroke")
+            UIStroke.Name = "UIStroke"
+            UIStroke.Color = Color3.fromRGB(50, 50, 50)
+            UIStroke.Thickness = 1
+            UIStroke.Parent = LogoText
       
 			local Logo = Instance.new("ImageLabel")
 			Logo.Name = "Logo"
