@@ -30,7 +30,7 @@ getgenv().Elysian = {
             ['Jump'] = -1,
             ['Fall'] = -1,
         },
-        ['Auto Shoot'] = true,
+        ['Auto Air Shoot'] = true,
         ['Airshot Function'] = {
             ['Enabled'] = true,
             ['Part'] = "LowerTorso"
@@ -566,8 +566,8 @@ if getgenv().Elysian['HvH']['Walkspeed']['Enabled'] then
     end)
 end
 
-if getgenv().Elysian['Camlock']['Auto Shoot'] then
-    local AutoShootButton, getAutoShootState = CreateButton("AutoShoot", UDim2.new(0, 10, 0, 190), function(state)
+if getgenv().Elysian['Camlock']['Auto Air Shoot'] then
+    local AutoShootButton, getAutoShootState = CreateButton("Auto Air Shoot", UDim2.new(0, 10, 0, 190), function(state)
         auto_shooting = state
     end)
 end
@@ -620,8 +620,8 @@ userInputService.InputBegan:Connect(function(input, gameProcessedEvent)
         end
     end
 
-    -- Keybind for Z: Toggle Auto-Shoot
-    if input.KeyCode == Enum.KeyCode.Z and getgenv().Elysian['Camlock']['Auto Shoot'] then
+    -- Keybind for Z: Toggle Auto Air Shoot
+    if input.KeyCode == Enum.KeyCode.Z and getgenv().Elysian['Camlock']['Auto Air Shoot'] then
         auto_shooting = not auto_shooting
         -- Update AutoShoot button state if it exists
         if AutoShootButton then
@@ -634,11 +634,14 @@ end)
 
 local function AutoShoot()
     if Locking and Plr and isValidTarget(Plr) then
-        local character = client.Character
-        if character then
-            local tool = character:FindFirstChildOfClass("Tool")
-            if tool and tool:IsA("Tool") then
-                tool:Activate()
+        local humanoid = Plr.Character:FindFirstChild("Humanoid")
+        if humanoid and humanoid:GetState() == Enum.HumanoidStateType.Freefall then
+            local character = client.Character
+            if character then
+                local tool = character:FindFirstChildOfClass("Tool")
+                if tool and tool:IsA("Tool") then
+                    tool:Activate()
+                end
             end
         end
     end
