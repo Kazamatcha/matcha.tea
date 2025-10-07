@@ -55,12 +55,13 @@ local Config = {
     AutoWallhopEnabled = false,
     SpinbotEnabled = false,
     SpinbotSpeed = 450,
-    Prediction = nil,
+    Prediction = 0.1,
     OnlyTargetHitbox = false,
     RainbowHitEffectEnabled = true,
     WalkFloatEnabled = false,
     InfiniteZoomEnabled = false,
     AntiVoidEnabled = false,
+    AirPartEnabled = false,  
 }
 local desync_setback = Instance.new("Part")
 desync_setback.Name = "Desync Setback"
@@ -254,7 +255,7 @@ local function CreateButton(parent, name, callback)
     button.Size = UDim2.new(0.7, -5, 1, 0)
     button.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
     button.BackgroundTransparency = 0.2
-    button.TextColor3 = Color3.fromRGB(0, 0, 0)
+    button.TextColor3 = Color3.fromRGB(92, 169, 221)
     button.TextSize = 14
     button.Font = Enum.Font.Gotham
     button.Text = name
@@ -292,7 +293,7 @@ local function CreateButton(parent, name, callback)
             local screenBtn = Instance.new("TextButton")
             screenBtn.Size = UDim2.new(0, 70, 0, 30)
             screenBtn.Position = UDim2.new(0, 100, 0, 300)
-            screenBtn.BackgroundColor3 = Color3.fromRGB(200, 200, 200)
+            screenBtn.BackgroundColor3 = Color3.fromRGB(208, 240, 253)
             screenBtn.Text = name
             screenBtn.TextColor3 = Color3.fromRGB(92, 169, 221)
             screenBtn.TextSize = 10
@@ -356,8 +357,8 @@ Title.TextColor3 = Color3.fromRGB(92, 169, 221)
 Title.BackgroundTransparency = 1
 
 local TitleIcon = Instance.new("ImageLabel", MainFrame)
-TitleIcon.Size = UDim2.new(0, 30, 0, 30) -- Kích thước icon
-TitleIcon.Position = UDim2.new(1, -40, 0, -5) -- Đặt bên phải, nhô lên 5 pixel trên chữ "n"
+TitleIcon.Size = UDim2.new(0, 40, 0, 40) -- Kích thước icon
+TitleIcon.Position = UDim2.new(1, -140, 0, -10) -- Đặt bên phải, nhô lên 5 pixel trên chữ "n"
 TitleIcon.BackgroundTransparency = 1
 TitleIcon.Image = "http://www.roblox.com/asset/?id=13968824463"
 TitleIcon.ScaleType = Enum.ScaleType.Fit
@@ -368,7 +369,7 @@ local PingClock = Instance.new("TextLabel")
 PingClock.Size = UDim2.new(0, 200, 0, 25)
 PingClock.Position = UDim2.new(0, 5, 0, 35)
 PingClock.BackgroundTransparency = 1
-PingClock.TextColor3 = Color3.fromRGB(200, 200, 200)
+PingClock.TextColor3 = Color3.fromRGB(92, 169, 221)
 PingClock.Font = Enum.Font.Gotham
 PingClock.TextSize = 12
 PingClock.Parent = MainFrame
@@ -427,13 +428,13 @@ local function createTab(name)
     btn.Font = Enum.Font.Gotham
     btn.TextSize = 14
     btn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    btn.TextColor3 = Color3.fromRGB(0, 0, 0)
+    btn.TextColor3 = Color3.fromRGB(92, 169, 221)
     Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
     attachButtonEffects(btn, 3)
     return btn
 end
 
-local Tab1Btn = createTab("Da Hood")
+local Tab1Btn = createTab("Aimlock")
 local Tab2Btn = createTab("Universal")
 local Tab3Btn = createTab("Scripts")
 local Tab5Btn = createTab("Info")
@@ -481,7 +482,7 @@ local ButtonFrame1 = Instance.new("ScrollingFrame", Page1)
 ButtonFrame1.Size = UDim2.new(0.5, -5, 1, -20)
 ButtonFrame1.Position = UDim2.new(0, 5, 0, 10)
 ButtonFrame1.BackgroundTransparency = 1
-ButtonFrame1.ScrollBarThickness = 4
+ButtonFrame1.ScrollBarThickness = 0
 ButtonFrame1.CanvasSize = UDim2.new(0, 0, 0, 0)
 
 local ButtonLayout1 = Instance.new("UIListLayout", ButtonFrame1)
@@ -495,7 +496,7 @@ local PlayerListFrame = Instance.new("ScrollingFrame", Page1)
 PlayerListFrame.Size = UDim2.new(0.5, -5, 1, -20)
 PlayerListFrame.Position = UDim2.new(0.5, 0, 0, 10)
 PlayerListFrame.BackgroundTransparency = 1
-PlayerListFrame.ScrollBarThickness = 4
+PlayerListFrame.ScrollBarThickness = 0
 PlayerListFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
 
 local UIListLayout = Instance.new("UIListLayout", PlayerListFrame)
@@ -517,8 +518,9 @@ local function UpdatePlayerList()
             button.Size = UDim2.new(1, -4, 0, 20)
             button.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
             button.BackgroundTransparency = 0.2
-            button.TextColor3 = Color3.fromRGB(0, 0, 0)
+            button.TextColor3 = Color3.fromRGB(92, 169, 221)
             button.TextSize = 14
+            button.BorderSizePixel = 0
             button.Font = Enum.Font.Gotham
             button.AutoButtonColor = false
             button.Parent = PlayerListFrame
@@ -549,7 +551,7 @@ local ButtonFrame2Left = Instance.new("ScrollingFrame", Page2)
 ButtonFrame2Left.Size = UDim2.new(0.5, -5, 1, -20)
 ButtonFrame2Left.Position = UDim2.new(0, 5, 0, 10)
 ButtonFrame2Left.BackgroundTransparency = 1
-ButtonFrame2Left.ScrollBarThickness = 4
+ButtonFrame2Left.ScrollBarThickness = 0
 ButtonFrame2Left.CanvasSize = UDim2.new(0, 0, 0, 0)
 
 local ButtonLayout2Left = Instance.new("UIListLayout", ButtonFrame2Left)
@@ -563,7 +565,7 @@ local ButtonFrame2Right = Instance.new("ScrollingFrame", Page2)
 ButtonFrame2Right.Size = UDim2.new(0.5, -5, 1, -20)
 ButtonFrame2Right.Position = UDim2.new(0.5, 0, 0, 10)
 ButtonFrame2Right.BackgroundTransparency = 1
-ButtonFrame2Right.ScrollBarThickness = 4
+ButtonFrame2Right.ScrollBarThickness = 0
 ButtonFrame2Right.CanvasSize = UDim2.new(0, 0, 0, 0)
 
 local ButtonLayout2Right = Instance.new("UIListLayout", ButtonFrame2Right)
@@ -578,7 +580,7 @@ local ScriptHubScroll = Instance.new("ScrollingFrame", Page3)
 ScriptHubScroll.Size = UDim2.new(1, -10, 1, -30) -- Extended height for more space
 ScriptHubScroll.Position = UDim2.new(0, 5, 0, 5)
 ScriptHubScroll.BackgroundTransparency = 1
-ScriptHubScroll.ScrollBarThickness = 6
+ScriptHubScroll.ScrollBarThickness = 0
 ScriptHubScroll.ScrollingDirection = Enum.ScrollingDirection.Y
 ScriptHubScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
 
@@ -840,7 +842,7 @@ local function sendNotification(title, text, duration)
 end
 
 local autoSelect = false
-local tbEnabled = true
+local tbEnabled = false
 local fovRadius = 20
 local Player = nil
 local camera = Workspace.CurrentCamera
@@ -896,8 +898,8 @@ corner.Parent = title
 
 local gradient = Instance.new("UIGradient")
 gradient.Color = ColorSequence.new{
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(55, 55, 55)),
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(230, 230, 230))
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(208, 240, 253)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(188, 220, 233))
 }
 gradient.Rotation = 45
 gradient.Parent = title
@@ -938,40 +940,25 @@ local function GetPredFromPing(p)
     elseif p < 70 then return 0.13892
     elseif p < 80 then return 0.1403
     elseif p < 90 then return 0.1446
-    elseif p < 100 then return 0.1475,
-    else return 0.165 + (p - 100) / 1000  
+    elseif p < 100 then return 0.1475  
     end
 end
 
--- Sửa hàm CalculateVIPPrediction (bỏ distanceFactor để giống standard Da Hood, dùng scalar pred)
-local function CalculateVIPPrediction(part, ping)
+local function CalculateVIPPrediction(part, scalar)  -- Thay 'ping' bằng 'scalar'
     if not part or not part:IsA("BasePart") then return nil end
     local velocity = part.Velocity
-    local pred = GetPredFromPing(ping)  -- Tính scalar pred từ ping
-    return part.Position + velocity * pred
+    return part.Position + velocity * scalar  -- Dùng scalar trực tiếp
 end
 
 createInput(
     ButtonFrame1,
-    "CustomPing",
-    Config.CustomPing,
-    "Enter CustomPing",
+    "Prediction",
+    Config.Prediction,
+    "Enter Prediction (e.g. 0.1)",
     function(value)
-        Config.CustomPing = value
+        Config.Prediction = value
     end
 )
-
-task.spawn(function()
-    while task.wait(0.2) do
-        local ping = GetPing()
-        if Config.AutoPredictionEnabled then
-            Config.Prediction = CalculateVIPPrediction(ping)
-        else
-            local cp = Config.CustomPing or ping
-            Config.Prediction = CalculateVIPPrediction(cp)
-        end
-    end
-end)
 
 autoPredictionButton = CreateButton(ButtonFrame1, "Auto Prediction: OFF", function()
     Config.AutoPredictionEnabled = not Config.AutoPredictionEnabled
@@ -986,6 +973,12 @@ hitpartButton = CreateButton(ButtonFrame1, "Hitpart: Head", function()
     getgenv().Aimbot.Hitpart = hitpartOptions[hitpartIndex]
     hitpartButton.Text = "Hitpart: " .. getgenv().Aimbot.Hitpart
     sendNotification("Aimlock", "Hitpart changed to " .. getgenv().Aimbot.Hitpart)
+end)
+
+airPartButton = CreateButton(ButtonFrame1, "Air Part: OFF", function()
+    Config.AirPartEnabled = not Config.AirPartEnabled
+    airPartButton.Text = "Air Part: " .. (Config.AirPartEnabled and "ON" or "OFF")
+    sendNotification("Air Part", Config.AirPartEnabled and "ON" or "OFF")
 end)
 
 -- Nút cho trang 1
@@ -3176,6 +3169,19 @@ local function GetClosestValidPlayer()
     return closestPlayer
 end
 
+local function getpart()
+    if not Config.AirPartEnabled or not Player or not Player.Character then
+        return Player.Character[getgenv().Aimbot.Hitpart]  -- Default nếu tắt hoặc invalid
+    end
+
+    local hum = Player.Character:FindFirstChildOfClass("Humanoid")
+    if hum and hum:GetState() == Enum.HumanoidStateType.Freefall then
+        return Player.Character:FindFirstChild("UpperTorso") or Player.Character[getgenv().Aimbot.Hitpart]  -- Air: UpperTorso (fallback nếu không có)
+    else
+        return Player.Character[getgenv().Aimbot.Hitpart]  -- Normal: Hitpart ban đầu
+    end
+end
+
 RunService.RenderStepped:Connect(function(deltaTime)
     UpdateESP()
     UpdateSpeed()
@@ -3185,11 +3191,19 @@ RunService.RenderStepped:Connect(function(deltaTime)
     end
 
     if Config.AimbotEnabled and getgenv().Aimbot.Status then
+        -- Thêm phần tính scalar ở đây (gộp GetPing và set prediction)
+        local pred_scalar
+        if Config.AutoPredictionEnabled then
+            local ping = GetPing()  -- Chỉ gọi GetPing nếu auto bật
+            pred_scalar = GetPredFromPing(ping)  -- Tính scalar từ ping
+        else
+            pred_scalar = Config.Prediction or 0.135  -- Dùng scalar từ input (hoặc default)
+        end
+
         Player = GetClosestValidPlayer()
         if Player and Player.Character and Player.Character:FindFirstChild(getgenv().Aimbot.Hitpart) then
-            local part = Player.Character[getgenv().Aimbot.Hitpart]
-            local ping = Config.AutoPredictionEnabled and GetPing() or (Config.CustomPing or GetPing())
-            local predictedPos = CalculateVIPPrediction(part, ping)
+            local part = getpart()
+            local predictedPos = CalculateVIPPrediction(part, pred_scalar)  -- Dùng scalar mới tính
             if predictedPos and not IsObstructed(Camera.CFrame.Position, predictedPos) then
                 Camera.CFrame = CFrame.new(Camera.CFrame.Position, predictedPos)
             end
@@ -3349,7 +3363,7 @@ if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled then
     local selectBtn = Instance.new("TextButton")
     selectBtn.Size = UDim2.new(0, 110, 0, 35)
     selectBtn.Position = UDim2.new(0, 300, 0, 200)
-    selectBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    selectBtn.BackgroundColor3 = Color3.fromRGB(234, 248, 251)
     selectBtn.Text = "Set Target"
     selectBtn.Font = Enum.Font.GothamBold
     selectBtn.TextSize = 14
