@@ -13,7 +13,7 @@ desync_setback.Transparency = 1
 do
 	Library = {
 		Open = true;
-		Accent = Color3.fromRGB(0, 255, 200);
+		Accent = Color3.fromRGB(255, 182, 193);
 		Pages = {};
 		Sections = {};
 		Flags = {};
@@ -88,7 +88,7 @@ do
 	local ColorHolders = {}
 	
 	for i = 1, 10 do
-	    print("Starhook Mobile (atzlazyblue): Loaded!")
+	    print("Vhuy.ghoul Mobile (anhchangm52): Loaded!")
 	end;
 
 	-- // Extension
@@ -257,6 +257,10 @@ do
 				elseif theme:IsA("ScrollingFrame") then
 					theme.ScrollBarImageColor3 = Library.Accent
 				end
+
+                if theme:IsA("ImageLabel") and obj == "ImageColor3" then  -- Kiểm tra property
+                    theme.ImageColor3 = Color
+                end
 			end
 		end
 		--
@@ -877,6 +881,18 @@ do
 			Holder.BorderSizePixel = 0
 			Holder.BorderColor3 = Color3.new(0,0,0)
 			Holder.ZIndex = 52
+
+            local Glow = Instance.new("ImageLabel")
+            Glow.Name = "Glow"
+            Glow.BackgroundTransparency = 1
+            Glow.Position = UDim2.new(0, -165, 0, -18)  -- Offset lớn hơn để bao phủ Tabs (x=5)
+            Glow.Size = UDim2.new(1, 180, 1, 30)  
+            Glow.ZIndex = 0  -- Nằm dưới tất cả nội dung
+            Glow.Image = "rbxassetid://5028857084"
+            Glow.ImageColor3 = Library.Accent  -- Màu accent
+            Glow.ScaleType = Enum.ScaleType.Slice
+            Glow.SliceCenter = Rect.new(24, 24, 276, 276)
+            Glow.Parent = Holder  -- Làm con của Holder
 			--
 			Frame.Size = UDim2.new(0,5,1,0)
 			Frame.BackgroundColor3 = Color3.new(0.0588235, 0.0588235, 0.0588235)
@@ -4738,16 +4754,84 @@ do
                     root_part.CFrame = root_part.CFrame + humanoid.MoveDirection * speed;
                 end;
 
-				if (cframe_fly_enabled and cframe_fly_keybind and utility.has_character(local_player)) then --// credits to xander
-					local move_direction = local_player.Character.Humanoid.MoveDirection;
-					local hrp = local_player.Character.HumanoidRootPart;
+        -- Fly logic
+                local function CreateCore()
+                    if workspace:FindFirstChild("Core") then
+                        workspace.Core:Destroy()
+                    end
+                    local Core = Instance.new("Part")
+                    Core.Name = "Core"
+                    Core.Size = Vector3.new(0.05, 0.05, 0.05)
+                    Core.CanCollide = false
+                    Core.Transparency = 1
+                    Core.Parent = workspace
+                    local Weld = Instance.new("Weld", Core)
+                    Weld.Part0 = Core
+                    Weld.Part1 = local_player.Character.HumanoidRootPart
+                    Weld.C0 = CFrame.new(0, 0, 0)
+                    return Core
+                end
 
-					local add = Vector3.new(0, (user_input_service:IsKeyDown(Enum.KeyCode.Space) and cframe_fly_speed /  8 or user_input_service:IsKeyDown(Enum.KeyCode.LeftShift) and -cframe_fly_speed / 8) or 0, 0);
+                local function StartFly()
+                    if getgenv().Flying then return end
+                    getgenv().Flying = true
+                    local humanoid = local_player.Character:FindFirstChildOfClass("Humanoid")
+                    if humanoid then
+                        humanoid.PlatformStand = true
+                    end
+                    local Core = CreateCore()
+                    local BV = Instance.new("BodyVelocity", Core)
+                    BV.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+                    BV.Velocity = Vector3.zero
+                    local BG = Instance.new("BodyGyro", Core)
+                    BG.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
+                    BG.P = 9e4
+                    BG.CFrame = Core.CFrame
+                    utility.new_connection(run_service.RenderStepped, function()
+                        if not getgenv().Flying then return end
+                        local camera = workspace.CurrentCamera
+                        local moveDirection = Vector3.zero
+                        if user_input_service:IsKeyDown(Enum.KeyCode.W) then
+                            moveDirection = moveDirection + camera.CFrame.LookVector
+                        end
+                        if user_input_service:IsKeyDown(Enum.KeyCode.S) then
+                            moveDirection = moveDirection - camera.CFrame.LookVector
+                        end
+                        if user_input_service:IsKeyDown(Enum.KeyCode.A) then
+                            moveDirection = moveDirection - camera.CFrame.RightVector
+                        end
+                        if user_input_service:IsKeyDown(Enum.KeyCode.D) then
+                            moveDirection = moveDirection + camera.CFrame.RightVector
+                        end
+                        if user_input_service:IsKeyDown(Enum.KeyCode.Space) then
+                            moveDirection = moveDirection + Vector3.new(0, 1, 0)
+                        end
+                        if user_input_service:IsKeyDown(Enum.KeyCode.LeftControl) then
+                            moveDirection = moveDirection - Vector3.new(0, 1, 0)
+                        end
+                        BV.Velocity = moveDirection * cframe_fly_speed
+                        BG.CFrame = camera.CFrame
+                    end)
+                end
 
-					hrp.CFrame = hrp.CFrame + (move_direction * delta_time) * cframe_fly_speed * 10;
-					hrp.CFrame = hrp.CFrame + add;
-					hrp.Velocity = (hrp.Velocity * Vector3.new(1, 0, 1)) + Vector3.new(0, 1.9, 0);
-				end;
+                local function StopFly()
+                    if not getgenv().Flying then return end
+                    getgenv().Flying = false
+                    local humanoid = local_player.Character:FindFirstChildOfClass("Humanoid")
+                    if humanoid then
+                        humanoid.PlatformStand = false
+                    end
+                    if workspace:FindFirstChild("Core") then
+                        workspace.Core:Destroy()
+                    end
+                end
+
+                -- Handle fly toggle
+                if cframe_fly_enabled and cframe_fly_keybind and utility.has_character(local_player) then
+                    StartFly()
+                else
+                    StopFly()
+                end
 
                 if (no_jump_cooldown and utility.has_character(local_player)) then
                     local_player.Character.Humanoid.UseJumpPower = false;
@@ -4770,7 +4854,7 @@ do
                     local gun = dadada.get_gun();
                     if (gun) then
                         dadada.rapid(gun);
-                        task.wait(0.1);
+                        task.wait(0);
                     end;
                 end;
 
@@ -5507,8 +5591,6 @@ do
 	end;
 end;
 
-local ownerCode = "2082011"
-
 do
 	--// Example
 	local window = library:New({
@@ -5797,76 +5879,63 @@ do
 	end;
 
     do
-        local playersLeft = ui.tabs["players"]:Section({Name = "Actions", Side = "Left", Size = 250});  -- Tăng size để thêm code
+        local playersLeft = ui.tabs["players"]:Section({Name = "Actions", Side = "Left", Size = 250});
         local playersRight = ui.tabs["players"]:Section({Name = "Player List", Side = "Right", Size = 200});
 
-        playersLeft:Textbox({Name = "Enter Owner Code", Flag = "owner_code_input", Placeholder = "Enter code"});
-        playersLeft:Button({Name = "Confirm Code", Callback = function()
-            if flags["owner_code_input"] == ownerCode then  -- ownerCode = "2082011"
-                isOwner = true;
-                Library:Notification("Owner quyền unlocked!", 5);
-        
-                -- Tạo 4 nút chỉ khi code đúng (không cần local variable nữa)
-                playersLeft:Button({Name = "Kill Selected", Callback = function()
-                    for _, plr in pairs(selectedPlayers) do
-                        if plr.Character and plr.Character:FindFirstChild("Humanoid") then
-                            plr.Character.Humanoid.Health = 0;
-                            Library:Notification("Killed " .. plr.DisplayName, 3);
-                        end
-                    end
-                end});
-        
-                playersLeft:Button({Name = "Bring Selected", Callback = function()
-                    for _, plr in pairs(selectedPlayers) do
-                        if plr.Character and LocalPlayer.Character then
-                            plr.Character:SetPrimaryPartCFrame(LocalPlayer.Character.PrimaryPart.CFrame * CFrame.new(0, 0, -3));
-                            Library:Notification("Brought " .. plr.DisplayName, 3);
-                        end
-                    end
-                end});
-        
-                playersLeft:Button({Name = "Freeze Selected", Callback = function()
-                    for _, plr in pairs(selectedPlayers) do
-                        local humanoid = plr.Character:FindFirstChild("Humanoid");
-                        if humanoid then humanoid.WalkSpeed = 0; end
-                        for _, part in ipairs(plr.Character:GetChildren()) do
-                            if part:IsA("BasePart") then part.Anchored = true; end
-                        end
-                        Library:Notification("Froze " .. plr.DisplayName, 3);
-                    end
-                end});
-        
-                playersLeft:Button({Name = "Unfreeze Selected", Callback = function()
-                    for _, plr in pairs(selectedPlayers) do
-                        local humanoid = plr.Character:FindFirstChild("Humanoid");
-                        if humanoid then humanoid.WalkSpeed = 16; end  -- Default
-                        for _, part in ipairs(plr.Character:GetChildren()) do
-                    if part:IsA("BasePart") then part.Anchored = false; end
-                        end
-                        Library:Notification("Unfroze " .. plr.DisplayName, 3);
-                    end
-                end});
-            else
-                Library:Notification("Sai code!", 5);
-            end
-        end});
-        -- Toggle View (giữ nguyên, đặt trước nút để layout đẹp)
-        playersLeft:Toggle({Name = "View (Spectate)", Flag = "players_view_toggle", Callback = function(state)
-            if state and selectedPlayers[1] then
-                workspace.CurrentCamera.CameraSubject = selectedPlayers[1].Character.Humanoid;
-            else
-                workspace.CurrentCamera.CameraSubject = LocalPlayer.Character.Humanoid;
-            end
+        local PlayerTarget = nil
+
+        playersLeft:Button({Name = "TP Players", Callback = function()
+            if PlayerTarget and PlayerTarget.Character and local_player.Character then
+			    local root = local_player.Character and local_player.Character:FindFirstChild("HumanoidRootPart")
+			    if root then
+			        local pos = PlayerTarget.Character.HumanoidRootPart.Position
+                    root.CFrame = CFrame.new(pos + Vector3.new(0, 3, 0))
+                end
+			end
         end});
 
-        playersLeft:Button({Name = "TP (Bring)", Callback = function()
-            for _, plr in pairs(selectedPlayers) do
-                if plr.Character and LocalPlayer.Character then
-                    plr.Character:SetPrimaryPartCFrame(LocalPlayer.Character.PrimaryPart.CFrame * CFrame.new(0, 0, -3))
+        local playerList
+        local function updatePlayerList()
+            local playerOptions = {}
+            for _, plr in ipairs(game.Players:GetPlayers()) do
+                if plr ~= local_player then
+                    table.insert(playerOptions, string.format("%s (%s)", plr.DisplayName, plr.Name))
                 end
             end
-        end})
+            playerList:Refresh(playerOptions)
+        end
+
+        playerList = playersRight:List({
+            Name = "Select Player",
+            Flag = "selected_player",
+            Options = {},
+            Default = "",
+            Callback = function(selectedOption)
+                PlayerTarget = nil
+                for _, plr in ipairs(game.Players:GetPlayers()) do
+                    if selectedOption == string.format("%s (%s)", plr.DisplayName, plr.Name) then
+                        PlayerTarget = plr
+                        break
+                    end
+                end
+            end
+        })
+
+        updatePlayerList()
+
+        game.Players.PlayerAdded:Connect(function(plr)
+            updatePlayerList()
+        end)
+
+        game.Players.PlayerRemoving:Connect(function(plr)
+            updatePlayerList()
+            if PlayerTarget == plr then
+                PlayerTarget = nil
+                Library.Flags["selected_player"] = ""
+            end
+        end)
     end;
+
 	--// movement
 	do
 		local cframe_speed = ui.tabs["movement"]:Section({Name = "CFrame speed", Side = "Left", Size = 125});
@@ -5885,7 +5954,7 @@ do
 		do
 			local main_toggle = cframe_fly:Toggle({Name = "Enabled", Flag = "rage_cframe_fly_enabled"});
 			cframe_fly:Keybind({Flag = "rage_cframe_fly_keybind", Name = "Keybind", Default = Enum.KeyCode.C, Mode = "Toggle"});
-			cframe_fly:Slider({Name = "Speed", Flag = "rage_cframe_fly_amount", Default = 1, Minimum = 1, Maximum = 30, Decimals = 0.01, Ending = "%"});
+			cframe_fly:Slider({Name = "Speed", Flag = "rage_cframe_fly_amount", Default = 100, Minimum = 1, Maximum = 300, Decimals = 0.01, Ending = "%"});
 		end;
 
     	do
