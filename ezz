@@ -1,0 +1,986 @@
+-- Configuration
+local config = {
+    usePrediction = true,
+    AutoPred = true,
+    prediction = 0.077285846595,
+    keybind = Enum.KeyCode.Q,
+    toggleGuiKeybind = Enum.KeyCode.Z,
+    offset = 1,
+    resolver = true,
+    smoothness = 1,
+    hitPart = "UpperTorso",
+    antiGroundShots = false,
+    groundShotsValue = 0.5,
+    universal = true, 
+    aimbotMode = "toggle", 
+    walkspeedKeybind = Enum.KeyCode.T,
+    walkspeed = 200,
+    walkspeedEnabled = false,
+    stretchEnabled = false,
+    stretchAmount = 0.90,
+    playEmoteKey = Enum.KeyCode.F,
+    emoteSelect = "happier jump",
+    playEmoteMethod = "always",
+    statsTarget = false,
+	espBox = false
+}
+
+-- Services
+local players = game:GetService("Players")
+local userInputService = game:GetService("UserInputService")
+local runService = game:GetService("RunService")
+local tweenService = game:GetService("TweenService")
+local currentCamera = workspace.CurrentCamera
+
+-- Local Player
+local localPlayer = players.LocalPlayer
+local mouse = localPlayer:GetMouse()
+
+-- Create GUI
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Parent = localPlayer:WaitForChild("PlayerGui")
+ScreenGui.ResetOnSpawn = false  -- Prevent reset on respawn
+
+local MainFrame = Instance.new("Frame", ScreenGui)
+MainFrame.Size = UDim2.new(0, 400, 0, 500)
+MainFrame.Position = UDim2.new(0.5, -200, 0.5, -250)
+MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Visible = true
+MainFrame.ClipsDescendants = true
+
+local UICornerMain = Instance.new("UICorner", MainFrame)
+UICornerMain.CornerRadius = UDim.new(0, 12)
+
+local UIStrokeMain = Instance.new("UIStroke", MainFrame)
+UIStrokeMain.Color = Color3.fromRGB(60, 60, 60)
+UIStrokeMain.Thickness = 1
+
+local UIGradientMain = Instance.new("UIGradient", MainFrame)
+UIGradientMain.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(45, 45, 45)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(25, 25, 25))
+}
+
+local Glow = Instance.new("ImageLabel", MainFrame)
+Glow.Name = "Glow"
+Glow.BackgroundTransparency = 1
+Glow.Position = UDim2.new(0, -165, 0, -18)  
+Glow.Size = UDim2.new(1, 180, 1, 30)  
+Glow.ZIndex = 0  
+Glow.Image = "rbxassetid://5028857084"
+Glow.ImageColor3 = Color3.fromRGB(255, 0, 0)
+Glow.ScaleType = Enum.ScaleType.Slice
+Glow.SliceCenter = Rect.new(24, 24, 276, 276)
+
+local Header = Instance.new("Frame", MainFrame)
+Header.Size = UDim2.new(1, 0, 0, 50)
+Header.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+Header.BorderSizePixel = 0
+
+local UICornerHeader = Instance.new("UICorner", Header)
+UICornerHeader.CornerRadius = UDim.new(0, 12)
+
+local Title = Instance.new("TextLabel", Header)
+Title.Text = "betuyen.lock"
+Title.Size = UDim2.new(0, 200, 1, 0)
+Title.Position = UDim2.new(0, 60, 0, 0)
+Title.BackgroundTransparency = 1
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.TextSize = 24
+Title.Font = Enum.Font.GothamBold
+
+local Logo = Instance.new("ImageLabel", Header)
+Logo.Size = UDim2.new(0, 40, 0, 40)
+Logo.Position = UDim2.new(0, 10, 0, 5)
+Logo.BackgroundTransparency = 1
+Logo.Image = "http://www.roblox.com/asset/?id=123575368"
+
+local ScrollingFrame = Instance.new("ScrollingFrame", MainFrame)
+ScrollingFrame.Size = UDim2.new(1, 0, 1, -50)
+ScrollingFrame.Position = UDim2.new(0, 0, 0, 50)
+ScrollingFrame.BackgroundTransparency = 1
+ScrollingFrame.BorderSizePixel = 0
+ScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, 1000)
+ScrollingFrame.ScrollBarThickness = 8
+ScrollingFrame.ScrollBarImageColor3 = Color3.fromRGB(100, 100, 100)
+
+local settings = {
+    {name = "usePrediction", type = "boolean"},
+    {name = "AutoPred", type = "boolean"},
+    {name = "prediction", type = "number"},
+    {name = "keybind", type = "keybind"},
+    {name = "offset", type = "number"},
+    {name = "resolver", type = "boolean"},
+    {name = "espBox", type = "boolean"},
+    {name = "smoothness", type = "number"},
+    {name = "antiGroundShots", type = "boolean"},
+    {name = "groundShotsValue", type = "number"},
+    {name = "universal", type = "boolean"}, -- Added universal setting
+    {name = "walkspeedKeybind", type = "keybind"},
+    {name = "walkspeed", type = "number"},
+    {name = "walkspeedEnabled", type = "boolean"},
+    {name = "stretchEnabled", type = "boolean"},
+    {name = "stretchAmount", type = "number"},
+    {name = "playEmoteKey", type = "keybind"},
+    {name = "statsTarget", type = "boolean"},
+}
+
+local hitParts = {"Head", "UpperTorso", "HumanoidRootPart", "LowerTorso"}
+local aimbotModes = {"toggle", "hold"}
+local emotes = {"happier jump", "babyqueen", "ez", "take the l", "floss"}
+local emoteMethods = {"always", "movestop"}
+local emoteIds = {
+    ["happier jump"] = "http://www.roblox.com/asset/?id=15609995579",
+    ["babyqueen"] = "http://www.roblox.com/asset/?id=14352343065",
+    ["ez"] = "rbxassetid://96673018720208",
+    ["take the l"] = "rbxassetid://95656304023751",
+    ["floss"] = "rbxassetid://10714340543"
+}
+
+local function createSetting(name, settingType, position)
+    local Label = Instance.new("TextLabel", ScrollingFrame)
+    Label.Text = name
+    Label.Size = UDim2.new(0, 150, 0, 40)
+    Label.Position = UDim2.new(0, 10, 0, position)
+    Label.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    Label.BorderSizePixel = 0
+    Label.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Label.TextSize = 18
+    Label.Font = Enum.Font.Gotham
+
+    local UICornerLabel = Instance.new("UICorner", Label)
+    UICornerLabel.CornerRadius = UDim.new(0, 6)
+
+    local UIStrokeLabel = Instance.new("UIStroke", Label)
+    UIStrokeLabel.Color = Color3.fromRGB(70, 70, 70)
+    UIStrokeLabel.Thickness = 1
+
+    local Input
+    if settingType == "boolean" then
+        Input = Instance.new("TextButton", ScrollingFrame)
+        Input.Text = tostring(config[name])
+        Input.MouseButton1Click:Connect(function()
+            config[name] = not config[name]
+            Input.Text = tostring(config[name])
+            if name == "animationCustom" then
+                if config[name] and localPlayer.Character then
+                    replaceAnimations(localPlayer.Character)
+                end
+            elseif name == "stretchEnabled" then
+                -- Handled in RenderStepped
+            elseif name == "walkspeedEnabled" then
+                if localPlayer.Character then
+                    applySpeed(localPlayer.Character)
+                end
+            elseif name == "statsTarget" then
+                -- Handled in RenderStepped
+            end
+        end)
+    elseif settingType == "keybind" then
+        Input = Instance.new("TextBox", ScrollingFrame)
+        Input.Text = config[name].Name
+        Input.FocusLost:Connect(function()
+            config[name] = Enum.KeyCode[Input.Text] or config[name]
+        end)
+    else
+        Input = Instance.new("TextBox", ScrollingFrame)
+        Input.Text = tostring(config[name])
+        Input.FocusLost:Connect(function()
+            if settingType == "number" then
+                config[name] = tonumber(Input.Text) or config[name]
+            end
+        end)
+    end
+    Input.Size = UDim2.new(0, 200, 0, 40)
+    Input.Position = UDim2.new(0, 170, 0, position)
+    Input.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    Input.BorderSizePixel = 0
+    Input.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Input.TextSize = 18
+    Input.Font = Enum.Font.Gotham
+
+    local UICornerInput = Instance.new("UICorner", Input)
+    UICornerInput.CornerRadius = UDim.new(0, 6)
+
+    local UIStrokeInput = Instance.new("UIStroke", Input)
+    UIStrokeInput.Color = Color3.fromRGB(80, 80, 80)
+    UIStrokeInput.Thickness = 1
+
+    Input.MouseEnter:Connect(function()
+        tweenService:Create(UIStrokeInput, TweenInfo.new(0.2), {Color = Color3.fromRGB(100, 100, 100)}):Play()
+    end)
+
+    Input.MouseLeave:Connect(function()
+        tweenService:Create(UIStrokeInput, TweenInfo.new(0.2), {Color = Color3.fromRGB(80, 80, 80)}):Play()
+    end)
+end
+
+for i, setting in ipairs(settings) do
+    createSetting(setting.name, setting.type, (i - 1) * 50) -- Increased spacing
+end
+
+-- Dropdown for hitPart
+local hitPartLabel = Instance.new("TextLabel", ScrollingFrame)
+hitPartLabel.Text = "hitPart"
+hitPartLabel.Size = UDim2.new(0, 150, 0, 40)
+hitPartLabel.Position = UDim2.new(0, 10, 0, #settings * 50)
+hitPartLabel.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+hitPartLabel.BorderSizePixel = 0
+hitPartLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+hitPartLabel.TextSize = 18
+hitPartLabel.Font = Enum.Font.Gotham
+
+local UICornerHitPartLabel = Instance.new("UICorner", hitPartLabel)
+UICornerHitPartLabel.CornerRadius = UDim.new(0, 6)
+
+local UIStrokeHitPartLabel = Instance.new("UIStroke", hitPartLabel)
+UIStrokeHitPartLabel.Color = Color3.fromRGB(70, 70, 70)
+UIStrokeHitPartLabel.Thickness = 1
+
+local hitPartButton = Instance.new("TextButton", ScrollingFrame)
+hitPartButton.Text = config.hitPart
+hitPartButton.Size = UDim2.new(0, 200, 0, 40)
+hitPartButton.Position = UDim2.new(0, 170, 0, #settings * 50)
+hitPartButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+hitPartButton.BorderSizePixel = 0
+hitPartButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+hitPartButton.TextSize = 18
+hitPartButton.Font = Enum.Font.Gotham
+
+local UICornerHitPartButton = Instance.new("UICorner", hitPartButton)
+UICornerHitPartButton.CornerRadius = UDim.new(0, 6)
+
+local UIStrokeHitPartButton = Instance.new("UIStroke", hitPartButton)
+UIStrokeHitPartButton.Color = Color3.fromRGB(80, 80, 80)
+UIStrokeHitPartButton.Thickness = 1
+
+local hitPartDropdown = Instance.new("Frame", ScrollingFrame)
+hitPartDropdown.Size = UDim2.new(0, 200, 0, #hitParts * 40)
+hitPartDropdown.Position = UDim2.new(0, 170, 0, #settings * 50 + 40)
+hitPartDropdown.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+hitPartDropdown.Visible = false
+hitPartDropdown.ZIndex = 1000
+
+local UICornerHitPartDropdown = Instance.new("UICorner", hitPartDropdown)
+UICornerHitPartDropdown.CornerRadius = UDim.new(0, 6)
+
+local UIStrokeHitPartDropdown = Instance.new("UIStroke", hitPartDropdown)
+UIStrokeHitPartDropdown.Color = Color3.fromRGB(80, 80, 80)
+UIStrokeHitPartDropdown.Thickness = 1
+
+for i, part in ipairs(hitParts) do
+    local option = Instance.new("TextButton", hitPartDropdown)
+    option.Text = part
+    option.Size = UDim2.new(1, 0, 0, 40)
+    option.Position = UDim2.new(0, 0, 0, (i-1)*40)
+    option.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    option.BorderSizePixel = 0
+    option.TextColor3 = Color3.fromRGB(255, 255, 255)
+    option.TextSize = 18
+    option.Font = Enum.Font.Gotham
+	option.ZIndex = 1000
+    option.MouseButton1Click:Connect(function()
+        config.hitPart = part
+        hitPartButton.Text = part
+        hitPartDropdown.Visible = false
+    end)
+
+    local UICornerOption = Instance.new("UICorner", option)
+    UICornerOption.CornerRadius = UDim.new(0, 6)
+
+    local UIStrokeOption = Instance.new("UIStroke", option)
+    UIStrokeOption.Color = Color3.fromRGB(90, 90, 90)
+    UIStrokeOption.Thickness = 1
+end
+
+hitPartButton.MouseButton1Click:Connect(function()
+    hitPartDropdown.Visible = not hitPartDropdown.Visible
+end)
+-- Dropdown for aimbotMode
+local aimbotModeLabel = Instance.new("TextLabel", ScrollingFrame)
+aimbotModeLabel.Text = "aimbotMode"
+aimbotModeLabel.Size = UDim2.new(0, 150, 0, 40)
+aimbotModeLabel.Position = UDim2.new(0, 10, 0, (#settings + 1) * 50)
+aimbotModeLabel.BackgroundColor3 = Color3.fromRGB(55, 55, 55)
+aimbotModeLabel.BorderSizePixel = 0
+aimbotModeLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+aimbotModeLabel.TextSize = 18
+aimbotModeLabel.Font = Enum.Font.Gotham
+
+local UICornerAimbotModeLabel = Instance.new("UICorner", aimbotModeLabel)
+UICornerAimbotModeLabel.CornerRadius = UDim.new(0, 8)
+
+local aimbotModeButton = Instance.new("TextButton", ScrollingFrame)
+aimbotModeButton.Text = config.aimbotMode
+aimbotModeButton.Size = UDim2.new(0, 200, 0, 40)
+aimbotModeButton.Position = UDim2.new(0, 170, 0, (#settings + 1) * 50)
+aimbotModeButton.BackgroundColor3 = Color3.fromRGB(65, 65, 65)
+aimbotModeButton.BorderSizePixel = 0
+aimbotModeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+aimbotModeButton.TextSize = 18
+aimbotModeButton.Font = Enum.Font.Gotham
+
+local UICornerAimbotModeButton = Instance.new("UICorner", aimbotModeButton)
+UICornerAimbotModeButton.CornerRadius = UDim.new(0, 8)
+
+local aimbotModeDropdown = Instance.new("Frame", ScrollingFrame)
+aimbotModeDropdown.Size = UDim2.new(0, 200, 0, #aimbotModes * 40)
+aimbotModeDropdown.Position = UDim2.new(0, 170, 0, (#settings + 1) * 50 + 40)
+aimbotModeDropdown.BackgroundColor3 = Color3.fromRGB(65, 65, 65)
+aimbotModeDropdown.Visible = false
+aimbotModeDropdown.ZIndex = 1000
+
+local UICornerAimbotModeDropdown = Instance.new("UICorner", aimbotModeDropdown)
+UICornerAimbotModeDropdown.CornerRadius = UDim.new(0, 8)
+
+for i, mode in ipairs(aimbotModes) do
+    local option = Instance.new("TextButton", aimbotModeDropdown)
+    option.Text = mode
+    option.Size = UDim2.new(1, 0, 0, 40)
+    option.Position = UDim2.new(0, 0, 0, (i-1)*40)
+    option.BackgroundColor3 = Color3.fromRGB(75, 75, 75)
+    option.BorderSizePixel = 0
+    option.TextColor3 = Color3.fromRGB(255, 255, 255)
+    option.TextSize = 18
+    option.Font = Enum.Font.Gotham
+	option.ZIndex = 1000
+    option.MouseButton1Click:Connect(function()
+        config.aimbotMode = mode
+        aimbotModeButton.Text = mode
+        aimbotModeDropdown.Visible = false
+    end)
+
+    local UICornerOption = Instance.new("UICorner", option)
+    UICornerOption.CornerRadius = UDim.new(0, 8)
+end
+
+aimbotModeButton.MouseButton1Click:Connect(function()
+    aimbotModeDropdown.Visible = not aimbotModeDropdown.Visible
+end)
+
+-- Dropdown for emoteSelect
+local emoteSelectLabel = Instance.new("TextLabel", ScrollingFrame)
+emoteSelectLabel.Text = "emoteSelect"
+emoteSelectLabel.Size = UDim2.new(0, 150, 0, 40)
+emoteSelectLabel.Position = UDim2.new(0, 10, 0, (#settings + 2) * 50)
+emoteSelectLabel.BackgroundColor3 = Color3.fromRGB(55, 55, 55)
+emoteSelectLabel.BorderSizePixel = 0
+emoteSelectLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+emoteSelectLabel.TextSize = 18
+emoteSelectLabel.Font = Enum.Font.Gotham
+
+local UICornerEmoteSelectLabel = Instance.new("UICorner", emoteSelectLabel)
+UICornerEmoteSelectLabel.CornerRadius = UDim.new(0, 8)
+
+local emoteSelectButton = Instance.new("TextButton", ScrollingFrame)
+emoteSelectButton.Text = config.emoteSelect
+emoteSelectButton.Size = UDim2.new(0, 200, 0, 40)
+emoteSelectButton.Position = UDim2.new(0, 170, 0, (#settings + 2) * 50)
+emoteSelectButton.BackgroundColor3 = Color3.fromRGB(65, 65, 65)
+emoteSelectButton.BorderSizePixel = 0
+emoteSelectButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+emoteSelectButton.TextSize = 18
+emoteSelectButton.Font = Enum.Font.Gotham
+
+local UICornerEmoteSelectButton = Instance.new("UICorner", emoteSelectButton)
+UICornerEmoteSelectButton.CornerRadius = UDim.new(0, 8)
+
+local emoteSelectDropdown = Instance.new("Frame", ScrollingFrame)
+emoteSelectDropdown.Size = UDim2.new(0, 200, 0, #emotes * 40)
+emoteSelectDropdown.Position = UDim2.new(0, 170, 0, (#settings + 2) * 50 + 40)
+emoteSelectDropdown.BackgroundColor3 = Color3.fromRGB(65, 65, 65)
+emoteSelectDropdown.Visible = false
+emoteSelectDropdown.ZIndex = 1000
+
+local UICornerEmoteSelectDropdown = Instance.new("UICorner", emoteSelectDropdown)
+UICornerEmoteSelectDropdown.CornerRadius = UDim.new(0, 8)
+
+for i, emote in ipairs(emotes) do
+    local option = Instance.new("TextButton", emoteSelectDropdown)
+    option.Text = emote
+    option.Size = UDim2.new(1, 0, 0, 40)
+    option.Position = UDim2.new(0, 0, 0, (i-1)*40)
+    option.BackgroundColor3 = Color3.fromRGB(75, 75, 75)
+    option.BorderSizePixel = 0
+    option.TextColor3 = Color3.fromRGB(255, 255, 255)
+    option.TextSize = 18
+    option.Font = Enum.Font.Gotham
+	option.ZIndex = 1000
+    option.MouseButton1Click:Connect(function()
+        config.emoteSelect = emote
+        emoteSelectButton.Text = emote
+        emoteSelectDropdown.Visible = false
+    end)
+
+    local UICornerOption = Instance.new("UICorner", option)
+    UICornerOption.CornerRadius = UDim.new(0, 8)
+end
+
+emoteSelectButton.MouseButton1Click:Connect(function()
+    emoteSelectDropdown.Visible = not emoteSelectDropdown.Visible
+end)
+
+-- Dropdown for playEmoteMethod
+local playEmoteMethodLabel = Instance.new("TextLabel", ScrollingFrame)
+playEmoteMethodLabel.Text = "playEmoteMethod"
+playEmoteMethodLabel.Size = UDim2.new(0, 150, 0, 40)
+playEmoteMethodLabel.Position = UDim2.new(0, 10, 0, (#settings + 3) * 50)
+playEmoteMethodLabel.BackgroundColor3 = Color3.fromRGB(55, 55, 55)
+playEmoteMethodLabel.BorderSizePixel = 0
+playEmoteMethodLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+playEmoteMethodLabel.TextSize = 18
+playEmoteMethodLabel.Font = Enum.Font.Gotham
+
+local UICornerPlayEmoteMethodLabel = Instance.new("UICorner", playEmoteMethodLabel)
+UICornerPlayEmoteMethodLabel.CornerRadius = UDim.new(0, 8)
+
+local playEmoteMethodButton = Instance.new("TextButton", ScrollingFrame)
+playEmoteMethodButton.Text = config.playEmoteMethod
+playEmoteMethodButton.Size = UDim2.new(0, 200, 0, 40)
+playEmoteMethodButton.Position = UDim2.new(0, 170, 0, (#settings + 3) * 50)
+playEmoteMethodButton.BackgroundColor3 = Color3.fromRGB(65, 65, 65)
+playEmoteMethodButton.BorderSizePixel = 0
+playEmoteMethodButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+playEmoteMethodButton.TextSize = 18
+playEmoteMethodButton.Font = Enum.Font.Gotham
+
+local UICornerPlayEmoteMethodButton = Instance.new("UICorner", playEmoteMethodButton)
+UICornerPlayEmoteMethodButton.CornerRadius = UDim.new(0, 8)
+
+local playEmoteMethodDropdown = Instance.new("Frame", ScrollingFrame)
+playEmoteMethodDropdown.Size = UDim2.new(0, 200, 0, #emoteMethods * 40)
+playEmoteMethodDropdown.Position = UDim2.new(0, 170, 0, (#settings + 3) * 50 + 40)
+playEmoteMethodDropdown.BackgroundColor3 = Color3.fromRGB(65, 65, 65)
+playEmoteMethodDropdown.Visible = false
+playEmoteMethodDropdown.ZIndex = 1000
+
+local UICornerPlayEmoteMethodDropdown = Instance.new("UICorner", playEmoteMethodDropdown)
+UICornerPlayEmoteMethodDropdown.CornerRadius = UDim.new(0, 8)
+
+for i, method in ipairs(emoteMethods) do
+    local option = Instance.new("TextButton", playEmoteMethodDropdown)
+    option.Text = method
+    option.Size = UDim2.new(1, 0, 0, 40)
+    option.Position = UDim2.new(0, 0, 0, (i-1)*40)
+    option.BackgroundColor3 = Color3.fromRGB(75, 75, 75)
+    option.BorderSizePixel = 0
+    option.TextColor3 = Color3.fromRGB(255, 255, 255)
+    option.TextSize = 18
+    option.Font = Enum.Font.Gotham
+	option.ZIndex = 1000
+    option.MouseButton1Click:Connect(function()
+        config.playEmoteMethod = method
+        playEmoteMethodButton.Text = method
+        playEmoteMethodDropdown.Visible = false
+    end)
+
+    local UICornerOption = Instance.new("UICorner", option)
+    UICornerOption.CornerRadius = UDim.new(0, 8)
+end
+
+playEmoteMethodButton.MouseButton1Click:Connect(function()
+    playEmoteMethodDropdown.Visible = not playEmoteMethodDropdown.Visible
+end)
+
+-- Adjust canvas size
+ScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, (#settings + 4) * 50 + 200)
+userInputService.InputBegan:Connect(function(input, processed)
+    if processed then return end
+    if input.KeyCode == config.toggleGuiKeybind then
+        if MainFrame.Visible then
+            tweenService:Create(MainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(0, 0, 0, 0)}):Play()
+            task.wait(0.3)
+            MainFrame.Visible = false
+        else
+            MainFrame.Visible = true
+            tweenService:Create(MainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(0, 400, 0, 500)}):Play()
+        end
+    end
+end)
+
+-- Similar for emoteSelect and playEmoteMethod in misc
+
+-- Snow falling effect when GUI is open
+local snowParticles = Instance.new("ParticleEmitter", ScreenGui)
+snowParticles.Texture = "rbxassetid://118641183" -- Snow texture
+snowParticles.Size = NumberSequence.new(0.5)
+snowParticles.Lifetime = NumberRange.new(5, 10)
+snowParticles.Rate = 50
+snowParticles.VelocitySpread = 360
+snowParticles.Speed = NumberRange.new(5, 10)
+snowParticles.Enabled = false
+
+runService.RenderStepped:Connect(function()
+    snowParticles.Enabled = MainFrame.Visible
+end)
+
+-- Function to apply walkspeed
+local defaultWalkspeed = 16
+local function applySpeed(character)
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    if humanoid then
+        if config.walkspeedEnabled then
+            humanoid.WalkSpeed = config.walkspeed
+        else
+            humanoid.WalkSpeed = defaultWalkspeed
+        end
+        humanoid:GetPropertyChangedSignal("WalkSpeed"):Connect(function()
+            if config.walkspeedEnabled and humanoid.WalkSpeed ~= config.walkspeed then
+                humanoid.WalkSpeed = config.walkspeed
+            elseif not config.walkspeedEnabled and humanoid.WalkSpeed ~= defaultWalkspeed then
+                humanoid.WalkSpeed = defaultWalkspeed
+            end
+        end)
+    end
+end
+
+-- Walkspeed input
+userInputService.InputBegan:Connect(function(input, processed)
+    if processed then return end
+    if input.KeyCode == config.walkspeedKeybind then
+        config.walkspeedEnabled = not config.walkspeedEnabled
+        if localPlayer.Character then
+            applySpeed(localPlayer.Character)
+        end
+    end
+end)
+
+localPlayer.CharacterAdded:Connect(applySpeed)
+
+-- Stretch logic
+runService.RenderStepped:Connect(function()
+    if config.stretchEnabled then
+        currentCamera.CFrame = currentCamera.CFrame * CFrame.new(0, 0, 0, 1, 0, 0, 0, config.stretchAmount, 0, 0, 0, 1)
+    end
+end)
+
+-- Emote logic
+local emotePlaying = false
+local emoteTrack = nil
+
+local function playEmote()
+    local character = localPlayer.Character
+    if character then
+        local humanoid = character:FindFirstChildOfClass("Humanoid")
+        if humanoid then
+            local emoteId = emoteIds[config.emoteSelect]
+            if emoteId then
+                local animation = Instance.new("Animation")
+                animation.AnimationId = emoteId
+                emoteTrack = humanoid:LoadAnimation(animation)
+                emoteTrack:Play()
+                emotePlaying = true
+            end
+        end
+    end
+end
+
+local function stopEmote()
+    if emoteTrack then
+        emoteTrack:Stop()
+        emotePlaying = false
+    end
+end
+
+userInputService.InputBegan:Connect(function(input, processed)
+    if processed then return end
+    if input.KeyCode == config.playEmoteKey then
+        if config.playEmoteMethod == "always" then
+            if emotePlaying then
+                stopEmote()
+            else
+                playEmote()
+            end
+        elseif config.playEmoteMethod == "movestop" then
+            if emotePlaying then
+                stopEmote()
+            else
+                playEmote()
+            end
+        end
+    end
+end)
+
+-- Stop emote when moving in movestop mode
+runService.RenderStepped:Connect(function()
+    if config.playEmoteMethod == "movestop" and emotePlaying then
+        local character = localPlayer.Character
+        if character then
+            local humanoid = character:FindFirstChildOfClass("Humanoid")
+            if humanoid and humanoid.MoveDirection.Magnitude > 0 then
+                stopEmote()
+            end
+        end
+    end
+end)
+
+-- Function to check if a target is valid
+local function isValidTarget(character)
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    if humanoid and humanoid.Health > 0 then
+        local hitPart = character:FindFirstChild(config.hitPart)
+        if not hitPart and config.universal then
+            hitPart = character:FindFirstChild("UpperTorso") or character:FindFirstChild("Head") or character.PrimaryPart
+        end
+        if hitPart then
+            -- Wall check
+            local params = RaycastParams.new()
+            params.FilterDescendantsInstances = {localPlayer.Character or nil}
+            params.FilterType = Enum.RaycastFilterType.Blacklist
+            local rayDirection = (hitPart.Position - currentCamera.CFrame.Position).Unit * (hitPart.Position - currentCamera.CFrame.Position).Magnitude
+            local ray = workspace:Raycast(currentCamera.CFrame.Position, rayDirection, params)
+            if ray and ray.Instance:IsDescendantOf(character) then
+                local worldToViewportPoint, onScreen = currentCamera:WorldToViewportPoint(hitPart.Position)
+                if onScreen then
+                    return hitPart, Vector2.new(worldToViewportPoint.X, worldToViewportPoint.Y)
+                end
+            end
+        end
+    end
+    return nil, nil
+end
+
+-- Function to find the closest target
+local function target()
+    local target = nil
+    local shortestDistance = math.huge
+
+    for _, player in ipairs(players:GetPlayers()) do
+        if player ~= localPlayer and player.Character then
+            local hitPart, screenPos = isValidTarget(player.Character)
+            if hitPart then
+                local distance = (Vector2.new(mouse.X, mouse.Y) - screenPos).Magnitude
+                if distance < shortestDistance then
+                    target = hitPart
+                    shortestDistance = distance
+                end
+            end
+        end
+    end
+    return target
+end
+
+-- Variables to store state
+local targeting = false
+local victim = nil
+
+-- Input event to toggle targeting and GUI visibility
+userInputService.InputBegan:Connect(function(input, processed)
+    if processed then return end
+    if input.KeyCode == config.keybind then
+        if config.aimbotMode == "toggle" then
+            targeting = not targeting
+            victim = targeting and target() or nil
+            if victim then
+                oldPos = victim.Position
+            end
+        elseif config.aimbotMode == "hold" then
+            targeting = true
+            victim = target()
+            if victim then
+                oldPos = victim.Position
+            end
+        end
+    end
+end)
+
+-- Input event to stop targeting in hold mode
+userInputService.InputEnded:Connect(function(input, processed)
+    if processed then return end
+    if config.aimbotMode == "hold" and input.KeyCode == config.keybind then
+        targeting = false
+        victim = nil
+    end
+end)
+
+-- Variables to store velocity and position
+local velocity = Vector3.new(0, 0, 0)
+local oldPos = Vector3.new(0, 0, 0)
+
+-- Heartbeat event to calculate velocity
+runService.Heartbeat:Connect(function(deltaTime)
+    if victim and victim.Parent then
+        local currentPos = victim.Position
+        local displacement = currentPos - oldPos
+        velocity = velocity:Lerp(displacement / deltaTime, 0.4)
+        oldPos = currentPos
+    end
+end)
+
+-- Stats Target UI
+local targetUI = Instance.new("Frame", ScreenGui)
+targetUI.Name = "TargetUI"
+targetUI.BackgroundColor3 = Color3.fromRGB(13, 13, 13)
+targetUI.BorderSizePixel = 0
+targetUI.Position = UDim2.new(0.405, 0, 0.645, 0)
+targetUI.Size = UDim2.new(0, 337, 0, 132)
+targetUI.Visible = false
+
+local UICornerTarget = Instance.new("UICorner", targetUI)
+UICornerTarget.CornerRadius = UDim.new(0, 8)
+
+local UIStrokeTarget = Instance.new("UIStroke", targetUI)
+UIStrokeTarget.Color = Color3.fromRGB(50, 50, 50)
+UIStrokeTarget.Thickness = 1
+
+local imageFrame = Instance.new("Frame", targetUI)
+imageFrame.Name = "Image"
+imageFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+imageFrame.BorderSizePixel = 0
+imageFrame.Position = UDim2.new(0.033, 0, 0.121, 0)
+imageFrame.Size = UDim2.new(0, 100, 0, 100)
+
+local mainImage = Instance.new("ImageLabel", imageFrame)
+mainImage.Name = "MainImage"
+mainImage.BackgroundTransparency = 1
+mainImage.BorderSizePixel = 0
+mainImage.Size = UDim2.new(1, 0, 1, 0)
+mainImage.Image = ""
+
+local UICornerImage = Instance.new("UICorner", mainImage)
+UICornerImage.CornerRadius = UDim.new(0, 8)
+
+local UICornerImageFrame = Instance.new("UICorner", imageFrame)
+UICornerImageFrame.CornerRadius = UDim.new(0, 8)
+
+local UIStrokeImageFrame = Instance.new("UIStroke", imageFrame)
+UIStrokeImageFrame.Color = Color3.fromRGB(35, 35, 35)
+UIStrokeImageFrame.Thickness = 1
+
+local infoFrame = Instance.new("Frame", targetUI)
+infoFrame.Name = "Info"
+infoFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+infoFrame.BorderSizePixel = 0
+infoFrame.Position = UDim2.new(0.371, 0, 0.121, 0)
+infoFrame.Size = UDim2.new(0, 202, 0, 100)
+
+local UICornerInfo = Instance.new("UICorner", infoFrame)
+UICornerInfo.CornerRadius = UDim.new(0, 8)
+
+local UIStrokeInfo = Instance.new("UIStroke", infoFrame)
+UIStrokeInfo.Color = Color3.fromRGB(35, 35, 35)
+UIStrokeInfo.Thickness = 1
+
+local logo = Instance.new("ImageLabel", infoFrame)
+logo.Name = "Logo"
+logo.BackgroundTransparency = 1
+logo.BorderSizePixel = 0
+logo.Position = UDim2.new(0.802, 0, -0.007, 0)
+logo.Size = UDim2.new(0, 40, 0, 40)
+logo.Image = "http://www.roblox.com/asset/?id=18305816180"
+
+local playerName = Instance.new("TextLabel", infoFrame)
+playerName.Name = "PlayerName"
+playerName.BackgroundTransparency = 1
+playerName.BorderSizePixel = 0
+playerName.Position = UDim2.new(0.06, 0, 0, 0)
+playerName.Size = UDim2.new(0, 115, 0, 39)
+playerName.Font = Enum.Font.Roboto
+playerName.Text = ""
+playerName.TextColor3 = Color3.fromRGB(255, 255, 255)
+playerName.TextScaled = true
+playerName.TextStrokeTransparency = 0
+
+local healthBar = Instance.new("Frame", infoFrame)
+healthBar.Name = "Health"
+healthBar.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+healthBar.BorderSizePixel = 0
+healthBar.Position = UDim2.new(0.03, 0, 0.47, 0)
+healthBar.Size = UDim2.new(0, 143, 0, 13)
+
+local UICornerHealth = Instance.new("UICorner", healthBar)
+UICornerHealth.CornerRadius = UDim.new(0, 4)
+
+local healthInline = Instance.new("Frame", healthBar)
+healthInline.Name = "HealthInline"
+healthInline.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
+healthInline.BorderSizePixel = 0
+healthInline.Position = UDim2.new(0, 0, 0, 0)
+healthInline.Size = UDim2.new(1, 0, 1, 0)
+
+local UICornerHealthInline = Instance.new("UICorner", healthInline)
+UICornerHealthInline.CornerRadius = UDim.new(0, 4)
+
+local armorBar = Instance.new("Frame", infoFrame)
+armorBar.Name = "Armor"
+armorBar.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+armorBar.BorderSizePixel = 0
+armorBar.Position = UDim2.new(0.03, 0, 0.7, 0)
+armorBar.Size = UDim2.new(0, 143, 0, 13)
+
+local UICornerArmor = Instance.new("UICorner", armorBar)
+UICornerArmor.CornerRadius = UDim.new(0, 4)
+
+local armorInline = Instance.new("Frame", armorBar)
+armorInline.Name = "ArmorInline"
+armorInline.BackgroundColor3 = Color3.fromRGB(0, 140, 227)
+armorInline.BorderSizePixel = 0
+armorInline.Position = UDim2.new(0, 0, 0, 0)
+armorInline.Size = UDim2.new(1, 0, 1, 0)
+
+local UICornerArmorInline = Instance.new("UICorner", armorInline)
+UICornerArmorInline.CornerRadius = UDim.new(0, 4)
+
+local targetBox = Drawing.new("Square")
+targetBox.Visible = false
+targetBox.Color = Color3.fromRGB(255, 0, 0)
+targetBox.Thickness = 2
+targetBox.Filled = false
+
+local targetHealthBar = Drawing.new("Line")
+targetHealthBar.Visible = false
+targetHealthBar.Color = Color3.fromRGB(0, 255, 0)
+targetHealthBar.Thickness = 2
+
+local targetHealthText = Drawing.new("Text")
+targetHealthText.Visible = false
+targetHealthText.Color = Color3.fromRGB(255, 255, 255)
+targetHealthText.Size = 14
+targetHealthText.Center = true
+targetHealthText.Outline = true
+
+runService.RenderStepped:Connect(function()
+    -- Auto prediction theo ping
+    if config.AutoPred then
+        local pingValue = game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValueString()
+        local split = string.split(pingValue, " ")
+        local ping = tonumber(split[1])
+
+        if ping then
+            if ping < 30 then
+                config.prediction = 0.1130
+            elseif ping < 40 then
+                config.prediction = 0.13544
+            elseif ping < 50 then
+                config.prediction = 0.13575
+            elseif ping < 60 then
+                config.prediction = 0.13598
+            elseif ping < 70 then
+                config.prediction = 0.13892
+            elseif ping < 80 then
+                config.prediction = 0.1403
+            elseif ping < 90 then
+                config.prediction = 0.1446
+            elseif ping < 100 then
+                config.prediction = 0.1475
+            elseif ping < 110 then
+                config.prediction = 0.1502
+            end
+        end
+    end
+
+    -- Check victim hợp lệ
+    if targeting and victim and victim.Parent then
+        local humanoid = victim.Parent:FindFirstChildOfClass("Humanoid")
+        if humanoid and humanoid.Health > 0 then
+            -- Tính prediction
+            local pos = victim.Position
+            if config.usePrediction then
+                local vel = config.resolver and velocity or victim.Velocity
+                pos = pos + Vector3.new(
+                    vel.X,
+                    config.antiGroundShots and (vel.Y * config.groundShotsValue) or vel.Y,
+                    vel.Z
+                ) * config.prediction
+            end
+
+            -- Aimbot lerp
+            currentCamera.CFrame = currentCamera.CFrame:Lerp(
+                CFrame.new(currentCamera.CFrame.Position, pos),
+                config.smoothness
+            )
+
+            -- Hiện stats target
+            if config.statsTarget then
+                local targetPlayer = players:GetPlayerFromCharacter(victim.Parent)
+                if targetPlayer then
+                    targetUI.Visible = true
+                    mainImage.Image = "rbxthumb://type=AvatarHeadShot&id=" .. targetPlayer.UserId .. "&w=420&h=420"
+                    playerName.Text = targetPlayer.DisplayName .. " (@" .. targetPlayer.Name .. ")"
+
+                    -- Máu
+                    local healthRatio = humanoid.Health / humanoid.MaxHealth
+                    healthInline.Size = UDim2.new(healthRatio, 0, 1, 0)
+
+                    -- Giáp
+                    local armorValue = 0
+                    local bodyEffects = victim.Parent:FindFirstChild("BodyEffects")
+                    if bodyEffects then
+                        local armor = bodyEffects:FindFirstChild("Armor")
+                        if armor then
+                            armorValue = armor.Value
+                        end
+                    end
+                    armorInline.Size = UDim2.new(armorValue / 100, 0, 1, 0)
+                else
+                    targetUI.Visible = false
+                end
+            else
+                targetUI.Visible = false
+            end
+
+            -- ESP box + máu (chỉ bật khi config.espBox = true)
+            if config.espBox then
+                local character = victim.Parent
+                local root = character:FindFirstChild("HumanoidRootPart")
+                local head = character:FindFirstChild("Head")
+                if root and head then
+                    local headPos, headOnScreen = currentCamera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.5, 0))
+                    local legPos, legOnScreen = currentCamera:WorldToViewportPoint(root.Position - Vector3.new(0, 3, 0))
+
+                    if headOnScreen and legOnScreen then
+                        -- Box
+                        targetBox.Size = Vector2.new(
+                            math.abs(headPos.X - legPos.X) * 1.5,
+                            math.abs(headPos.Y - legPos.Y) * 1.2
+                        )
+                        targetBox.Position = Vector2.new(
+                            math.min(headPos.X, legPos.X) - targetBox.Size.X / 3,
+                            math.min(headPos.Y, legPos.Y)
+                        )
+                        targetBox.Visible = true
+
+                        -- Health bar
+                        local healthRatio = humanoid.Health / humanoid.MaxHealth
+                        targetHealthBar.From = Vector2.new(targetBox.Position.X - 5, targetBox.Position.Y + targetBox.Size.Y)
+                        targetHealthBar.To = Vector2.new(targetBox.Position.X - 5, targetBox.Position.Y + targetBox.Size.Y * (1 - healthRatio))
+                        targetHealthBar.Visible = true
+
+                        -- Health text
+                        targetHealthText.Text = tostring(math.floor(humanoid.Health))
+                        targetHealthText.Position = Vector2.new(
+                            targetBox.Position.X - 20,
+                            targetBox.Position.Y + targetBox.Size.Y * (1 - healthRatio) - 10
+                        )
+                        targetHealthText.Visible = true
+                    else
+                        targetBox.Visible = false
+                        targetHealthBar.Visible = false
+                        targetHealthText.Visible = false
+                    end
+                else
+                    targetBox.Visible = false
+                    targetHealthBar.Visible = false
+                    targetHealthText.Visible = false
+                end
+            else
+                targetBox.Visible = false
+                targetHealthBar.Visible = false
+                targetHealthText.Visible = false
+            end
+        else
+            targetUI.Visible = false
+            targetBox.Visible = false
+            targetHealthBar.Visible = false
+            targetHealthText.Visible = false
+        end
+    else
+        targetUI.Visible = false
+        targetBox.Visible = false
+        targetHealthBar.Visible = false
+        targetHealthText.Visible = false
+    end
+end)
