@@ -88,6 +88,9 @@ local Notifications_Frame = nil
 local aimlockEnabled = true
 local viewEnabled = false
 local stomptarget = false 
+local flyEnabled = false
+local flySpeed = 100
+local joystickFlyConnection = nil
 
 local possibleRemotes = {
     "MAINEVENT",
@@ -135,6 +138,8 @@ local themes = {
         WorldAmbient = Color3.fromRGB(60,80,100),
         WorldOutdoor = Color3.fromRGB(20,120,180),
         Fog = Color3.fromRGB(20,100,130),
+        targetChamsColor = Color3.fromRGB(0, 255, 220),  -- Neon cyan nổi bật
+        targetTracerColor = Color3.fromRGB(200, 255, 250),  -- Neon hồng nhạt
     },
     Sunset = {
         FOVColor = Color3.fromRGB(255,150,40),
@@ -146,6 +151,8 @@ local themes = {
         WorldAmbient = Color3.fromRGB(80,40,30),
         WorldOutdoor = Color3.fromRGB(180,90,50),
         Fog = Color3.fromRGB(120,60,40),
+        targetChamsColor = Color3.fromRGB(255, 150, 40),  -- Cam sunset
+        targetTracerColor = Color3.fromRGB(255, 100, 30),  -- Đỏ cam
     },
     Nature = {
         FOVColor = Color3.fromRGB(70,220,110),
@@ -157,6 +164,8 @@ local themes = {
         WorldAmbient = Color3.fromRGB(30,60,40),
         WorldOutdoor = Color3.fromRGB(60,120,80),
         Fog = Color3.fromRGB(40,80,60),
+        targetChamsColor = Color3.fromRGB(70, 220, 110),  -- Xanh lá tươi
+        targetTracerColor = Color3.fromRGB(120, 200, 150),  -- Xanh nhạt
     },
     DarkViolet = {
         FOVColor = Color3.fromRGB(200,40,200),
@@ -168,6 +177,8 @@ local themes = {
         WorldAmbient = Color3.fromRGB(20,10,30),
         WorldOutdoor = Color3.fromRGB(80,40,120),
         Fog = Color3.fromRGB(60,20,80),
+        targetChamsColor = Color3.fromRGB(200, 40, 200),  -- Tím đậm
+        targetTracerColor = Color3.fromRGB(255, 60, 180),  -- Hồng tím
     },
     Cyberpunk = {
         FOVColor = Color3.fromRGB(255,20,147),
@@ -179,6 +190,8 @@ local themes = {
         WorldAmbient = Color3.fromRGB(50,20,60),
         WorldOutdoor = Color3.fromRGB(100,50,120),
         Fog = Color3.fromRGB(80,30,100),
+        targetChamsColor = Color3.fromRGB(255, 20, 147),  -- Hồng neon cyber
+        targetTracerColor = Color3.fromRGB(255, 105, 180),  -- Hồng nhạt cyber
     },
     Ocean = {
         FOVColor = Color3.fromRGB(0,191,255),
@@ -190,6 +203,8 @@ local themes = {
         WorldAmbient = Color3.fromRGB(40,60,80),
         WorldOutdoor = Color3.fromRGB(80,120,160),
         Fog = Color3.fromRGB(50,100,150),
+        targetChamsColor = Color3.fromRGB(0, 191, 255),  -- Xanh dương ocean
+        targetTracerColor = Color3.fromRGB(135, 206, 250),  -- Xanh nhạt sky
     },
     Lava = {
         FOVColor = Color3.fromRGB(255,69,0),
@@ -201,6 +216,8 @@ local themes = {
         WorldAmbient = Color3.fromRGB(80,30,20),
         WorldOutdoor = Color3.fromRGB(120,50,40),
         Fog = Color3.fromRGB(100,40,30),
+        targetChamsColor = Color3.fromRGB(255, 69, 0),  -- Đỏ lava
+        targetTracerColor = Color3.fromRGB(255, 99, 71),  -- Cam đỏ
     },
     Default = {
         FOVColor = Color3.fromRGB(255,255,255),
@@ -212,6 +229,8 @@ local themes = {
         WorldAmbient = Lighting.Ambient,
         WorldOutdoor = Lighting.OutdoorAmbient,
         Fog = Lighting.FogColor,
+        targetChamsColor = Color3.fromRGB(214, 112, 122),  -- Hồng mặc định
+        targetTracerColor = Color3.fromRGB(255, 255, 255),  -- Trắng
     }
 }
 
@@ -557,7 +576,6 @@ local function distToCursorFromWorldPos(pos)
     return (screenPos - Vector2.new(mousePos.X, mousePos.Y)).Magnitude
 end
 
--- VISIBILITY CHECK: returns true if direct line from camera to targetHead hits the target (or nothing)
 local function isVisibleFromCamera(targetHead)
     if not targetHead or not targetHead.Position then return false end
     local origin = Cam.CFrame.Position
@@ -581,6 +599,23 @@ local function isVisibleFromCamera(targetHead)
     return false
 end
 
+-- New filterTarget function
+local function filterTarget(player)
+    if not player or player ~= selected then
+        return false, "Not selected target"
+    end
+    local part = player.Character and player.Character:FindFirstChild(GetPart(player))
+    if part and part.Position then
+        if not isVisibleFromCamera(part) then
+            return false, "Target obstructed"
+        end
+    end
+    if not isAlive(player) then
+        return false, "Target K.O. or grabbed"
+    end
+    return true, "Target valid"
+end
+
 -- get nearest SELECTED, ALIVE, VISIBLE player to cursor (head target). returns player or nil
 local function getNearestSelectedAliveVisible()
     local best, bestDist = nil, math.huge
@@ -601,23 +636,6 @@ local function getNearestSelectedAliveVisible()
         end
     end
     return best, bestDist
-end
-
-local function getNearestSelectedPlayer()
-    local best, bestDist = nil, math.huge
-    for ply, hl in pairs(selected) do
-        if ply and hl and hl.Enabled and isAlive(ply) and ply.Character then
-            local root = ply.Character:FindFirstChild("HumanoidRootPart") or ply.Character.PrimaryPart
-            if root then
-                local dist = (root.Position - Cam.CFrame.Position).Magnitude
-                if dist < bestDist then
-                    bestDist = dist
-                    best = ply
-                end
-            end
-        end
-    end
-    return best
 end
 
 -- cleanup when players leave
@@ -675,6 +693,74 @@ instantStompConnection = UIS.InputBegan:Connect(function(input, gameProcessed)
     end
 end)
 
+-- Fly function for CFrame movement
+local function updateFly()
+    local char = LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not char or not hrp then return end
+
+    if not flyEnabled then return end
+    
+    local moveDirection = Vector3.new(0, 0, 0)
+
+    if UIS.TouchEnabled then
+        -- 📱 Mobile: Joystick + hướng nhìn
+        local joystick = UIS:GetJoystickState(Enum.UserInputType.Touch)
+        for _, state in ipairs(joystick) do
+            moveDirection = moveDirection + Vector3.new(state.Position.X, 0, -state.Position.Y)
+        end
+        local lookDir = Cam.CFrame.LookVector
+        if lookDir.Y > 0.1 then
+            moveDirection = moveDirection + Vector3.new(0, 1, 0)
+        elseif lookDir.Y < -0.1 then
+            moveDirection = moveDirection + Vector3.new(0, -1, 0)
+        end
+    else
+        -- 💻 PC: Space lên, Ctrl xuống
+        if UIS:IsKeyDown(Enum.KeyCode.Space) then
+            moveDirection = moveDirection + Vector3.new(0, 1, 0)
+        end
+        if UIS:IsKeyDown(Enum.KeyCode.LeftControl) then
+            moveDirection = moveDirection + Vector3.new(0, -1, 0)
+        end
+
+        -- Camera hướng nhìn
+        local camLook = Cam.CFrame.LookVector
+        local camRight = Cam.CFrame.RightVector
+
+        local input = Vector3.new(
+            (UIS:IsKeyDown(Enum.KeyCode.D) and 1 or 0) - (UIS:IsKeyDown(Enum.KeyCode.A) and 1 or 0),
+            0,
+            (UIS:IsKeyDown(Enum.KeyCode.S) and 1 or 0) - (UIS:IsKeyDown(Enum.KeyCode.W) and 1 or 0)
+        )
+
+        -- Dùng hướng camera để tính toán vector di chuyển
+        moveDirection = moveDirection + (camLook * -input.Z + camRight * input.X)
+    end
+
+    -- Áp dụng tốc độ bay
+    if moveDirection.Magnitude > 0 then
+        hrp.Velocity = moveDirection.Unit * flySpeed
+    else
+        hrp.Velocity = Vector3.new(0, 0, 0)
+    end
+end
+
+-- Fly toggle function
+local function toggleFly(state)
+    flyEnabled = state
+    local char = LocalPlayer.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not char or not hum or not hrp then return end
+    if flyEnabled then
+        Notify("Fly: ON", 2)
+    else
+        hrp.Velocity = Vector3.new(0, 0, 0)
+        Notify("Fly: OFF", 2)
+    end
+end
+
 -- Mobile UI
 local Sigmaballs = Instance.new("ScreenGui")
 Sigmaballs.Name = "Sigmaballs"
@@ -684,26 +770,11 @@ Sigmaballs.ResetOnSpawn = false
 
 local lockid = "rbxassetid://140623923630784"
 
-local function toggleSelectPlayer(ply)
-    if not ply then
-        if selected then
-            removeHighlightFromPlayer(selected)
-            removeTracer(selected)
-            Notify(string.format("Deselected %s (@%s)", selected.DisplayName or selected.Name, selected.Name), 2)
-            selected = nil
-            if UIS.TouchEnabled then
-                lockid = "rbxassetid://140623923630784"
-                if ImageButton then
-                    ImageButton.Image = lockid
-                end
-            end
-        end
-        return
-    end
-    if selected == ply then
-        removeHighlightFromPlayer(ply)
-        removeTracer(ply)
-        Notify(string.format("Deselected %s (@%s)", ply.DisplayName or ply.Name, ply.Name), 2)
+local function untarget()
+    if selected then
+        Notify("Untargeted " .. selected.Name, 2)
+        if chamsTargetEnabled then removeHighlightFromPlayer(selected) end
+        if tracerTargetEnabled then removeTracer(selected) end
         selected = nil
         if UIS.TouchEnabled then
             lockid = "rbxassetid://140623923630784"
@@ -711,29 +782,11 @@ local function toggleSelectPlayer(ply)
                 ImageButton.Image = lockid
             end
         end
-    else
-        if selected then
-            removeHighlightFromPlayer(selected)
-            removeTracer(selected)
-        end
-        selected = ply
-        if chamsTargetEnabled then
-            addHighlightToPlayer(ply)
-        end
-        if tracerTargetEnabled then
-            createTracer(ply)
-        end
-        Notify(string.format("Selected %s (@%s)", ply.DisplayName or ply.Name, ply.Name), 3)
-        if UIS.TouchEnabled then
-            lockid = "rbxassetid://96086736054343"
-            if ImageButton then
-                ImageButton.Image = lockid
-            end
-        end
     end
 end
-local function selectNearestPlayerToCenter()
-    local center = Vector2.new(Cam.ViewportSize.X/2, Cam.ViewportSize.Y/2)
+
+local function selectNearestTarget()
+    local center = UIS.TouchEnabled and Vector2.new(Cam.ViewportSize.X/2, Cam.ViewportSize.Y/2) or UIS:GetMouseLocation()
     local best, bestDist = nil, math.huge
     for _, p in ipairs(Players:GetPlayers()) do
         if p ~= LP and p.Character then
@@ -751,11 +804,26 @@ local function selectNearestPlayerToCenter()
             end
         end
     end
-    toggleSelectPlayer(best)
-    if not best then
-        Notify("No valid target found near screen center.", 2)
+    if best then
+        selected = best
+        if chamsTargetEnabled then
+            addHighlightToPlayer(best)
+        end
+        if tracerTargetEnabled then
+            createTracer(best)
+        end
+        Notify(string.format("Selected %s (@%s)", best.DisplayName or best.Name, best.Name), 3)
+        if UIS.TouchEnabled then
+            lockid = "rbxassetid://96086736054343"
+            if ImageButton then
+                ImageButton.Image = lockid
+            end
+        end
+    else
+        Notify("No valid target found.", 2)
     end
 end
+
 if UIS.TouchEnabled then
     local ImageButton = Instance.new("ImageButton")
     ImageButton.Name = "ImageButton"
@@ -771,54 +839,21 @@ if UIS.TouchEnabled then
     Ui2corner.CornerRadius = UDim.new(0.2, 0)
     Ui2corner.Parent = ImageButton
     ImageButton.MouseButton1Click:Connect(function()
-        selectNearestPlayerToCenter()
-        ImageButton.Image = lockid
+        if selected then
+            untarget()
+        else
+            selectNearestTarget()
+        end
     end)
 end
--- Input Handling
 UIS.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
     if input.UserInputType == Enum.UserInputType.Keyboard then
         if input.KeyCode == selectKey then
-            if UIS.TouchEnabled then
-                selectNearestPlayerToCenter()
+            if selected then
+                untarget()
             else
-                local best, bestDist = nil, math.huge
-                for _, p in ipairs(Players:GetPlayers()) do
-                    if p ~= LP and p.Character then
-                        local root = p.Character:FindFirstChild("HumanoidRootPart")
-                        if root and root.Position then
-                            local v = Cam:WorldToViewportPoint(root.Position)
-                            local onScreen = v.Z > 0 and v.X >= 0 and v.X <= Cam.ViewportSize.X and v.Y >= 0 and v.Y <= Cam.ViewportSize.Y
-                            if onScreen then
-                                local d = distToCursorFromWorldPos(root.Position)
-                                if d < bestDist then
-                                    bestDist = d
-                                    best = p
-                                end
-                            end
-                        end
-                    end
-                end
-                toggleSelectPlayer(best)
-                if not best then
-                    Notify("No valid target found.", 2)
-                end
-            end
-            return
-        end
-        if input.KeyCode == aimlockKey then
-            aimlockEnabled = not aimlockEnabled
-            Notify("Aimlock: " .. (aimlockEnabled and "ON" or "OFF"), 2)
-            if not aimlockEnabled then
-                if selected then
-                    removeHighlightFromPlayer(selected)
-                    removeTracer(selected)
-                    selected = nil
-                    if UIS.TouchEnabled then
-                        ImageButton.Image = "rbxassetid://140623923630784"
-                    end
-                end
+                selectNearestTarget()
             end
             return
         end
@@ -1085,6 +1120,8 @@ end)
 -- Biến autoshoot
 local tbEnabled = false
 local fovRadius = 20
+local targetOnly = false
+local triggerbotKey = Enum.KeyCode.Z
 
 -- Danh sách các bộ phận có thể bắn
 local hitParts = {
@@ -1093,11 +1130,11 @@ local hitParts = {
     "RightUpperLeg", "RightLowerLeg", "RightFoot", "Torso", "Left Arm", "Right Arm", "Left Leg", "Right Leg"
 }
 
--- Hàm kiểm tra bộ phận hợp lệ
 local function validPart(p)
     if not p or not p.Parent or not p.Parent:FindFirstChild("Humanoid") then return false end
     local player = Players:GetPlayerFromCharacter(p.Parent)
-    if not player or player ~= selected then return false end
+    if not player then return false end
+    if targetOnly and player ~= selected then return false end
     for _, n in ipairs(hitParts) do
         if p.Name:lower() == n:lower() then return true end
     end
@@ -1111,26 +1148,11 @@ local function distToCursor(part)
     return (Vector2.new(v.X, v.Y) - Vector2.new(m.X, m.Y)).Magnitude
 end
 
-local function click()
-    if UIS.TouchEnabled then
-        local touchPos = UIS:GetMouseLocation()
-        VIM:SendTouchEvent(0, Enum.UserInputState.Begin, touchPos)
-        task.wait()
-        VIM:SendTouchEvent(0, Enum.UserInputState.End, touchPos)
-    else
-        pcall(function()
-            VIM:SendMouseButtonEvent(0, 0, 0, true)
-            task.wait()
-            VIM:SendMouseButtonEvent(0, 0, 0, false)
-        end)
-    end
-end
-
-local function GetBestTargetPart()
+local function GetBestTargetPart(target)
     local bestPart, bestDist = nil, fovRadius
-    if selected and selected.Character and isAlive(selected) then
+    if target and target.Character and isAlive(target) then
         for _, partName in ipairs(hitParts) do
-            local part = selected.Character:FindFirstChild(partName)
+            local part = target.Character:FindFirstChild(partName)
             if part and part:IsA("BasePart") then
                 local dist = distToCursor(part)
                 if dist < bestDist then
@@ -1140,7 +1162,20 @@ local function GetBestTargetPart()
             end
         end
     end
+    if not bestPart then
+        Notify("No valid target part found.", 2)
+    end
     return bestPart
+end
+
+local function toolActivate()
+    local char = LocalPlayer.Character
+    if char then
+        local tool = char:FindFirstChildWhichIsA("Tool")
+        if tool then
+            pcall(function() tool:Activate() end)
+        end
+    end
 end
 
 -- ===== CHAT COMMANDS =====
@@ -1203,50 +1238,49 @@ MakeButton("AutoShoot", Color3.fromRGB(244, 112, 122), function(state)
     else
         Notify("AutoShoot: OFF", 2)
     end
-end, Enum.KeyCode.Z) -- Phím Z để bật/tắt
+end, triggerbotKey) -- Phím Z để bật/tắt
 
--- Vòng lặp autoshoot
 Run.RenderStepped:Connect(function()
-    if tbEnabled then
-        local part = GetBestTargetPart()
-        if part then
-            task.spawn(function()
-                local cap = part
-                task.wait(0)
-                if tbEnabled and distToCursor(cap) <= fovRadius then
-                    local origin = Cam.CFrame.Position
-                    local direction = (cap.Position - origin)
-                    local rayParams = RaycastParams.new()
-                    rayParams.FilterType = Enum.RaycastFilterType.Blacklist
-                    rayParams.FilterDescendantsInstances = {LocalPlayer.Character or {}}
-
-                    local result = workspace:Raycast(origin, direction, rayParams)
-
-                    -- Chỉ bắn nếu raycast trúng chính xác target (không bị che)
-                    if not result or result.Instance:IsDescendantOf(cap.Parent) then
-                        if UIS.TouchEnabled and not UIS.MouseEnabled then
-                            -- Mobile
-                            local char = LocalPlayer.Character
-                            local fired = false
-                            if char then
-                                for _, tool in ipairs(char:GetChildren()) do
-                                    if tool:IsA("Tool") then
-                                        pcall(function() tool:Activate() end)
-                                        fired = true
-                                        break
-                                    end
-                                end
-                            end
-                            if not fired then
-                                click() -- Fallback tap
-                            end
-                        else
-                            -- PC
-                            click()
+    if not tbEnabled then return end
+    local target = nil
+    if targetOnly then
+        if not selected or not isAlive(selected) then return end
+        target = selected
+    else
+        local best, bestDist = nil, fovRadius
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer and p.Character and isAlive(p) then
+                for _, partName in ipairs(hitParts) do
+                    local part = p.Character:FindFirstChild(partName)
+                    if part and part:IsA("BasePart") then
+                        local dist = distToCursor(part)
+                        if dist < bestDist then
+                            best = p
+                            bestDist = dist
                         end
                     end
                 end
-            end)
+            end
+        end
+        target = best
+    end
+    if not target then
+        return
+    end
+    local part = GetBestTargetPart(target) -- Modified to accept target parameter
+    if part then
+        local dist = distToCursor(part)
+        if dist <= fovRadius then
+            local origin = Cam.CFrame.Position
+            local direction = (part.Position - origin)
+            local rayParams = RaycastParams.new()
+            rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+            rayParams.FilterDescendantsInstances = {LocalPlayer.Character or {}}
+            local result = workspace:Raycast(origin, direction, rayParams)
+
+            if not result or result.Instance:IsDescendantOf(part.Parent) then
+                toolActivate()
+            end
         end
     end
 end)
@@ -1268,6 +1302,10 @@ UIS.InputBegan:Connect(function(input, gpe)
 end)
 
 Run.Heartbeat:Connect(function()
+
+    if flyEnabled then
+        updateFly()
+    end
     if AutoPingSets then
         -- Lấy giá trị ping
         local pingvalue, ping
@@ -1306,7 +1344,6 @@ Run.Heartbeat:Connect(function()
     end
 end)
 
--- ====== AIMLOCK LOOP ======
 Run.RenderStepped:Connect(function(dt)
     local char = LocalPlayer.Character
     if not char then return end
@@ -1318,7 +1355,9 @@ Run.RenderStepped:Connect(function(dt)
         task.wait(3.7)
     end
     if not aimlockEnabled or not selected then return end
-    local targetPart = selected.Character and selected.Character:FindFirstChild(GetPart(selected))
+    local isValid, reason = filterTarget(selected)
+    if not isValid then return end
+    local targetPart = selected.Character:FindFirstChild(GetPart(selected))
     if not targetPart then return end
     if resolverEnabled then
         pcall(function()
@@ -1333,13 +1372,17 @@ Run.RenderStepped:Connect(function(dt)
             targetPart.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
         end)
     end
-    local vel = targetPart.Velocity or Vector3.new(0,0,0)
+    local vel = targetPart.Velocity or Vector3.new(0, 0, 0)
     local predicted = targetPart.Position + vel * predictionTime
     local camPos = Cam.CFrame.Position
     local desiredCFrame = CFrame.new(camPos, predicted)
     local alpha = math.clamp(aimSmoothing, 0, 1)
     local newCFrame = Cam.CFrame:Lerp(desiredCFrame, alpha)
-    pcall(function() Cam.CFrame = newCFrame end)
+    pcall(function()
+        Cam.CFrame = newCFrame
+    end, function(err)
+        warn("Aimlock: Failed to set Cam.CFrame - " .. tostring(err))
+    end)
 end)
 
 Run.Heartbeat:Connect(function()
@@ -1571,7 +1614,21 @@ local function handleCommandText(raw)
         if args[2] then
             local target = findClosestPlayer(args[2])
             if target then
-                toggleSelectPlayer(target)
+                if selected == target then
+                    untarget()
+                else
+                    if selected then
+                        untarget()
+                    end
+                    selected = target
+                    if chamsTargetEnabled then
+                        addHighlightToPlayer(target)
+                    end
+                    if tracerTargetEnabled then
+                        createTracer(target)
+                    end
+                    Notify(string.format("Selected %s (@%s)", target.DisplayName or target.Name, target.Name), 3)
+                end
             else
                 Notify("Player not found!", 2)
             end
@@ -1883,6 +1940,16 @@ AimlockSection:Toggle({
         Notify("Aimlock: " .. (state and "ON" or "OFF"), 2)
     end
 })
+
+AimlockSection:Keybind({
+    Flag = "SelectKey",
+    Title = "Select Target Key",
+    Desc = "Key to select or untarget a player",
+    Value = tostring(selectKey):match("Enum%.KeyCode%.(.+)") or "Q",
+    Callback = function(v)
+        selectKey = Enum.KeyCode[v]
+    end
+})
 AimlockSection:Toggle({
     Title = "View Target",
     Value = viewEnabled,
@@ -1962,6 +2029,46 @@ AimlockSection:Dropdown({
     Callback = function(value)
         currentHitPart = value
         Notify("Hit Part set to " .. value, 2)
+    end
+})
+
+local TriggerbotSection = AimlockTab:Section({ Title = "Triggerbot Settings" })
+
+-- Replace MakeButton with WindUI Toggle for AutoShoot
+TriggerbotSection:Toggle({
+    Title = "AutoShoot",
+    Value = tbEnabled,
+    Callback = function(state)
+        tbEnabled = state
+        Notify("AutoShoot: " .. (state and "ON" or "OFF"), 2)
+    end
+})
+
+TriggerbotSection:Keybind({
+    Flag = "TriggerbotKey",
+    Title = "Triggerbot Key",
+    Desc = "Key to toggle triggerbot",
+    Value = tostring(triggerbotKey):match("Enum%.KeyCode%.(.+)") or "Z",
+    Callback = function(v)
+        triggerbotKey = Enum.KeyCode[v]
+        tbEnabled = not tbEnabled
+    end
+})
+
+TriggerbotSection:Slider({
+    Title = "Triggerbot FOV",
+    Value = {Min=5, Max=50, Default=fovRadius, Step=1},
+    Callback = function(v)
+        fovRadius = v
+        Notify("Triggerbot FOV set to " .. v, 2)
+    end
+})
+TriggerbotSection:Toggle({
+    Title = "Target Only",
+    Value = targetOnly,
+    Callback = function(state)
+        targetOnly = state
+        Notify("Target Only: " .. (state and "ON" or "OFF"), 2)
     end
 })
 
@@ -2165,6 +2272,10 @@ MiscSection:Toggle({
     end
 })
 
+MiscSection:Toggle({ Title = "Fly", Value = flyEnabled, Callback = function(state) toggleFly(state) end })
+MiscSection:Slider({ Title = "Fly Speed", Value = {Min=10, Max=500, Default=flySpeed, Step=1}, Callback = function(v) flySpeed = v; Notify("Fly Speed set to " .. v, 2) end })
+MiscSection:Keybind({Flag="FlyToggleKey",Title="Fly Toggle Key",Desc="Key to toggle fly mode",Value="F",Callback=function(v) flyEnabled=not flyEnabled;toggleFly(flyEnabled);Notify("Fly: "..(flyEnabled and "ON" or "OFF"),2) end})
+
 MiscSection:Slider({
     Title = "WalkSpeed",
     Value = { Min = 16, Max = 500, Default = SpeedAmount, Step = 1 },
@@ -2197,9 +2308,38 @@ WorldSection:Dropdown({ Title = "Theme", Values = {"Neon", "Sunset", "Nature", "
     Lighting.FogColor = theme.Fog
 
     boxESPColor = theme.BoxColor
-    boxESPOutlineColor = theme.BoxOutline  -- If you want outline support; add a variable if needed
+    boxESPOutlineColor = theme.BoxOutline
     nameESPColor = theme.NameColor
     healthBoxESPColor = theme.HealthColor
+    targetChamsColor = theme.targetChamsColor
+    targetTracerColor = theme.targetTracerColor
+    if selected and chamsTargetEnabled then
+        local hl = createOrGetHighlightForPlayer(selected)
+        hl.FillColor = theme.targetChamsColor
+        hl.OutlineColor = theme.targetChamsColor
+    end
+    if selected and tracerTargetEnabled then
+        removeTracer(selected)
+        createTracer(selected)
+    end
+
+    -- Set GUI theme based on themeName
+    if themeName == "Neon" then
+        WindUI:SetTheme("Sky")
+    elseif themeName == "Sunset" then
+        WindUI:SetTheme("Amber")
+    elseif themeName == "Nature" then
+        WindUI:SetTheme("Plant")
+    elseif themeName == "DarkViolet" then
+        WindUI:SetTheme("Violet")
+    elseif themeName == "Cyberpunk" then
+        WindUI:SetTheme("CottonCandy")
+    elseif themeName == "Ocean" then
+        WindUI:SetTheme("Sky")
+    elseif themeName == "Lava" then
+        WindUI:SetTheme("Red")
+    end
+    -- Default theme does not change GUI theme
 end })
 WorldSection:Colorpicker({ Title = "Ambient", Default = Lighting.Ambient, Callback = function(c) Lighting.Ambient = c end })
 WorldSection:Colorpicker({ Title = "Outdoor Ambient", Default = Lighting.OutdoorAmbient, Callback = function(c) Lighting.OutdoorAmbient = c end })
