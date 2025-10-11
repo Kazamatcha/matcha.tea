@@ -8,6 +8,7 @@ local LocalPlayer = Players.LocalPlayer
 local LP      = Players.LocalPlayer
 local Mouse   = LP:GetMouse()
 local Cam     = workspace.CurrentCamera
+local Lighting = game:GetService("Lighting")
 local rs = game:GetService("RunService")
 local uis = game:GetService("UserInputService")
 local lp = game.Players.LocalPlayer
@@ -122,6 +123,97 @@ local SpeedAmount = 200
 local boxESPs = {}
 local healthBars = {}
 local nameLabels = {}
+
+local themes = {
+    Neon = {
+        FOVColor = Color3.fromRGB(0,255,220),
+        LineColor = Color3.fromRGB(200,255,250),
+        BoxColor = Color3.fromRGB(0,200,255),
+        BoxOutline = Color3.fromRGB(20,20,25),
+        NameColor = Color3.fromRGB(250,250,250),
+        HealthColor = Color3.fromRGB(0,255,160),
+        WorldAmbient = Color3.fromRGB(60,80,100),
+        WorldOutdoor = Color3.fromRGB(20,120,180),
+        Fog = Color3.fromRGB(20,100,130),
+    },
+    Sunset = {
+        FOVColor = Color3.fromRGB(255,150,40),
+        LineColor = Color3.fromRGB(255,100,30),
+        BoxColor = Color3.fromRGB(255,120,60),
+        BoxOutline = Color3.fromRGB(18,10,8),
+        NameColor = Color3.fromRGB(255,235,200),
+        HealthColor = Color3.fromRGB(255,200,80),
+        WorldAmbient = Color3.fromRGB(80,40,30),
+        WorldOutdoor = Color3.fromRGB(180,90,50),
+        Fog = Color3.fromRGB(120,60,40),
+    },
+    Nature = {
+        FOVColor = Color3.fromRGB(70,220,110),
+        LineColor = Color3.fromRGB(120,200,150),
+        BoxColor = Color3.fromRGB(30,170,80),
+        BoxOutline = Color3.fromRGB(8,20,10),
+        NameColor = Color3.fromRGB(220,255,220),
+        HealthColor = Color3.fromRGB(40,255,90),
+        WorldAmbient = Color3.fromRGB(30,60,40),
+        WorldOutdoor = Color3.fromRGB(60,120,80),
+        Fog = Color3.fromRGB(40,80,60),
+    },
+    DarkViolet = {
+        FOVColor = Color3.fromRGB(200,40,200),
+        LineColor = Color3.fromRGB(255,60,180),
+        BoxColor = Color3.fromRGB(160,90,255),
+        BoxOutline = Color3.fromRGB(12,8,20),
+        NameColor = Color3.fromRGB(255,200,255),
+        HealthColor = Color3.fromRGB(220,30,140),
+        WorldAmbient = Color3.fromRGB(20,10,30),
+        WorldOutdoor = Color3.fromRGB(80,40,120),
+        Fog = Color3.fromRGB(60,20,80),
+    },
+    Cyberpunk = {
+        FOVColor = Color3.fromRGB(255,20,147),
+        LineColor = Color3.fromRGB(255,105,180),
+        BoxColor = Color3.fromRGB(138,43,226),
+        BoxOutline = Color3.fromRGB(10,10,20),
+        NameColor = Color3.fromRGB(255,255,255),
+        HealthColor = Color3.fromRGB(0,255,255),
+        WorldAmbient = Color3.fromRGB(50,20,60),
+        WorldOutdoor = Color3.fromRGB(100,50,120),
+        Fog = Color3.fromRGB(80,30,100),
+    },
+    Ocean = {
+        FOVColor = Color3.fromRGB(0,191,255),
+        LineColor = Color3.fromRGB(135,206,250),
+        BoxColor = Color3.fromRGB(70,130,180),
+        BoxOutline = Color3.fromRGB(10,20,30),
+        NameColor = Color3.fromRGB(240,255,255),
+        HealthColor = Color3.fromRGB(0,255,255),
+        WorldAmbient = Color3.fromRGB(40,60,80),
+        WorldOutdoor = Color3.fromRGB(80,120,160),
+        Fog = Color3.fromRGB(50,100,150),
+    },
+    Lava = {
+        FOVColor = Color3.fromRGB(255,69,0),
+        LineColor = Color3.fromRGB(255,99,71),
+        BoxColor = Color3.fromRGB(178,34,34),
+        BoxOutline = Color3.fromRGB(20,10,10),
+        NameColor = Color3.fromRGB(255,245,238),
+        HealthColor = Color3.fromRGB(255,140,0),
+        WorldAmbient = Color3.fromRGB(80,30,20),
+        WorldOutdoor = Color3.fromRGB(120,50,40),
+        Fog = Color3.fromRGB(100,40,30),
+    },
+    Default = {
+        FOVColor = Color3.fromRGB(255,255,255),
+        LineColor = Color3.fromRGB(255,255,255),
+        BoxColor = Color3.fromRGB(255,255,255),
+        BoxOutline = Color3.fromRGB(0,0,0),
+        NameColor = Color3.fromRGB(255,255,255),
+        HealthColor = Color3.fromRGB(0,255,0),
+        WorldAmbient = Lighting.Ambient,
+        WorldOutdoor = Lighting.OutdoorAmbient,
+        Fog = Lighting.FogColor,
+    }
+}
 
 -- Hàm GetPart cho airpart
 local function GetPart(target)
@@ -1188,7 +1280,9 @@ Run.Heartbeat:Connect(function()
             ping = 60 -- Giá trị mặc định nếu lỗi
         end
 
-        if ping > 100 then
+        if ping > 110 then
+            predictionTime = 0.1502
+        elseif ping > 100 then
             predictionTime = 0.1475
         elseif ping > 90 then
             predictionTime = 0.1446
@@ -1651,6 +1745,7 @@ local Window = WindUI:CreateWindow({
 local AimlockTab = Window:Tab({ Title = "Aimlock", Icon = "target" })
 local VisualESPTab = Window:Tab({ Title = "Visual ESP", Icon = "eye" })
 local MiscTab = Window:Tab({ Title = "Misc", Icon = "settings" })
+local WorldTab = Window:Tab({ Title = "World", Icon = "globe" })
 local SettingsTab = Window:Tab({ Title = "Settings", Icon = "settings-2" })
 
 -- Logic antilock
@@ -1663,98 +1758,120 @@ RunService.Heartbeat:Connect(function()
     end 
 end)
 
--- ESP functions
-local function createBoxESP(plr)
-    if boxESPs[plr] then return end
-    local box = Drawing.new("Square")
-    box.Visible = false
-    box.Color = boxESPColor
-    box.Thickness = 1
-    box.Filled = false
-    boxESPs[plr] = box
+-- ESP functions (modified)
+local ESP = {}
 
-    local healthBar = Drawing.new("Line")
-    healthBar.Visible = false
-    healthBar.Color = healthBoxESPColor
-    healthBar.Thickness = 2
-    healthBars[plr] = healthBar
-
-    local nameLabel = Drawing.new("Text")
-    nameLabel.Visible = false
-    nameLabel.Color = nameESPColor
-    nameLabel.Size = 16
-    nameLabel.Center = true
-    nameLabel.Outline = true
-    nameLabels[plr] = nameLabel
+local function createESP(plr)
+    if plr == LocalPlayer then return end
+    if ESP[plr] then return end
+    local t = {}
+    t.boxOutline = Drawing.new("Square")
+    t.boxOutline.Color = Color3.fromRGB(0, 0, 0)
+    t.boxOutline.Thickness = 2
+    t.boxOutline.Filled = false
+    t.boxOutline.Visible = false
+    t.box = Drawing.new("Square")
+    t.box.Color = boxESPColor
+    t.box.Thickness = 1
+    t.box.Filled = false
+    t.box.Visible = false
+    t.healthLine = Drawing.new("Line")
+    t.healthLine.Color = healthBoxESPColor
+    t.healthLine.Thickness = 2
+    t.healthLine.Visible = false
+    t.name = Drawing.new("Text")
+    t.name.Color = nameESPColor
+    t.name.Size = 14
+    t.name.Center = true
+    t.name.Outline = true
+    t.name.Visible = false
+    t.healthText = Drawing.new("Text")
+    t.healthText.Color = healthBoxESPColor
+    t.healthText.Size = 13
+    t.healthText.Center = true
+    t.healthText.Outline = true
+    t.healthText.Visible = false
+    ESP[plr] = t
 end
 
 local function updateESP()
-    for _, plr in pairs(Players:GetPlayers()) do
-        if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") and plr.Character:FindFirstChild("Head") then
-            local root = plr.Character.HumanoidRootPart
-            local head = plr.Character.Head
+    for plr, draws in pairs(ESP) do
+        draws.boxOutline.Color = Color3.fromRGB(0, 0, 0)
+        draws.box.Color = boxESPColor
+        draws.name.Color = nameESPColor
+        draws.healthLine.Color = healthBoxESPColor
+        draws.healthText.Color = healthBoxESPColor
+
+        if isAlive(plr) and plr.Character then
+            local root = plr.Character:FindFirstChild("HumanoidRootPart") or plr.Character:FindFirstChild("Torso")
+            local head = plr.Character:FindFirstChild("Head") or root
             local hum = plr.Character:FindFirstChildOfClass("Humanoid")
-            local vector, onScreen = Cam:WorldToViewportPoint(root.Position)
+            if root and head and hum then
+                local top, onScreenTop = Cam:WorldToViewportPoint(head.Position + Vector3.new(0,0.4,0))
+                local bottom, onScreenBottom = Cam:WorldToViewportPoint(root.Position - Vector3.new(0,1,0))
+                if not onScreenTop or not onScreenBottom then
+                    for _,v in pairs(draws) do v.Visible = false end
+                else
+                    local sizeY = math.abs(bottom.Y - top.Y)
+                    if sizeY < 2 then
+                        for _,v in pairs(draws) do v.Visible = false end
+                    else
+                        local sizeX = sizeY / 2
+                        local posX, posY = top.X - sizeX/2, top.Y
 
-            if onScreen then
-                local box = boxESPs[plr]
-                if boxESPEnabled and box then
-                    local headPos = Cam:WorldToViewportPoint(head.Position + Vector3.new(0, 0.5, 0))
-                    local legPos = Cam:WorldToViewportPoint(root.Position - Vector3.new(0, 3, 0))
-                    box.Size = Vector2.new(math.abs(headPos.X - legPos.X) * 1.5, math.abs(headPos.Y - legPos.Y) * 1.2)
-                    box.Position = Vector2.new(math.min(headPos.X, legPos.X) - box.Size.X / 3, math.min(headPos.Y, legPos.Y))
-                    box.Visible = true
-                    box.Color = boxESPColor
-                elseif box then
-                    box.Visible = false
-                end
+                        draws.boxOutline.Visible = boxESPEnabled
+                        draws.boxOutline.Position = Vector2.new(posX, posY)
+                        draws.boxOutline.Size = Vector2.new(sizeX, sizeY)
 
-                local healthBar = healthBars[plr]
-                if healthBoxESPEnabled and healthBar and hum then
-                    local healthRatio = hum.Health / hum.MaxHealth
-                    healthBar.From = Vector2.new(box.Position.X - 5, box.Position.Y + box.Size.Y)
-                    healthBar.To = Vector2.new(box.Position.X - 5, box.Position.Y + box.Size.Y * (1 - healthRatio))
-                    healthBar.Visible = true
-                    healthBar.Color = healthBoxESPColor
-                elseif healthBar then
-                    healthBar.Visible = false
-                end
+                        draws.box.Visible = boxESPEnabled
+                        draws.box.Position = Vector2.new(posX, posY)
+                        draws.box.Size = Vector2.new(sizeX, sizeY)
 
-                local nameLabel = nameLabels[plr]
-                if nameESPEnabled and nameLabel then
-                    nameLabel.Text = plr.Name
-                    nameLabel.Position = Vector2.new(box.Position.X + box.Size.X / 2, box.Position.Y - 20)
-                    nameLabel.Visible = true
-                    nameLabel.Color = nameESPColor
-                elseif nameLabel then
-                    nameLabel.Visible = false
+                        draws.name.Visible = nameESPEnabled
+                        draws.name.Text = plr.Name
+                        draws.name.Position = Vector2.new(posX + sizeX/2, posY - 14)
+
+                        local hp = hum.Health or 0
+                        local maxhp = hum.MaxHealth or 100
+                        local ratio = math.clamp(hp / (maxhp ~= 0 and maxhp or 1), 0, 1)
+                        local from = Vector2.new(posX - 6, posY + sizeY)
+                        local to = Vector2.new(posX - 6, posY + sizeY * (1 - ratio))
+                        draws.healthLine.Visible = healthBoxESPEnabled
+                        draws.healthLine.From = from
+                        draws.healthLine.To = to
+
+                        draws.healthText.Visible = healthBoxESPEnabled
+                        draws.healthText.Text = tostring(math.floor(hp))
+                        draws.healthText.Position = Vector2.new(posX - 18, (to.Y - 8))
+                    end
                 end
             else
-                if boxESPs[plr] then boxESPs[plr].Visible = false end
-                if healthBars[plr] then healthBars[plr].Visible = false end
-                if nameLabels[plr] then nameLabels[plr].Visible = false end
+                for _,v in pairs(draws) do v.Visible = false end
             end
+        else
+            for _,v in pairs(draws) do v.Visible = false end
         end
     end
 end
 
-Run.RenderStepped:Connect(updateESP)
-
-Players.PlayerAdded:Connect(function(plr)
-    createBoxESP(plr)
-end)
-
+-- Replace old connections and calls
+Players.PlayerAdded:Connect(createESP)
 for _, plr in pairs(Players:GetPlayers()) do
     if plr ~= LocalPlayer then
-        createBoxESP(plr)
+        createESP(plr)
     end
 end
 
 Players.PlayerRemoving:Connect(function(plr)
-    if boxESPs[plr] then boxESPs[plr]:Remove() boxESPs[plr] = nil end
-    if healthBars[plr] then healthBars[plr]:Remove() healthBars[plr] = nil end
-    if nameLabels[plr] then nameLabels[plr]:Remove() nameLabels[plr] = nil end
+    if ESP[plr] then
+        for _, v in pairs(ESP[plr]) do
+            v:Remove()
+        end
+        ESP[plr] = nil
+    end
 end)
+
+Run.RenderStepped:Connect(updateESP)
 
 -- UI với WindUI
 local AimlockSection = AimlockTab:Section({ Title = "Aimlock Settings" })
@@ -2072,77 +2189,42 @@ MiscSection:Dropdown({
     end
 })
 
+local WorldSection = WorldTab:Section({ Title = "Lighting Settings" })
+WorldSection:Dropdown({ Title = "Theme", Values = {"Neon", "Sunset", "Nature", "DarkViolet", "Cyberpunk", "Ocean", "Lava", "Default"}, Value = "Default", Callback = function(themeName)
+    local theme = themes[themeName]
+    Lighting.Ambient = theme.WorldAmbient
+    Lighting.OutdoorAmbient = theme.WorldOutdoor
+    Lighting.FogColor = theme.Fog
+
+    boxESPColor = theme.BoxColor
+    boxESPOutlineColor = theme.BoxOutline  -- If you want outline support; add a variable if needed
+    nameESPColor = theme.NameColor
+    healthBoxESPColor = theme.HealthColor
+end })
+WorldSection:Colorpicker({ Title = "Ambient", Default = Lighting.Ambient, Callback = function(c) Lighting.Ambient = c end })
+WorldSection:Colorpicker({ Title = "Outdoor Ambient", Default = Lighting.OutdoorAmbient, Callback = function(c) Lighting.OutdoorAmbient = c end })
+WorldSection:Colorpicker({ Title = "Fog Color", Default = Lighting.FogColor, Callback = function(c) Lighting.FogColor = c end })
+WorldSection:Slider({ Title = "Brightness", Value = {Min=0, Max=10, Default=Lighting.Brightness}, Callback = function(v) Lighting.Brightness = v end })
+WorldSection:Slider({ Title = "Clock Time", Value = {Min=0, Max=24, Default=Lighting.ClockTime}, Callback = function(v) Lighting.ClockTime = v end })
+WorldSection:Slider({ Title = "Exposure", Value = {Min=-10, Max=10, Default=Lighting.ExposureCompensation}, Callback = function(v) Lighting.ExposureCompensation = v end })
+
 local AppearanceSection = SettingsTab:Section({ Title = "Appearance" })
-local themes = {}
-for themeName, _ in pairs(WindUI:GetThemes()) do
-    table.insert(themes, themeName)
-end
-table.sort(themes)
+local themeList = {}
+for themeName in pairs(WindUI:GetThemes()) do table.insert(themeList, themeName) end
+table.sort(themeList)
+AppearanceSection:Dropdown({ Title = "Select Theme", Values = themeList, Value = WindUI:GetCurrentTheme(), Callback = function(v) WindUI:SetTheme(v) end })
+AppearanceSection:Slider({ Title = "Window Transparency", Value = {Min=0, Max=1, Default=WindUI.TransparencyValue, Step=0.1}, Callback = function(v) WindUI.TransparencyValue = v Window:ToggleTransparency(v > 0) end })
+AppearanceSection:Toggle({ Title = "Dark Mode", Value = WindUI:GetCurrentTheme() == "Dark", Callback = function(v) WindUI:SetTheme(v and "Dark" or "Light") end })
 
-AppearanceSection:Dropdown({
-    Title = "Select Theme",
-    Values = themes,
-    Value = WindUI:GetCurrentTheme(),
-    Callback = function(theme)
-        WindUI:SetTheme(theme)
-        WindUI:Notify({ Title = "Theme Changed", Content = "Applied: " .. theme, Duration = 2 })
-    end
-})
-AppearanceSection:Slider({
-    Title = "Window Transparency",
-    Value = { Min = 0, Max = 1, Default = WindUI.TransparencyValue, Step = 0.1 },
-    Callback = function(value)
-        WindUI.TransparencyValue = value
-        Window:ToggleTransparency(value > 0)
-        WindUI:Notify({ Title = "Transparency Updated", Content = "Set to: " .. value, Duration = 2 })
-    end
-})
-AppearanceSection:Toggle({
-    Title = "Dark Mode",
-    Value = WindUI:GetCurrentTheme() == "Dark",
-    Callback = function(state)
-        WindUI:SetTheme(state and "Dark" or "Light")
-    end
-})
 local UtilitiesSection = SettingsTab:Section({ Title = "Utilities" })
-UtilitiesSection:Toggle({
-    Title = "Show GUI",
-    Value = true,
-    Callback = function(state)
-        Window:SetVisible(state)  -- Giả sử WindUI có method SetVisible, nếu không thì dùng Window.Frame.Visible = state
-        WindUI:Notify({ Title = "GUI Visibility", Content = state and "Shown" or "Hidden", Duration = 2 })
-    end
-})
-UtilitiesSection:Button({
-    Title = "Rejoin Server",
-    Callback = function()
-        TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
-        WindUI:Notify({ Title = "Rejoining...", Duration = 2 })
-    end
-})
-UtilitiesSection:Button({
-    Title = "Server Hop",
-    Callback = function()
-        -- Lấy list server từ HttpService hoặc API Roblox
-        local servers = game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100")
-        local serverList = game:GetService("HttpService"):JSONDecode(servers)
-        local randomServer = serverList.data[math.random(1, #serverList.data)]
-        TeleportService:TeleportToPlaceInstance(game.PlaceId, randomServer.id)
-        WindUI:Notify({ Title = "Hopping to new server...", Duration = 2 })
-    end
-})
-UtilitiesSection:Button({
-    Title = "Unload Script",
-    Callback = function()
-        Window:Destroy()  -- Hoặc unload toàn bộ script
-        WindUI:Notify({ Title = "Script Unloaded", Duration = 2 })
-        -- Thêm code để disconnect all connections nếu cần
-    end
-})
+UtilitiesSection:Toggle({ Title = "Show GUI", Value = true, Callback = function(v) Window:SetVisible(v) end })
+UtilitiesSection:Button({ Title = "Rejoin Server", Callback = function() game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer) end })
+UtilitiesSection:Button({ Title = "Server Hop", Callback = function()
+    local servers = game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100")
+    local serverList = game:GetService("HttpService"):JSONDecode(servers)
+    local randomServer = serverList.data[math.random(1, #serverList.data)]
+    game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, randomServer.id)
+end })
+UtilitiesSection:Button({ Title = "Unload Script", Callback = function() Window:Destroy() end })
 
--- Thông báo khởi động
-WindUI:Notify({
-    Title = "Betuyen.cc Loaded!",
-    Content = "Script loaded successfully",
-    Duration = 5
-})
+WindUI:Notify({ Title = "Betuyen.cc Loaded!", Content = "Script loaded successfully", Duration = 5 })
