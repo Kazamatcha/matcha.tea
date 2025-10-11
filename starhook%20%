@@ -221,6 +221,14 @@ local game_support = {
         BulletName = "Part",
         BulletBeamName = "gb",
         BulletPath = workspace
+    [101072334878729] = {
+        Number = 7,
+        Name = "Da Aim",
+        Remote = "MAINEVENT",
+        Argument = "MOUSE",
+        BulletName = "Part",
+        BulletBeamName = "gb",
+        BulletPath = workspace
     },
     [11143225577] = {
         Number = 8,
