@@ -1,3 +1,106 @@
+-- LocalScript trong StarterPlayerScripts
+
+local Players = game:GetService("Players")
+local StarterCharacterScripts = game:GetService("StarterPlayer"):WaitForChild("StarterCharacterScripts")
+local player = Players.LocalPlayer
+
+-- GUI
+local ScreenGui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
+ScreenGui.Name = "CharScriptsViewer"
+
+local Frame = Instance.new("Frame", ScreenGui)
+Frame.Size = UDim2.new(0, 400, 0, 400)
+Frame.Position = UDim2.new(0, 50, 0, 100)
+Frame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+Frame.BorderSizePixel = 0
+
+local Title = Instance.new("TextLabel", Frame)
+Title.Size = UDim2.new(1, 0, 0, 30)
+Title.Text = "StarterCharacterScripts Viewer"
+Title.TextColor3 = Color3.new(1,1,1)
+Title.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+Title.BorderSizePixel = 0
+Title.Font = Enum.Font.SourceSansBold
+Title.TextSize = 18
+
+local Scrolling = Instance.new("ScrollingFrame", Frame)
+Scrolling.Size = UDim2.new(1, -10, 1, -40)
+Scrolling.Position = UDim2.new(0, 5, 0, 35)
+Scrolling.CanvasSize = UDim2.new(0,0,0,0)
+Scrolling.ScrollBarThickness = 6
+Scrolling.BackgroundTransparency = 1
+
+local UIListLayout = Instance.new("UIListLayout", Scrolling)
+UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+UIListLayout.Padding = UDim.new(0,2)
+
+-- copy path
+local function getFullPath(obj)
+    local path = obj.Name
+    local parent = obj.Parent
+    while parent and parent ~= game do
+        path = parent.Name .. "." .. path
+        parent = parent.Parent
+    end
+    return "game."..path
+end
+
+-- table để lưu trạng thái folder mở/đóng
+local folderStates = {}
+
+-- tạo button
+local function createButton(obj, indent)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, -10, 0, 25)
+    btn.TextXAlignment = Enum.TextXAlignment.Left
+    btn.Text = string.rep("   ", indent) .. obj.Name .. " ("..obj.ClassName..")"
+    btn.TextColor3 = Color3.new(1,1,1)
+    btn.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+    btn.BorderSizePixel = 0
+    btn.Font = Enum.Font.SourceSans
+    btn.TextSize = 16
+
+    if obj:IsA("Folder") then
+        btn.MouseButton1Click:Connect(function()
+            folderStates[obj] = not folderStates[obj]
+            refreshList()
+        end)
+    else
+        btn.MouseButton1Click:Connect(function()
+            setclipboard(getFullPath(obj)) -- copy path
+        end)
+    end
+
+    return btn
+end
+
+-- hàm vẽ danh sách
+function refreshList()
+    for _,v in ipairs(Scrolling:GetChildren()) do
+        if v:IsA("TextButton") then v:Destroy() end
+    end
+
+    local function addChildren(parent, indent)
+        for _,child in ipairs(parent:GetChildren()) do
+            local btn = createButton(child, indent)
+            btn.Parent = Scrolling
+
+            -- nếu là folder và đang mở thì vẽ thêm con
+            if child:IsA("Folder") and folderStates[child] then
+                addChildren(child, indent+1)
+            end
+        end
+    end
+
+    addChildren(StarterCharacterScripts, 0)
+    Scrolling.CanvasSize = UDim2.new(0,0,0,UIListLayout.AbsoluteContentSize.Y+10)
+end
+
+-- cập nhật khi thay đổi
+StarterCharacterScripts.ChildAdded:Connect(refreshList)
+StarterCharacterScripts.ChildRemoved:Connect(refreshList)
+
+refreshList()
 
 
 --// ScreenGui
