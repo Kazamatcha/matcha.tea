@@ -88,11 +88,11 @@ local State = {
     FlyEnabled = FlyCfg.Enabled,
     SpeedEnabled = SpeedCfg.Enabled
 }
-
--- Standalone Walkspeed Variables
-local WalkspeedEnabled = false
-local WalkspeedAmount = 200
-local WalkspeedKeybind = Enum.KeyCode.T
+if not WalkspeedEnabled then
+    local WalkspeedEnabled = false
+    local WalkspeedAmount = 200
+    local WalkspeedKeybind = Enum.KeyCode.T
+end
 
 -- helper to store connections so we can disconnect easily
 local function addConnection(conn)
