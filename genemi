@@ -1,0 +1,208 @@
+
+-- ⚠️ Cảnh báo: Sử dụng API key cá nhân của bạn. Đừng chia sẻ public!
+local API_KEY = "AIzaSyAy4i8yiIVyo2c9pU6I5Qhjp8yijs9aJ-E"
+
+local HttpService = game:GetService("HttpService")
+local Players = game:GetService("Players")
+local LP = Players.LocalPlayer
+-- get your api key here: https://aistudio.google.com/app/api-keys
+-- Tạo GUI
+local ScreenGui = Instance.new("ScreenGui")
+local Frame = Instance.new("Frame")
+local ChatBox = Instance.new("ScrollingFrame")
+local Input = Instance.new("TextBox")
+local Send = Instance.new("TextButton")
+local UIList = Instance.new("UIListLayout")
+
+ScreenGui.Name = "GeminiChat"
+ScreenGui.Parent = game.CoreGui
+
+Frame.Size = UDim2.new(0, 400, 0, 300)
+Frame.Position = UDim2.new(0.5, -200, 0.7, -150)
+Frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+Frame.BorderSizePixel = 0
+Frame.Active = true
+Frame.Draggable = true
+Frame.Parent = ScreenGui
+
+ChatBox.Size = UDim2.new(1, -10, 0.8, -10)
+ChatBox.Position = UDim2.new(0, 5, 0, 5)
+ChatBox.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+ChatBox.ScrollBarThickness = 6
+ChatBox.BorderSizePixel = 0
+ChatBox.Parent = Frame
+
+UIList.Parent = ChatBox
+UIList.SortOrder = Enum.SortOrder.LayoutOrder
+UIList.Padding = UDim.new(0, 5)
+
+Input.Size = UDim2.new(0.75, -10, 0.15, -5)
+Input.Position = UDim2.new(0, 5, 0.85, 0)
+Input.PlaceholderText = "Nhập tin nhắn..."
+Input.TextColor3 = Color3.fromRGB(255, 255, 255)
+Input.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+Input.BorderSizePixel = 0
+Input.Parent = Frame
+
+Send.Size = UDim2.new(0.25, -5, 0.15, -5)
+Send.Position = UDim2.new(0.75, 0, 0.85, 0)
+Send.Text = "Gửi"
+Send.BackgroundColor3 = Color3.fromRGB(0, 120, 255)
+Send.TextColor3 = Color3.new(1, 1, 1)
+Send.BorderSizePixel = 0
+Send.Parent = Frame
+
+-- Hàm thêm tin nhắn vào khung chat
+local function AddMessage(text, isAI)
+	local msg = Instance.new("TextLabel")
+	msg.Size = UDim2.new(1, -5, 0, 30)
+	msg.TextWrapped = true
+	msg.TextXAlignment = Enum.TextXAlignment.Left
+	msg.BackgroundTransparency = 1
+	msg.Font = Enum.Font.Gotham
+	msg.TextSize = 16
+	msg.TextColor3 = isAI and Color3.fromRGB(0, 200, 255) or Color3.fromRGB(255, 255, 255)
+	msg.Text = text
+	msg.Parent = ChatBox
+
+	ChatBox.CanvasSize = UDim2.new(0, 0, 0, UIList.AbsoluteContentSize.Y + 10)
+end
+
+-- Hàm gọi API Gemini
+local function TalkToGemini(message)
+	local body = HttpService:JSONEncode({
+		contents = {{
+			parts = {{
+				text = message
+			}}
+		}}
+	})
+
+	local ok, res = pcall(function()
+		return request({
+			Url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
+			Method = "POST",
+			Headers = {
+				["Content-Type"] = "application/json",
+				["X-goog-api-key"] = API_KEY
+			},
+			Body = body
+		})
+	end)
+
+	if ok and res and res.Body then
+		local success, data = pcall(function()
+			return HttpService:JSONDecode(res.Body)
+		end)
+
+		if success and data and data.candidates and data.candidates[1] then
+			local text = data.candidates[1].content.parts[1].text
+			if text then
+				AddMessage("Gemini: " .. text:gsub("[\r\n]", " "), true)
+			end
+		else
+			AddMessage("[Lỗi] Không thể đọc phản hồi từ Gemini", true)
+		end
+	else
+		AddMessage("[Lỗi] Không thể kết nối đến Gemini", true)
+	end
+end
+
+-- Gửi khi nhấn nút
+Send.MouseButton1Click:Connect(function()
+	local msg = Input.Text
+	if msg ~= "" then
+		AddMessage("Bạn: " .. msg, false)
+		Input.Text = ""
+		TalkToGemini(msg)
+	end
+end)
+
+-- Gửi khi nhấn Enter
+Input.FocusLost:Connect(function(enterPressed)
+	if enterPressed and Input.Text ~= "" then
+		AddMessage("Bạn: " .. Input.Text, false)
+		local txt = Input.Text
+		Input.Text = ""
+		TalkToGemini(txt)
+	end
+end)
+
+--[[
+	trả lời người khác
+]]
+
+HttpService = game:GetService("HttpService")
+TextChatService = game:GetService("TextChatService")
+Players = game:GetService("Players")
+LP = Players.LocalPlayer
+LastMsg = nil
+
+API_KEY = "YOUR API KEY HERE" 
+
+-- get your api key here: https://aistudio.google.com/app/api-keys
+
+MAX_DISTANCE = 15 
+
+-- Maximum distance to respond to a player
+
+function Say(text)
+	text = text:sub(1, 190)
+	coroutine.wrap(function()
+		pcall(function()
+			TextChatService.TextChannels.RBXGeneral:SendAsync(text)
+		end)
+	end)()
+end
+
+function Gemini(player, message)
+	local body = HttpService:JSONEncode({
+		contents = {{ parts = {{ text = message }} }}
+	})
+	local ok, res = pcall(function()
+		return request({
+			Url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
+			Method = "POST",
+			Headers = {
+				["Content-Type"] = "application/json",
+				["X-goog-api-key"] = API_KEY
+			},
+			Body = body
+		})
+	end)
+	if not ok or not res or not res.Body then return end
+	local success, data = pcall(function()
+		return HttpService:JSONDecode(res.Body)
+	end)
+	if success and data and data.candidates and data.candidates[1] and data.candidates[1].content and data.candidates[1].content.parts then
+		local text = data.candidates[1].content.parts[1].text
+		if text then
+			Say("[" .. player.DisplayName .. "]: " .. text:gsub("[\r\n]", " "))
+		end
+	end
+end
+
+TextChatService.OnBubbleAdded = function(msg)
+	local src = msg.TextSource
+	if not src or not src.UserId then return end
+
+	local plr = Players:GetPlayerByUserId(src.UserId)
+	if not plr or plr == LP then return end
+
+	local c1, c2 = LP.Character, plr.Character
+	if not c1 or not c2 then return end
+
+	local h1, h2 = c1:FindFirstChild("HumanoidRootPart"), c2:FindFirstChild("HumanoidRootPart")
+	if not h1 or not h2 or (h1.Position - h2.Position).Magnitude > MAX_DISTANCE then return end
+
+	local t = msg.Text
+	if t:gsub("%s+", "") == "" or t == "#" then return end
+
+	local id = plr.UserId .. "|" .. t
+	if id == LastMsg then return end
+	LastMsg = id
+
+	task.spawn(function()
+		Gemini(plr, t)
+	end)
+end
