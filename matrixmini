@@ -1,0 +1,582 @@
+-- Author: anhchangm52
+
+-- ======================
+-- ===  Settings (keep) ==
+-- ======================
+if not getgenv().MTXClient_Settings then
+    getgenv().MTXClient_Settings = {
+        ["Aim"] = {
+            ["AimPart"] = "Head",
+            ["AimlockKey"] = "q",
+            ["AimRadius"] = 35,
+            ["LookAt"] = true
+        },
+        ["Fov"] = {
+            ["Enabled"] = true,
+            ["Fov_Radius"] = 35,
+            ["insidefov_Visible"] = false,
+            ["insidefov_Color"] = Color3.fromRGB(105, 0, 255),
+            ["insidefov_transparency"] = 0.3,
+            ["outsidefov_Visible"] = true,
+            ["outsidefov_Color"] = Color3.fromRGB(208, 240, 253),
+            ["outsidefov_transparency"] = 1
+        },
+        ["ClientFly"] = {
+            ["Enabled"] = false,
+            ["Keybind"] = Enum.KeyCode.F,
+            ["Speed"] = 200
+        },
+        ["Speed"] = {
+            ["Enabled"] = false,
+            ["Keybind"] = Enum.KeyCode.Z,
+            ["amount"] = 20
+        },
+        ["Verifications"] = {
+            ["ThirdPerson"] = true,
+            ["FirstPerson"] = true,
+            ["TeamCheck"] = false,
+            ["K_O"] = true,
+            ["Grabing"] = true
+        },
+        ["Utility"] = {
+            ["NoSlow"] = true,
+            ["AntiGroundShots"] = true,
+            ["Notifications"] = true
+        },
+        ["Predict"] = {
+            ["PredictMovement"] = true,
+            ["PredictionVelocity"] = 7,
+            ["AirPrediction"] = true,
+            ["AirPredictionValue"] = 0.145
+        }
+    }
+end
+
+local Settings = getgenv().MTXClient_Settings
+
+-- ======================
+-- ===  Services  =======
+-- ======================
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local StarterGui = game:GetService("StarterGui")
+local Workspace = game:GetService("Workspace")
+
+-- ======================
+-- ===  Shortcuts  ======
+-- ======================
+local LocalPlayer = Players.LocalPlayer
+local Camera = Workspace.CurrentCamera
+local AimCfg = Settings.Aim
+local FovCfg = Settings.Fov
+local FlyCfg = Settings.ClientFly
+local SpeedCfg = Settings.Speed
+local UtilCfg = Settings.Utility
+local PredCfg = Settings.Predict
+
+-- ======================
+-- ===  State  ==========
+-- ======================
+local State = {
+    Aimlocked = false,
+    Target = nil,
+    Connections = {},
+    Drawing = {},
+    FlyEnabled = FlyCfg.Enabled,
+    SpeedEnabled = SpeedCfg.Enabled
+}
+
+-- Standalone Walkspeed Variables
+local WalkspeedEnabled = false
+local WalkspeedAmount = 200
+local WalkspeedKeybind = Enum.KeyCode.T
+
+-- helper to store connections so we can disconnect easily
+local function addConnection(conn)
+    table.insert(State.Connections, conn)
+    return conn
+end
+
+local function disconnectAll()
+    for _, c in ipairs(State.Connections) do
+        if c and c.Disconnect then
+            pcall(function() c:Disconnect() end)
+        end
+    end
+    State.Connections = {}
+end
+
+-- safe cloneref (if executor provides)
+local cloneref = cloneref or function(...) return ... end
+
+-- ======================
+-- ===  Utilities  ======
+-- ======================
+local Utils = {}
+
+function Utils.hasCharacter(player)
+    return player and player.Character and player.Character:FindFirstChild("Humanoid")
+end
+
+function Utils.isGrabbedOrKO(player)
+    if not player or not player.Character then return false end
+    local char = player.Character
+    local be = char:FindFirstChild("BodyEffects")
+    if Settings.Verifications["K_O"] and be and be:FindFirstChild("K.O") and be["K.O"].Value then
+        return true
+    end
+    if Settings.Verifications["Grabing"] and char:FindFirstChild("GRABBING_CONSTRAINT") then
+        return true
+    end
+    return false
+end
+
+function Utils.isInAir(char)
+    if not char or not char:FindFirstChild("Humanoid") then return false end
+    return char.Humanoid.FloorMaterial == Enum.Material.Air
+end
+
+function Utils.isFalling(player)
+    if not Utils.hasCharacter(player) then return false end
+    return player.Character.Humanoid:GetState() == Enum.HumanoidStateType.Freefall
+end
+
+-- notifications (simple)
+local Notifications = {}
+function Notifications.notify(opts)
+    if not UtilCfg.Notifications then return end
+    local title = opts.Title or "MTX Client"
+    local desc = opts.Description or ""
+    local dur = opts.Duration or 2
+
+    pcall(function()
+        StarterGui:SetCore("SendNotification", {
+            Title = title;
+            Text = desc;
+            Duration = dur;
+        })
+    end)
+end
+
+local introGui = Instance.new("ScreenGui")
+introGui.Name = "Matrix Mini"
+introGui.IgnoreGuiInset = true
+introGui.ResetOnSpawn = false
+introGui.DisplayOrder = 99999
+introGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+local bg = Instance.new("Frame")
+bg.Size = UDim2.new(1, 0, 1, 0)
+bg.BackgroundColor3 = Color3.new(0, 0, 0)
+bg.BackgroundTransparency = 1
+bg.Parent = introGui
+
+local title = Instance.new("TextLabel")
+title.AnchorPoint = Vector2.new(0.5, 0.5)
+title.Position = UDim2.new(0.5, 0, 0.5, 0)
+title.Size = UDim2.new(0, 400, 0, 120)
+title.Text = "DhuyxDtuyen"
+title.Font = Enum.Font.GothamBlack
+title.TextColor3 = Color3.fromRGB(92, 169, 221)
+title.TextScaled = true
+title.TextTransparency = 1
+title.BackgroundTransparency = 1
+title.Parent = introGui
+
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 12)
+corner.Parent = title
+
+local gradient = Instance.new("UIGradient")
+gradient.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(208, 240, 253)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(92, 169, 221))
+}
+gradient.Rotation = 45
+gradient.Parent = title
+
+-- Hiệu ứng fade in
+TweenService:Create(title, TweenInfo.new(1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.In), {TextTransparency = 0}):Play()
+TweenService:Create(bg, TweenInfo.new(1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.In), {BackgroundTransparency = 0.4}):Play()
+
+-- Hiệu ứng fade out
+task.delay(4, function()
+    TweenService:Create(title, TweenInfo.new(1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {TextTransparency = 1}):Play()
+    TweenService:Create(bg, TweenInfo.new(1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {BackgroundTransparency = 1}):Play()
+    task.delay(1.5, function()
+        introGui:Destroy()
+    end)
+end)
+
+-- ======================
+-- ===  Drawing FOV  =====
+-- ======================
+local function initFovDrawing()
+    local ok, Drawing = pcall(function() return Drawing end)
+    if not ok then return end
+
+    local outside = Drawing.new("Circle")
+    outside.Visible = false
+    outside.Radius = FovCfg.Fov_Radius * 3
+    outside.Color = FovCfg.outsidefov_Color
+    outside.Transparency = FovCfg.outsidefov_transparency
+    outside.Thickness = 2
+    outside.NumSides = 64
+
+    local inside = Drawing.new("Circle")
+    inside.Visible = false
+    inside.Radius = FovCfg.Fov_Radius * 3
+    inside.Filled = true
+    inside.Color = FovCfg.insidefov_Color
+    inside.Transparency = FovCfg.insidefov_transparency
+    inside.NumSides = 64
+
+    State.Drawing.fov_out = outside
+    State.Drawing.fov_in = inside
+end
+
+local function updateFovDrawing()
+    local inside = State.Drawing.fov_in
+    local outside = State.Drawing.fov_out
+    if not inside or not outside then return end
+
+    if FovCfg.Enabled then
+        local radius = FovCfg.Fov_Radius * 3
+        inside.Visible = FovCfg.insidefov_Visible
+        inside.Radius = radius
+        inside.Color = FovCfg.insidefov_Color
+        inside.Transparency = FovCfg.insidefov_transparency
+        inside.Position = UserInputService:GetMouseLocation()
+
+        outside.Visible = FovCfg.outsidefov_Visible
+        outside.Radius = radius
+        outside.Color = FovCfg.outsidefov_Color
+        outside.Transparency = FovCfg.outsidefov_transparency
+        outside.Position = UserInputService:GetMouseLocation()
+    else
+        inside.Visible = false
+        outside.Visible = false
+    end
+end
+
+-- ======================
+-- ===  Aim System  =====
+-- ======================
+local function getNearestTarget()
+    local players = {}
+    for _, pl in pairs(Players:GetPlayers()) do
+        if pl ~= LocalPlayer then
+            table.insert(players, pl)
+        end
+    end
+
+    local candidates = {}
+    local diffs = {}
+
+    for _, pl in ipairs(players) do
+        if pl.Character and pl.Character:FindFirstChild("Head") then
+            local head = pl.Character.Head
+            local dist = (head.Position - Camera.CFrame.Position).Magnitude
+            local mouseHit = LocalPlayer:GetMouse().Hit.p
+            local dir = (mouseHit - Camera.CFrame.p).Unit * dist
+            local ray = Ray.new(Camera.CFrame.p, dir)
+            local hitPart, hitPoint = Workspace:FindPartOnRay(ray, Workspace)
+            local diff = math.floor((hitPoint - head.Position).Magnitude)
+            candidates[pl.Name] = {distance = dist, player = pl, diff = diff}
+            table.insert(diffs, diff)
+        end
+    end
+
+    if #diffs == 0 then return nil end
+    local minDiff = math.min(unpack(diffs))
+    if minDiff > AimCfg.AimRadius then return nil end
+
+    for name, info in pairs(candidates) do
+        if info.diff == minDiff then
+            return info.player
+        end
+    end
+    return nil
+end
+
+local function validTarget(pl)
+    if not pl or not pl.Character then return false end
+    if Utils.isGrabbedOrKO(pl) then return false end
+    return true
+end
+
+local function aimTick(delta)
+    if not State.Aimlocked or not State.Target then return end
+    if not validTarget(State.Target) then
+        State.Target = nil
+        State.Aimlocked = false
+        Notifications.notify({Title = "MTX Client", Description = "Target lost", Duration = 1})
+        return
+    end
+
+    local tgtPart = State.Target.Character:FindFirstChild(AimCfg.AimPart)
+    if not tgtPart then
+        State.Target = nil
+        State.Aimlocked = false
+        return
+    end
+
+    local aimPos = tgtPart.Position
+
+    if PredCfg.PredictMovement then
+        aimPos = aimPos + tgtPart.Velocity / PredCfg.PredictionVelocity
+    end
+
+    if Utils.isInAir(tgtPart.Parent) and PredCfg.AirPrediction then
+        aimPos = aimPos + tgtPart.Velocity * PredCfg.AirPredictionValue
+    end
+
+    if UtilCfg.AntiGroundShots then
+        local part = State.Target.Character:FindFirstChild(tgtPart.Name)
+        if part and part.Velocity and part.Velocity.Y < 0 then
+            part.Velocity = Vector3.new(part.Velocity.X, 0, part.Velocity.Z)
+            if part.AssemblyLinearVelocity then
+                part.AssemblyLinearVelocity = Vector3.new(part.AssemblyLinearVelocity.X, 0, part.AssemblyLinearVelocity.Z)
+            end
+        end
+    end
+
+    if AimCfg.LookAt and Utils.hasCharacter(LocalPlayer) and State.Target and Utils.hasCharacter(State.Target) then
+        local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        local tr = State.Target.Character and State.Target.Character:FindFirstChild("HumanoidRootPart")
+        if root and tr then
+            root.CFrame = CFrame.new(root.CFrame.Position, Vector3.new(tr.CFrame.X, root.CFrame.Position.Y, tr.CFrame.Z))
+        end
+    end
+
+    Camera.CFrame = CFrame.new(Camera.CFrame.Position, aimPos)
+end
+
+-- key press handler for aimlock
+addConnection(UserInputService.InputBegan:Connect(function(input, gpe)
+    if gpe then return end
+    local keyName = tostring(input.KeyCode):gsub("Enum.KeyCode.", ""):lower()
+    local configured = tostring(AimCfg.AimlockKey):lower()
+    local pressed = ""
+    if input.UserInputType == Enum.UserInputType.Keyboard then
+        pressed = tostring(input.KeyCode):gsub("Enum.KeyCode.", ""):lower()
+    end
+    if pressed == configured then
+        if not State.Aimlocked then
+            pcall(function()
+                State.Target = getNearestTarget()
+                if State.Target then
+                    State.Aimlocked = true
+                    Notifications.notify({Title = "MTX Client", Description = "Target : " .. State.Target.Name, Duration = 1})
+                else
+                    Notifications.notify({Title = "MTX Client", Description = "No valid target found", Duration = 1})
+                end
+            end)
+        else
+            State.Target = nil
+            State.Aimlocked = false
+            Notifications.notify({Title = "MTX Client", Description = "Target : nil", Duration = 1})
+        end
+    end
+end))
+
+-- ======================
+-- ===  Fly System  =====
+-- ======================
+local function toggleFly()
+    State.FlyEnabled = not State.FlyEnabled
+    Settings.ClientFly.Enabled = State.FlyEnabled
+    Notifications.notify({Title = "MTX Client", Description = "Client Fly : " .. tostring(State.FlyEnabled), Duration = 1})
+end
+
+-- ======================
+-- ===  Walkspeed System ===
+-- ======================
+local function applyStats(humanoid)
+    if not humanoid then return end
+
+    if WalkspeedEnabled then
+        humanoid.WalkSpeed = WalkspeedAmount
+        humanoid.JumpPower = 80
+    else
+        humanoid.WalkSpeed = 18
+        humanoid.JumpPower = 55
+    end
+
+    -- Protect against game resets
+    humanoid:GetPropertyChangedSignal("WalkSpeed"):Connect(function()
+        if WalkspeedEnabled then
+            humanoid.WalkSpeed = WalkspeedAmount
+        end
+    end)
+    humanoid:GetPropertyChangedSignal("JumpPower"):Connect(function()
+        if WalkspeedEnabled then
+            humanoid.JumpPower = 80
+        end
+    end)
+end
+
+-- Handle character added for walkspeed
+addConnection(LocalPlayer.CharacterAdded:Connect(function(char)
+    local humanoid = char:WaitForChild("Humanoid")
+    applyStats(humanoid)
+end))
+
+-- Apply walkspeed to current character if it exists
+if Utils.hasCharacter(LocalPlayer) then
+    local humanoid = LocalPlayer.Character:FindFirstChild("Humanoid")
+    if humanoid then
+        applyStats(humanoid)
+    end
+end
+
+addConnection(UserInputService.InputBegan:Connect(function(input, gpe)
+    if gpe then return end
+    if input.KeyCode == FlyCfg.Keybind then
+        toggleFly()
+    end
+    if input.KeyCode == SpeedCfg.Keybind then
+        State.SpeedEnabled = not State.SpeedEnabled
+        Settings.Speed.Enabled = State.SpeedEnabled
+        Notifications.notify({Title = "MTX Client", Description = "Speed : " .. tostring(State.SpeedEnabled), Duration = 1})
+    end
+    if input.KeyCode == WalkspeedKeybind then
+        WalkspeedEnabled = not WalkspeedEnabled
+        if Utils.hasCharacter(LocalPlayer) then
+            local humanoid = LocalPlayer.Character:FindFirstChild("Humanoid")
+            if humanoid then
+                applyStats(humanoid)
+            end
+        end
+        Notifications.notify({Title = "MTX Client", Description = "Walkspeed : " .. tostring(WalkspeedEnabled), Duration = 1})
+    end
+end))
+
+local function updateFly(dt)
+    if not State.FlyEnabled then return end
+    if not Utils.hasCharacter(LocalPlayer) then return end
+    local char = LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+
+    local flySpeed = FlyCfg.Speed or 25
+    local moveDirection = Vector3.new(0, 0, 0)
+
+    if UserInputService.TouchEnabled then
+        local joystick = UserInputService:GetJoystickState(Enum.UserInputType.Touch)
+        for _, state in ipairs(joystick) do
+            moveDirection = moveDirection + Vector3.new(state.Position.X, 0, -state.Position.Y)
+        end
+        local lookDir = Camera.CFrame.LookVector
+        if lookDir.Y > 0.1 then
+            moveDirection = moveDirection + Vector3.new(0, 1, 0)
+        elseif lookDir.Y < -0.1 then
+            moveDirection = moveDirection + Vector3.new(0, -1, 0)
+        end
+    else
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+            moveDirection = moveDirection + Vector3.new(0, 1, 0)
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
+            moveDirection = moveDirection + Vector3.new(0, -1, 0)
+        end
+
+        local camLook = Camera.CFrame.LookVector
+        local camRight = Camera.CFrame.RightVector
+
+        local inputX = (UserInputService:IsKeyDown(Enum.KeyCode.D) and 1 or 0) - (UserInputService:IsKeyDown(Enum.KeyCode.A) and 1 or 0)
+        local inputZ = (UserInputService:IsKeyDown(Enum.KeyCode.S) and 1 or 0) - (UserInputService:IsKeyDown(Enum.KeyCode.W) and 1 or 0)
+
+        moveDirection = moveDirection + (camLook * -inputZ + camRight * inputX)
+    end
+
+    if moveDirection.Magnitude > 0 then
+        hrp.Velocity = moveDirection.Unit * (FlyCfg.Speed or 25)
+    else
+        hrp.Velocity = Vector3.new(0, 0, 0)
+    end
+end
+
+local function updateSpeed(dt)
+    if not State.SpeedEnabled then return end
+    if not Utils.hasCharacter(LocalPlayer) then return end
+    local char = LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    local hum = char and char:FindFirstChild("Humanoid")
+    if not hrp or not hum then return end
+
+    local amt = SpeedCfg.amount or 20
+    local moveDir = hum.MoveDirection
+    if moveDir.Magnitude > 0 then
+        hrp.CFrame = hrp.CFrame + moveDir * (amt / 8)
+    end
+end
+
+local function applyNoSlow()
+    if not UtilCfg.NoSlow then return end
+    if not Utils.hasCharacter(LocalPlayer) then return end
+    local char = LocalPlayer.Character
+    local be = char:FindFirstChild("BodyEffects")
+    if be and be:FindFirstChild("Reload") and be.Reload.Value then
+        pcall(function() be.Reload.Value = false end)
+    end
+
+    local move = be and be:FindFirstChild("Movement")
+    if move then
+        local s = move:FindFirstChild("NoJumping") or move:FindFirstChild("NoWalkSpeed") or move:FindFirstChild("ReduceWalk")
+        if s then
+            pcall(function() s:Destroy() end)
+        end
+    end
+end
+
+local function applyAntiGroundShots()
+end
+
+local function bypassAnticheat()
+    pcall(function()
+        if LocalPlayer and LocalPlayer.Character then
+            for _, child in pairs(LocalPlayer.Character:GetChildren()) do
+                if child:IsA("Script") and child.Name ~= "Health" and child.Name ~= "Sound" and child:FindFirstChild("LocalScript") then
+                    pcall(function() child:Destroy() end)
+                    print("Bypassing Anticheat Scripts!")
+                end
+            end
+        end
+    end)
+end
+
+initFovDrawing()
+
+addConnection(RunService.RenderStepped:Connect(function(dt)
+    updateFovDrawing()
+end))
+
+addConnection(RunService.Heartbeat:Connect(function(dt)
+    if State.Aimlocked and State.Target then
+        pcall(function() aimTick(dt) end)
+    end
+
+    pcall(function() updateFly(dt) end)
+    pcall(function() updateSpeed(dt) end)
+
+    pcall(function() if UtilCfg.NoSlow then applyNoSlow() end end)
+end))
+
+bypassAnticheat()
+
+Notifications.notify({Title = "MTX Client", Description = "Matrix Mini", Duration = 3})
+
+print("MTX Client initialized.")
+
+local function Shutdown()
+    if State.Drawing and State.Drawing.fov_in then pcall(function() State.Drawing.fov_in:Remove() end) end
+    if State.Drawing and State.Drawing.fov_out then pcall(function() State.Drawing.fov_out:Remove() end) end
+    disconnectAll()
+    Notifications.notify({Title = "MTX Client", Description = "Shut down", Duration = 2})
+end
+
+getgenv().MTXClient_Shutdown = Shutdown
