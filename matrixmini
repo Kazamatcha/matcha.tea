@@ -88,11 +88,6 @@ local State = {
     FlyEnabled = FlyCfg.Enabled,
     SpeedEnabled = SpeedCfg.Enabled
 }
-if not WalkspeedEnabled then
-    local WalkspeedEnabled = false
-    local WalkspeedAmount = 200
-    local WalkspeedKeybind = Enum.KeyCode.T
-end
 
 -- helper to store connections so we can disconnect easily
 local function addConnection(conn)
@@ -398,8 +393,8 @@ end
 local function applyStats(humanoid)
     if not humanoid then return end
 
-    if WalkspeedEnabled then
-        humanoid.WalkSpeed = WalkspeedAmount
+    if getgenv().WalkspeedEnabled then
+        humanoid.WalkSpeed = getgenv().WalkspeedAmount
         humanoid.JumpPower = 80
     else
         humanoid.WalkSpeed = 18
@@ -408,12 +403,12 @@ local function applyStats(humanoid)
 
     -- Protect against game resets
     humanoid:GetPropertyChangedSignal("WalkSpeed"):Connect(function()
-        if WalkspeedEnabled then
-            humanoid.WalkSpeed = WalkspeedAmount
+        if getgenv().WalkspeedEnabled then
+            humanoid.WalkSpeed = getgenv().WalkspeedAmount
         end
     end)
     humanoid:GetPropertyChangedSignal("JumpPower"):Connect(function()
-        if WalkspeedEnabled then
+        if getgenv().WalkspeedEnabled then
             humanoid.JumpPower = 80
         end
     end)
@@ -443,15 +438,15 @@ addConnection(UserInputService.InputBegan:Connect(function(input, gpe)
         Settings.Speed.Enabled = State.SpeedEnabled
         Notifications.notify({Title = "MTX Client", Description = "Speed : " .. tostring(State.SpeedEnabled), Duration = 1})
     end
-    if input.KeyCode == WalkspeedKeybind then
-        WalkspeedEnabled = not WalkspeedEnabled
+    if input.KeyCode == getgenv().WalkspeedKeybind then
+        getgenv().WalkspeedEnabled = not getgenv().WalkspeedEnabled
         if Utils.hasCharacter(LocalPlayer) then
             local humanoid = LocalPlayer.Character:FindFirstChild("Humanoid")
             if humanoid then
                 applyStats(humanoid)
             end
         end
-        Notifications.notify({Title = "MTX Client", Description = "Walkspeed : " .. tostring(WalkspeedEnabled), Duration = 1})
+        Notifications.notify({Title = "MTX Client", Description = "Walkspeed : " .. tostring(getgenv().WalkspeedEnabled), Duration = 1})
     end
 end))
 
