@@ -772,7 +772,7 @@ local lockid = "rbxassetid://140623923630784"
 
 local function untarget()
     if selected then
-        Notify("Untargeted " .. selected.Name, 2)
+        Notify("Untargeted ", 2)
         if chamsTargetEnabled then removeHighlightFromPlayer(selected) end
         if tracerTargetEnabled then removeTracer(selected) end
         selected = nil
