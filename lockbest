@@ -1344,7 +1344,7 @@ Run.Heartbeat:Connect(function()
     end
 end)
 
-Run.RenderStepped:Connect(function(dt)
+Run.RenderStepped:Connect(function()
     local char = LocalPlayer.Character
     if not char then return end
     local tool = char:FindFirstChildWhichIsA("Tool")
@@ -1354,6 +1354,9 @@ Run.RenderStepped:Connect(function(dt)
         MainRemote:FireServer("Reload", tool)
         task.wait(3.7)
     end
+end)
+
+Run.RenderStepped:Connect(function(dt)
     if not aimlockEnabled or not selected then return end
     local isValid, reason = filterTarget(selected)
     if not isValid then return end
