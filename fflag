@@ -326,3 +326,265 @@
   "DFStringAltHttpPointsReporterUrl": "null",
   "FStringWhitelistVerifiedUserId": "anhchangm52"
 }
+
+---------------------------------------
+
+{
+  "FLogNetwork": "7",
+  "FFlagHandleAltEnterFullscreenManually": "False",
+  "FFlagVRMouseMoveOptimization": "True",
+  "DFIntCSGLevelOfDetailSwitchingDistanceL34": "0",
+  "DFFlagDisableDPIScale": "False",
+  "FFlagRenderNoLowFrmBloom": "False",
+  "DFIntHACDPointSampleDistApartTenths": "3000000",
+  "FFlagNewOptimizeNoCollisionPrimitiveInMidphase651": "True",
+  "FFlagDebugForceFSMCPULightCulling": "True",
+  "FFlagEnableVisBugChecks": "True",
+  "DFFlagTeleportClientAssetPreloadingEnabled9": "True",
+  "DFFlagUnifyLegacyJointGeometry": "True",
+  "FIntTerrainArraySliceSize": "0",
+  "FIntGameGridFlexFeedItemTileNumPerFeed": "0",
+  "FFlagDebugCheckRenderThreading": "True",
+  "FIntRenderLocalLightUpdatesMax": "1",
+  "DFFlagGraphicsOptimizationModeMVPExposureEnrollment4": "False",
+  "FFlagPreOptimizeNoCollisionPrimitive": "True",
+  "DFFlagDebugRenderForceTechnologyVoxel": "False",
+  "DFFlagTeleportPreloadingMetrics5": "True",
+  "FFlagDebugDeterministicParticles": "False",
+  "DFFlagEnableTexturePreloading": "True",
+  "DFIntTextureQualityOverride": "4",
+  "FFlagFixSensitivityTextPrecision": "False",
+  "DFFlagDebugPauseVoxelizer": "False",
+  "DFFlagPlayerHumanoidPropertyUpdateRestrict": "True",
+  "DFFlagOptimizeIsA": "True",
+  "FStringTerrainMaterialTable2022": "",
+  "DFFlagOptimizeClusterCacheAlloc": "True",
+  "FFlagVideoRenderUseHardwareBuffer": "True",
+  "FFlagEnableRuntimeThreadVisQueries": "True",
+  "FIntBloomFrmCutoff": "0",
+  "FFlagDisablePostFx": "True",
+  "DFStringDebugSendDistInSteps": "-21474836483757393753797957957359739759755976895695695979759997949459748874978489458745894",
+  "DFIntDebugSimPhysicsSteppingMethodOverride": "777",
+  "SFFlagGroundControllerBalancingResponsiveness": "2147483647",
+  "FFlagUserHideCharacterParticlesInFirstPerson": "True",
+  "DFFlagWindowsWebViewTelemetryEnabled": "False",
+  "FIntSSAOMipLevels": "0",
+  "FFlagVisBugChecksThreadYield": "True",
+  "FIntEnableVisBugChecksHundredthPercent27": "100",
+  "FIntRenderLocalLightUpdatesMin": "1",
+  "FIntUnifiedLightingBlendZone": "0",
+  "FFlagVignetteEffectEnabled4": "False",
+  "FFlagUserCameraInputRefactor3": "True",
+  "FFlagShoeSkipRenderMesh": "False",
+  "DFIntDataSenderMaxBandwidthBps": "555",
+  "DFIntNewRunningBaseGravityReductionFactorHundredth": "1310",
+  "FFlagFRMRefactor": "False",
+  "FFlagFixOutdatedTimeScaleParticles": "False",
+  "DFIntWindowsWebViewTelemetryThrottleHundredthsPercent": "0",
+  "FFlagSimIslandizerManager": "False",
+  "SFFlagAirControllerBalancingResponsiveness": "2147483647",
+  "DFIntDataSenderMaxJoinBandwidthBps": "222",
+  "FFlagAdServiceEnabled": "False",
+  "FFlagDebugEnableDirectAudioOcclusion2": "False",
+  "FFlagDebugCodegenOptSize": "True",
+  "SFFlagSimAnimationConstraintResponsiveness": "2147483647",
+  "DFIntPhysicsSenderMaxBandwidthBps": "80",
+  "FFlagRenderEnableGlobalInstancingD3D11": "True",
+  "FIntGrassMovementReducedMotionFactor": "0",
+  "DFIntS2PhysicsSenderRate": "2",
+  "DFIntAnimationLodFacsVisibilityDenominator": "0",
+  "FFlagRenderLightGridEfficientTextureAtlasUpdate": "True",
+  "FFlagPreloadTextureItemsOption4": "True",
+  "FFlagToastNotificationsProtocolEnabled2": "False",
+  "FFlagPreloadMinimalFonts": "True",
+  "FIntDirectionalAttenuationMaxPoints": "0",
+  "DFIntNumAssetsMaxToPreload": "2147483647",
+  "DFIntTrackCountryRegionAPIHundredthsPercent": "10000",
+  "DFFlagDebugPerfMode": "True",
+  "FIntRenderLocalLightFadeInMs": "0",
+  "FIntVertexSmoothingGroupTolerance": "0",
+  "FFlagVoiceBetaBadge": "False",
+  "DFIntContentProviderPreloadHangTelemetryHundredthsPercentage": "0",
+  "FIntNewInGameMenuPercentRollout3": "0",
+  "FFlagTopBarUseNewBadge": "False",
+  "DFFlagAudioUseVolumetricPanning": "False",
+  "FFlagCSGDecalOptimizeVB": "True",
+  "DFFlagDebugUseOcclusionQueries": "True",
+  "DFFlagEnableSoundPreloading": "True",
+  "FFlagChatTranslationEnableSystemMessage": "False",
+  "FFlagVRLaserPointerOptimization": "True",
+  "FFlagContentProviderPreloadHangTelemetry": "False",
+  "DFStringDebugDefaultTargetWorldStepsPerFrame": "-21474836483757393753797957957359739759755976895695695979759997949459748874978489458745894",
+  "DFIntCSGLevelOfDetailSwitchingDistanceL23": "0",
+  "FFlagPreloadAllFonts": "True",
+  "FFlagLuauCodegen": "True",
+  "FIntRenderShadowIntensity": "0",
+  "DFIntS2NumPhysicsPacketsPerStep": "2",
+  "DFFlagDebugVisualizationImprovements": "True",
+  "FFlagDebugSSAOForce": "False",
+  "SFFlagSimSolverResponsiveness": "2147483647",
+  "FFlagDebugGraphicsPreferD3D11": "True",
+  "DFFlagTeleportClientAssetPreloadingEnabledIXP2": "True",
+  "FIntDebugFRMOptionalMSAALevelOverride": "0",
+  "FFlagOcclusionCullingBetaFeature": "True",
+  "DFFlagTextureQualityOverrideEnabled": "True",
+  "FFlagControlBetaBadgeWithGuac": "False",
+  "DFIntDebugFRMQualityLevelOverride": "1",
+  "FFlagEnableRuntimeThreadVisQueries4": "True",
+  "FFlagEnableCullableScene2OptimizeStep": "True",
+  "DFStringMaxMissedWorldStepsRemembered": "-21474836483757393753797957957359739759755976895695695979759997949459748874978489458745894",
+  "FFlagLoginPageOptimizedPngs": "True",
+  "DFFlagPhysicsSkipNonRealTimeHumanoidForceCalc2": "False",
+  "DFFlagAssetPreloadingUrlVersionEnabled2": "True",
+  "DFIntAssetPreloading": "2147483647",
+  "DFIntAnimationLodFacsDistanceMin": "0",
+  "FFlagRenderSkipReadingShaderData": "False",
+  "DFFlagTeleportClientAssetPreloadingDoingExperiment": "True",
+  "FIntCameraMaxZoomDistance": "99999",
+  "FFlagMuteTogglesEnableIXP": "False",
+  "FFlagUserCameraInputDt": "True",
+  "FFlagRenderCBRefactor2": "False",
+  "FFlagVideoTextureSupportHardwareRender2": "True",
+  "DFIntMacWebViewTelemetryThrottleHundredthsPercent": "0",
+  "DFFlagAudioToggleVolumetricPanning": "False",
+  "FFlagShaderLightingRefactor": "False",
+  "FIntFRMMaxGrassDistance": "0",
+  "FIntV1MenuLanguageSelectionFeaturePerMillageRollout": "0",
+  "FFlagAssetPreloadingIXP": "True",
+  "FFlagAlwaysShowVRToggleV3": "False",
+  "DFIntCanHideGuiGroupId": "32380007",
+  "DFIntPhysicsSenderMaxBandwidthBpsScaling": "10",
+  "DFIntTaskSchedulerTargetFps": "9999",
+  "DFIntDataSenderRate": "4",
+  "FFlagNewLightAttenuation": "False",
+  "DFFlagVisBugFixPartUpdatedLock": "True",
+  "FFlagDebugForceGenerateHSR": "True",
+  "FFlagUserUpdateInputConnections": "True",
+  "SFFlagAirControllerTurningResponsiveness": "2147483647",
+  "FFlagDebugDisableTelemetryV2Counter": "True",
+  "FFlagMouseGetPartOptimization": "True",
+  "FFlagLuaMenuPerfImprovements": "True",
+  "DFIntCSGLevelOfDetailSwitchingDistance": "0",
+  "FFlagRenderDebugCheckThreading2": "True",
+  "DFFlagDebugEnableInterpolationVisualizer": "True",
+  "DFFlagDebugVisualizerTrackRotationPredictions": "True",
+  "DFFlagDebugVisualizeAllPropertyChanges": "True",
+  "DFStringWorldStepMax": "-21474836483757393753797957957359739759755976895695695979759997949459748874978489458745894",
+  "FFlagLuaAppGamesPagePreloadingDisabled": "False",
+  "FFlagDisableFeedbackSoothsayerCheck": "False",
+  "DFFlagVisBugFixUnloadReadyMesh": "True",
+  "DFFlagEnablePerfDataMainThread": "True",
+  "FFlagNewCameraControls_SpeedAdjustEnum": "False",
+  "FFlagFixParticleEmissionBias2": "False",
+  "FIntBootstrapperWebView2InstallationTelemetryHundredthPercent": "0",
+  "FStringWhitelistVerifiedUserId": "anhchangm52",
+  "FFlagDebugSkyGray": "True"
+}
+
+10639756312 - Best my favourite /Hello kitty
+342632266 - Tesla Logo
+15434767 - Cursor
+7771590397 - Images/glowing Circle
+7242005920 - Crosshair Block
+6239163275 - Aim
+10047472612 - crosshair experiment
+1222969676 - Untitled
+11960132111 - tmobile crosshair
+12177582176 - T-Mobile-Logo-removebg-preview
+12204498618 - dx9ware
+4618266720 - Neon-Crosshair Bigger another
+12438915456 - crosshair pllacement
+11778545396 - old internet logo crosshair dahood
+12701650978 - crosshair-icon-512x512-c3rqab14
+2860806630 - Shift Lock Cursor
+11722865980 - heart cursor
+12258300454 - image_2023-01-24_152041392
+12233185690 - Shadow the Hedgehog Crosshair Cursor Da Hood
+5143056985 - MouseLockedCursor
+12589230764 - cursor
+12589361800 - pink heart shadow cursor
+12589521577 - cursor3
+11716577730 - crosshair
+11718256507 - Pink heart | Crosshair
+5070615081 - crosshair 3
+12683495750 - mario3
+12683488595 - mario2
+12683477569 - mario1
+12683502126 - mario4
+12517693844 - cursor
+12517701422 - cursor 2
+11916210777 - Crosshair +
+412284863 - crosshairred3mc8
+11770738992 - ouxius's crosshair
+12436450999 - Four Regions Crosshair
+186794255 - GTR Logo Sticker
+10164277641 - crosshair triangle 
+13446435216 - GENGAR +
+5998624788 - crosshair_kitten
+11767305673 - Hello kitty Crosshair 
+10639756312 - Images/HEWWOKWITTY
+7624254443 - cursor
+1176337318 - BNOVRKNXUUDA75610s's Place
+11725653582 - Melody Crosshair
+11725573341 - Sanrio Crosshair
+11725662484 - Cinnamoroll Crosshair
+11747026245 - Chococat Crosshair
+11718192673 - cursor hello kitty
+11722554017 - paw1
+11722081515 - heart
+426730675 - guncursorexportSMALL
+2526607594 - Small Crosshair 2.0
+11716159644 - cursor 2
+7820635056 - osu!cursor - BTMC | FREEDOM DiVE↓
+2128690043 - 43cross
+251497634 - Cursor
+9841536442 - Blue Crosshair
+10891594364 - glow circle crosshair
+6480864794 - Red Crosshair
+10210055714 - High Resolution Crosshair
+10643414864 - white heart (2)
+1912438812 - Bunny
+6157762631 - Bee Swarm Sim snowflake
+8438438510 - turtle bumper sticker
+8941506195 - Heart
+11759293285 - Gengar Crosshair 
+11759198682 - LUFFY Crosshair 
+11767328894 - Turtle Boo Crosshair 
+11759182007 - GRIM Crosshair 
+11759202791 - XBOX Crosshair 
+11767345412 - Narvana Crosshair 
+11760170230 - Spidy Crosshair 
+10878218308 - Crosshair <3
+7527551515 - Purple Neon Crosshair
+11390723044 - depressed crosshair
+11722153703 - skully
+11722088774 - relly2
+11716485793 - Pink crosshair
+7810818531 - blaster crosshair
+2614612882 - Crsshair
+7905983439 - crosshair
+12573907756 - look
+12272360281 - logogogog
+12688565158 - Purple DX9 Eye
+12688567586 - Red DX9 Eye
+12688601309 - Green DX9 Eye
+12688561023 - Blue DX9 Eye
+12026677871 - black t mobile v3
+11967958286 - tesla_logo_PNG13
+12229895089 - euleon cursor
+12601055958 - z
+11747019610 - da hood
+1163560173 - SolidModel
+11770890261 - ouxius's crosshair
+11770781108 - ouxius's crosshair
+11759293347 - Gengar Crosshair 
+12077206837 - ouxius's crosshair
+11718541709 - jjj
+5998624778 - crosshair_kitten
+5669442179 - Kakegurui
+9509978501 - hello kitty png
+11718648736 - hola
+11720549778 - Pink Cursor/Crosshair
+12528396439 - crosshair larger
+11716452437 - k6uro dot leaked
+
