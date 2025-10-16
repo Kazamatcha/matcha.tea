@@ -1,0 +1,2279 @@
+local Players = game:GetService("Players")
+local UIS     = game:GetService("UserInputService")
+local Run     = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local VIM = game:GetService("VirtualInputManager")
+local ReplicatedStorage = game:GetService('ReplicatedStorage')
+local LocalPlayer = Players.LocalPlayer
+local LP      = Players.LocalPlayer
+local Mouse   = LP:GetMouse()
+local Cam     = workspace.CurrentCamera
+local Lighting = game:GetService("Lighting")
+local rs = game:GetService("RunService")
+local uis = game:GetService("UserInputService")
+local lp = game.Players.LocalPlayer
+local nn_nojumpcooldown = true
+local inStomp = false
+local instantstomp = false
+local RapidFireEnabled = false
+local RapidFireDelay = 0
+local isFiring = false
+local utility = {}
+utility.get_gun = function()
+    local char = lp.Character
+    if not char then return nil end
+    for _, tool in next, char:GetChildren() do
+        if tool:IsA("Tool") and (tool:FindFirstChild("Ammo") or tool:FindFirstChild("AmmoCount") or tool:FindFirstChild("GunScript")) then
+            return tool
+        end
+    end
+end
+
+utility.rapid = function(tool)
+    tool:Activate()
+end
+
+-- Input bắt đầu (chuột hoặc cảm ứng)
+local rapidFireConnection
+rapidFireConnection = UIS.InputBegan:Connect(function(i, gp)
+    if gp then return end
+    if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+        local gun = utility.get_gun()
+        if RapidFireEnabled and gun and not isFiring then
+            isFiring = true
+            task.spawn(function()
+                while isFiring and RapidFireEnabled do
+                    utility.rapid(gun)
+                    task.wait(RapidFireDelay)
+                end
+            end)
+            Notify("RapidFire activated", 2)
+        end
+    end
+end)
+
+-- Input kết thúc (chuột hoặc cảm ứng)
+local rapidFireEndConnection
+rapidFireEndConnection = UIS.InputEnded:Connect(function(i)
+    if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+        isFiring = false
+        Notify("RapidFire stopped", 2)
+    end
+end)
+
+spawn(function()
+    Run.Heartbeat:Connect(function()
+        if nn_nojumpcooldown then
+            lp.Character.Humanoid.UseJumpPower = false
+        else
+            lp.Character.Humanoid.UseJumpPower = true
+        end
+    end)
+end)
+
+-- ====== CONFIG ======
+local selectKey    = Enum.KeyCode.Q
+local aimlockKey   = Enum.KeyCode.H
+local viewKey = Enum.KeyCode.B
+local predictionTime = 0.17221418
+local aimSmoothing = 1 
+local maxSelectPx = 99999 
+local AutoPingSets = true
+local wasAimlockEnabledBeforeKO = false
+
+-- ====== STATE ======
+local selected = nil
+local Notifications = {}
+local Notifications_Frame = nil
+local aimlockEnabled = true
+local viewEnabled = false
+local stomptarget = false 
+local flyEnabled = false
+local flySpeed = 100
+local joystickFlyConnection = nil
+
+local possibleRemotes = {
+    "MAINEVENT",
+    "MainEvent",
+    "Remote",
+    "Packages",
+    "MainRemotes",
+    "Bullets",
+    "Event",
+    "EVENT",
+    "MainRemoteEvent",
+}  
+
+-- Biến toàn cục cho các tính năng mới
+getgenv().antilock = false
+local resolverEnabled = true
+local useAirPart = true
+local airPart = "UpperTorso"
+local airPartsR15 = {"Head", "UpperTorso", "LowerTorso", "LeftUpperArm", "RightUpperArm", "LeftUpperLeg", "RightUpperLeg"}
+local airPartsR6 = {"Head", "Torso", "Left Arm", "Right Arm", "Left Leg", "Right Leg"}
+local currentHitPart = "Head"
+local chamsTargetEnabled = false
+local tracerTargetEnabled = false
+local targetChamsColor = Color3.fromRGB(214,112,122)
+local targetTracerColor = Color3.fromRGB(255, 255, 255)
+local boxESPEnabled = false
+local boxESPColor = Color3.fromRGB(255, 0, 0)
+local healthBoxESPEnabled = false
+local healthBoxESPColor = Color3.fromRGB(0, 255, 0)
+local nameESPEnabled = false
+local nameESPColor = Color3.fromRGB(255, 255, 255)
+local SpeedAmount = 200
+local boxESPs = {}
+local healthBars = {}
+local nameLabels = {}
+
+local themes = {
+    Neon = {
+        FOVColor = Color3.fromRGB(0,255,220),
+        LineColor = Color3.fromRGB(200,255,250),
+        BoxColor = Color3.fromRGB(0,200,255),
+        BoxOutline = Color3.fromRGB(20,20,25),
+        NameColor = Color3.fromRGB(250,250,250),
+        HealthColor = Color3.fromRGB(0,255,160),
+        WorldAmbient = Color3.fromRGB(60,80,100),
+        WorldOutdoor = Color3.fromRGB(20,120,180),
+        Fog = Color3.fromRGB(20,100,130),
+        targetChamsColor = Color3.fromRGB(0, 255, 220),  -- Neon cyan nổi bật
+        targetTracerColor = Color3.fromRGB(200, 255, 250),  -- Neon hồng nhạt
+    },
+    Sunset = {
+        FOVColor = Color3.fromRGB(255,150,40),
+        LineColor = Color3.fromRGB(255,100,30),
+        BoxColor = Color3.fromRGB(255,120,60),
+        BoxOutline = Color3.fromRGB(18,10,8),
+        NameColor = Color3.fromRGB(255,235,200),
+        HealthColor = Color3.fromRGB(255,200,80),
+        WorldAmbient = Color3.fromRGB(80,40,30),
+        WorldOutdoor = Color3.fromRGB(180,90,50),
+        Fog = Color3.fromRGB(120,60,40),
+        targetChamsColor = Color3.fromRGB(255, 150, 40),  -- Cam sunset
+        targetTracerColor = Color3.fromRGB(255, 100, 30),  -- Đỏ cam
+    },
+    Nature = {
+        FOVColor = Color3.fromRGB(70,220,110),
+        LineColor = Color3.fromRGB(120,200,150),
+        BoxColor = Color3.fromRGB(30,170,80),
+        BoxOutline = Color3.fromRGB(8,20,10),
+        NameColor = Color3.fromRGB(220,255,220),
+        HealthColor = Color3.fromRGB(40,255,90),
+        WorldAmbient = Color3.fromRGB(30,60,40),
+        WorldOutdoor = Color3.fromRGB(60,120,80),
+        Fog = Color3.fromRGB(40,80,60),
+        targetChamsColor = Color3.fromRGB(70, 220, 110),  -- Xanh lá tươi
+        targetTracerColor = Color3.fromRGB(120, 200, 150),  -- Xanh nhạt
+    },
+    DarkViolet = {
+        FOVColor = Color3.fromRGB(200,40,200),
+        LineColor = Color3.fromRGB(255,60,180),
+        BoxColor = Color3.fromRGB(160,90,255),
+        BoxOutline = Color3.fromRGB(12,8,20),
+        NameColor = Color3.fromRGB(255,200,255),
+        HealthColor = Color3.fromRGB(220,30,140),
+        WorldAmbient = Color3.fromRGB(20,10,30),
+        WorldOutdoor = Color3.fromRGB(80,40,120),
+        Fog = Color3.fromRGB(60,20,80),
+        targetChamsColor = Color3.fromRGB(200, 40, 200),  -- Tím đậm
+        targetTracerColor = Color3.fromRGB(255, 60, 180),  -- Hồng tím
+    },
+    Cyberpunk = {
+        FOVColor = Color3.fromRGB(255,20,147),
+        LineColor = Color3.fromRGB(255,105,180),
+        BoxColor = Color3.fromRGB(138,43,226),
+        BoxOutline = Color3.fromRGB(10,10,20),
+        NameColor = Color3.fromRGB(255,255,255),
+        HealthColor = Color3.fromRGB(0,255,255),
+        WorldAmbient = Color3.fromRGB(50,20,60),
+        WorldOutdoor = Color3.fromRGB(100,50,120),
+        Fog = Color3.fromRGB(80,30,100),
+        targetChamsColor = Color3.fromRGB(255, 20, 147),  -- Hồng neon cyber
+        targetTracerColor = Color3.fromRGB(255, 105, 180),  -- Hồng nhạt cyber
+    },
+    Ocean = {
+        FOVColor = Color3.fromRGB(0,191,255),
+        LineColor = Color3.fromRGB(135,206,250),
+        BoxColor = Color3.fromRGB(70,130,180),
+        BoxOutline = Color3.fromRGB(10,20,30),
+        NameColor = Color3.fromRGB(240,255,255),
+        HealthColor = Color3.fromRGB(0,255,255),
+        WorldAmbient = Color3.fromRGB(40,60,80),
+        WorldOutdoor = Color3.fromRGB(80,120,160),
+        Fog = Color3.fromRGB(50,100,150),
+        targetChamsColor = Color3.fromRGB(0, 191, 255),  -- Xanh dương ocean
+        targetTracerColor = Color3.fromRGB(135, 206, 250),  -- Xanh nhạt sky
+    },
+    Lava = {
+        FOVColor = Color3.fromRGB(255,69,0),
+        LineColor = Color3.fromRGB(255,99,71),
+        BoxColor = Color3.fromRGB(178,34,34),
+        BoxOutline = Color3.fromRGB(20,10,10),
+        NameColor = Color3.fromRGB(255,245,238),
+        HealthColor = Color3.fromRGB(255,140,0),
+        WorldAmbient = Color3.fromRGB(80,30,20),
+        WorldOutdoor = Color3.fromRGB(120,50,40),
+        Fog = Color3.fromRGB(100,40,30),
+        targetChamsColor = Color3.fromRGB(255, 69, 0),  -- Đỏ lava
+        targetTracerColor = Color3.fromRGB(255, 99, 71),  -- Cam đỏ
+    },
+    Default = {
+        FOVColor = Color3.fromRGB(255,255,255),
+        LineColor = Color3.fromRGB(255,255,255),
+        BoxColor = Color3.fromRGB(255,255,255),
+        BoxOutline = Color3.fromRGB(0,0,0),
+        NameColor = Color3.fromRGB(255,255,255),
+        HealthColor = Color3.fromRGB(0,255,0),
+        WorldAmbient = Lighting.Ambient,
+        WorldOutdoor = Lighting.OutdoorAmbient,
+        Fog = Lighting.FogColor,
+        targetChamsColor = Color3.fromRGB(214, 112, 122),  -- Hồng mặc định
+        targetTracerColor = Color3.fromRGB(255, 255, 255),  -- Trắng
+    }
+}
+
+-- Hàm GetPart cho airpart
+local function GetPart(target)
+    local char = target.Character
+    if not char then return currentHitPart end
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    
+    -- Kiểm tra trạng thái nhảy của LocalPlayer
+    local localChar = LocalPlayer.Character
+    local localHum = localChar and localChar:FindFirstChildOfClass("Humanoid")
+    
+    -- Nếu useAirPart bật và (LocalPlayer đang nhảy HOẶC mục tiêu đang nhảy)
+    if useAirPart and (
+        (localHum and localHum:GetState() == Enum.HumanoidStateType.Freefall) or 
+        (hum and hum:GetState() == Enum.HumanoidStateType.Freefall)
+    ) then
+        return airPart
+    end
+    return currentHitPart
+end
+
+local function getMainRemote()
+    if ReplicatedStorage:FindFirstChild("MainEvent") then
+        return ReplicatedStorage.MainEvent
+    end
+    if ReplicatedStorage:FindFirstChild("MAINEVENT") then
+        return ReplicatedStorage.MAINEVENT
+    end
+
+    if ReplicatedStorage:FindFirstChild("Remote") then
+        return ReplicatedStorage.Remote
+    end
+
+    if ReplicatedStorage:FindFirstChild("Event") then
+        return ReplicatedStorage.Event
+    end
+
+    if ReplicatedStorage:FindFirstChild("EVENT") then
+        return ReplicatedStorage.EVENT
+    end
+
+    if ReplicatedStorage:FindFirstChild("MainRemoteEvent") then
+        return ReplicatedStorage.MainRemoteEvent
+    end
+
+    -- 3. MainRemotes.MainRemoteEvent
+    local mainRemotes = ReplicatedStorage:FindFirstChild("MainRemotes")
+    if mainRemotes and mainRemotes:FindFirstChild("MainRemoteEvent") then
+        return mainRemotes.MainRemoteEvent
+    end
+
+    if ReplicatedStorage:FindFirstChild("Bullets") then
+        return ReplicatedStorage.Bullets
+    end
+
+    -- 4. Packages.Knit.Services.ToolService.RE.UpdateAim
+    local packages = ReplicatedStorage:FindFirstChild("Packages")
+    if packages then
+        local knit = packages:FindFirstChild("Knit")
+        if knit and knit:FindFirstChild("Services") then
+            local toolService = knit.Services:FindFirstChild("ToolService")
+            if toolService and toolService:FindFirstChild("RE") then
+                local re = toolService.RE
+                if re:FindFirstChild("UpdateAim") then
+                    return re.UpdateAim
+                end
+            end
+        end
+    end
+
+    -- fallback: không tìm thấy
+    return nil
+end
+
+local MainRemote = getMainRemote()
+
+-- ====== HELPERS ======
+local function GetDictionaryLength(t)
+    local c = 0
+    for _ in pairs(t) do c = c + 1 end
+    return c
+end
+
+-- isAlive as you provided
+local function isAlive(plr)
+    if not plr or not plr.Character then return false end
+    local hum = plr.Character:FindFirstChildOfClass("Humanoid")
+    if not hum or hum.Health <= 0 then
+        return false
+    end
+
+    -- Check riêng cho Da Hood (BodyEffects)
+    local be = plr.Character:FindFirstChild("BodyEffects")
+    if be then
+        local ko = be:FindFirstChild("K.O")
+        local grabbed = be:FindFirstChild("GRABBING_CONSTRAINT")
+        if (ko and ko.Value) or (grabbed and grabbed.Value) then
+            return false
+        end
+    end
+
+    return true
+end
+
+local function isKO(plr)
+    return not isAlive(plr)
+end
+
+-- Theo dõi trạng thái K.O và grab để tự động tắt/bật aimlock
+local function monitorKOandGrab()
+    local function checkStatus(char)
+        local bodyEffects = char:WaitForChild("BodyEffects", 5)
+        if not bodyEffects then return end
+        local koValue = bodyEffects:FindFirstChild("K.O")
+        local grabbedValue = bodyEffects:FindFirstChild("GRABBING_CONSTRAINT")
+        if not koValue then return end
+
+        local connection
+        connection = Run.Heartbeat:Connect(function()
+            if not char or not char.Parent then
+                connection:Disconnect()
+                return
+            end
+
+            local isKO = koValue and koValue.Value
+            local isGrabbed = grabbedValue and grabbedValue.Value
+
+            if (isKO or isGrabbed) and aimlockEnabled then
+                wasAimlockEnabledBeforeKO = aimlockEnabled
+                aimlockEnabled = false
+            elseif not isKO and not isGrabbed and wasAimlockEnabledBeforeKO and not aimlockEnabled then
+                aimlockEnabled = true
+                wasAimlockEnabledBeforeKO = false
+            end
+        end)
+    end
+
+    if LocalPlayer.Character then
+        checkStatus(LocalPlayer.Character)
+    end
+    LocalPlayer.CharacterAdded:Connect(function(char)
+        task.wait(0.2)
+        checkStatus(char)
+    end)
+end
+
+-- Gọi hàm monitorKOandGrab khi script khởi động
+monitorKOandGrab()
+
+-- Notifications (non-blocking)
+local function ensureNotificationsGui()
+    if Notifications_Frame and Notifications_Frame.Parent then return end
+    local sg = Instance.new("ScreenGui")
+    sg.Name = "TB_Notifications"
+    sg.ResetOnSpawn = false
+    sg.Parent = game.CoreGui
+
+    local frame = Instance.new("Frame")
+    frame.Name = "Notifications"
+    frame.Size = UDim2.new(0, 300, 0, 200)
+    frame.Position = UDim2.new(0.5, -150, 1, -220)
+    frame.BackgroundTransparency = 1
+    frame.Parent = sg
+    Notifications_Frame = frame
+end
+
+local function Notify(Content, Delay)
+    assert(type(Content) == "string", "missing argument #1, (string expected got " .. type(Content) .. ")")
+    local Delay = type(Delay) == "number" and Delay or 3
+    ensureNotificationsGui()
+
+    local Text = Instance.new("TextLabel")
+    Text.Name = "Notification"
+    Text.BackgroundTransparency = 1
+    Text.Position = UDim2.new(0, 0, 0, GetDictionaryLength(Notifications)*22)
+    Text.Size = UDim2.new(1, 0, 0, 20)
+    Text.Text = Content
+    Text.Font = Enum.Font.SourceSansBold
+    Text.TextSize = 16
+    Text.TextColor3 = Color3.new(1,1,1)
+    Text.TextStrokeTransparency = 0.4
+    Text.TextTransparency = 1
+    Text.RichText = false
+    Text.ZIndex = 5
+    Text.Parent = Notifications_Frame
+
+    local Notification = { self = Text }
+    Notifications[Notification] = Notification
+
+    local tweenIn = TweenService:Create(Text, TweenInfo.new(0.22, Enum.EasingStyle.Quad), {TextTransparency = 0})
+    local tweenOut = TweenService:Create(Text, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {TextTransparency = 1})
+
+    tweenIn:Play()
+    tweenIn.Completed:Connect(function()
+        task.delay(Delay, function()
+            tweenOut:Play()
+            tweenOut.Completed:Connect(function()
+                Notifications[Notification] = nil
+                if Text and Text.Parent then Text:Destroy() end
+                local idx = 0
+                for k,v in pairs(Notifications) do
+                    local t = v.self
+                    if t and t.Parent then
+                        t.Position = UDim2.new(0, 0, 0, idx * 22)
+                    end
+                    idx = idx + 1
+                end
+            end)
+        end)
+    end)
+end
+
+local function createOrGetHighlightForPlayer(ply)
+    if not ply then return nil end
+    local hl = Instance.new("Highlight")
+    hl.Name = "TB_Highlight"
+    hl.Adornee = ply.Character or nil
+    hl.FillColor = targetChamsColor
+    hl.OutlineColor = targetChamsColor
+    hl.FillTransparency = 0.7
+    hl.OutlineTransparency = 0
+    hl.Enabled = false
+    hl.Parent = workspace
+    return hl
+end
+
+local tracers = {}  -- Giữ table tracers như cũ
+
+local function createTracer(ply)
+    if not LP.Character or not ply.Character then return end
+    local hrp1 = LP.Character:FindFirstChild("HumanoidRootPart")
+    local hrp2 = ply.Character:FindFirstChild("HumanoidRootPart")
+    if not hrp1 or not hrp2 then return end
+    if tracers[ply] then
+        tracers[ply]:Destroy()
+        tracers[ply] = nil
+    end
+    local att1 = Instance.new("Attachment", hrp1)
+    local att2 = Instance.new("Attachment", hrp2)
+    local beam = Instance.new("Beam")
+    beam.Attachment0 = att1
+    beam.Attachment1 = att2
+    beam.Color = ColorSequence.new(targetTracerColor)
+    beam.Width0 = 0.08
+    beam.Width1 = 0.08
+    beam.Parent = hrp1
+    tracers[ply] = beam
+    ply.CharacterAdded:Connect(function(newChar)
+        task.wait(0.2)
+        local newHrp = newChar:WaitForChild("HumanoidRootPart")
+        if tracers[ply] then
+            local newAtt = Instance.new("Attachment", newHrp)
+            tracers[ply].Attachment1 = newAtt
+        end
+    end)
+end
+local function removeTracer(ply)
+    if tracers[ply] then
+        tracers[ply]:Destroy()
+        tracers[ply] = nil
+    end
+end
+
+LocalPlayer.CharacterAdded:Connect(function(newChar)
+    task.wait(0.2)
+    if selected and selected.Character then
+        if chamsTargetEnabled then
+            local hl = createOrGetHighlightForPlayer(selected)
+            hl.Adornee = selected.Character
+            hl.Enabled = true
+        end
+        if tracerTargetEnabled then
+            createTracer(selected)
+        end
+    end
+end)
+
+local function addHighlightToPlayer(ply)
+    if not ply then return end
+    local hl = createOrGetHighlightForPlayer(ply)
+    if hl then
+        hl.Adornee = ply.Character or hl.Adornee
+        hl.Enabled = chamsTargetEnabled
+    end
+end
+
+local function removeHighlightFromPlayer(ply)
+    if not ply then return end
+    local hl = createOrGetHighlightForPlayer(ply)
+    if hl then
+        hl.Enabled = false
+    end
+end
+
+local function fullyRemoveHighlight(ply)
+    if not ply then return end
+    local hl = createOrGetHighlightForPlayer(ply)
+    if hl and hl.Destroy then
+        pcall(function() hl:Destroy() end)
+    end
+end
+
+-- View Target
+local function toggleViewTarget(state)
+    viewEnabled = state
+    if viewEnabled then
+        if selected and selected.Character then
+            local head = selected.Character:FindFirstChild("Head")
+            if head then
+                Cam.CameraSubject = head
+                Notify("Viewing " .. selected.Name .. "'s head", 2)
+            else
+                viewEnabled = false
+                Notify("Target has no head.", 2)
+            end
+        else
+            viewEnabled = false
+            Notify("No target selected.", 2)
+        end
+    else
+        local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+        if hum then
+            Cam.CameraSubject = hum
+        end
+        Notify("View disabled", 2)
+    end
+end
+
+--[[UIS.InputBegan:Connect(function(input, gpe)
+    if gpe then return end
+    if input.KeyCode == viewKey then
+        toggleViewTarget(not viewEnabled)
+    end
+end)]]
+
+-- Distance from world pos to mouse cursor in px (no visibility check here)
+local function distToCursorFromWorldPos(pos)
+    local v = Cam:WorldToViewportPoint(pos)
+    local screenPos = Vector2.new(v.X, v.Y)
+    local mousePos = UIS:GetMouseLocation()
+    return (screenPos - Vector2.new(mousePos.X, mousePos.Y)).Magnitude
+end
+
+local function isVisibleFromCamera(targetHead)
+    if not targetHead or not targetHead.Position then return false end
+    local origin = Cam.CFrame.Position
+    local direction = (targetHead.Position - origin)
+    local params = RaycastParams.new()
+    params.FilterType = Enum.RaycastFilterType.Blacklist
+    -- ignore local character so it doesn't block
+    if LP.Character then
+        params.FilterDescendantsInstances = {LP.Character}
+    else
+        params.FilterDescendantsInstances = {}
+    end
+    local res = workspace:Raycast(origin, direction, params)
+    if not res then
+        -- nothing hit => clear line
+        return true
+    end
+    if res.Instance and res.Instance:IsDescendantOf(targetHead.Parent) then
+        return true
+    end
+    return false
+end
+
+-- New filterTarget function
+local function filterTarget(player)
+    if not player or player ~= selected then
+        return false, "Not selected target"
+    end
+    local part = player.Character and player.Character:FindFirstChild(GetPart(player))
+    if part and part.Position then
+        if not isVisibleFromCamera(part) then
+            return false, "Target obstructed"
+        end
+    end
+    if not isAlive(player) then
+        return false, "Target K.O. or grabbed"
+    end
+    return true, "Target valid"
+end
+
+-- get nearest SELECTED, ALIVE, VISIBLE player to cursor (head target). returns player or nil
+local function getNearestSelectedAliveVisible()
+    local best, bestDist = nil, math.huge
+    for ply, hl in pairs(selected) do
+        if ply and hl and hl.Enabled then
+            if isAlive(ply) and ply.Character then
+                local head = ply.Character:FindFirstChild("Head")
+                if head and head.Position then
+                    if isVisibleFromCamera(head) then
+                        local d = distToCursorFromWorldPos(head.Position)
+                        if d < bestDist and d <= maxSelectPx then
+                            bestDist = d
+                            best = ply
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return best, bestDist
+end
+
+-- cleanup when players leave
+Players.PlayerRemoving:Connect(function(p)
+    if selected[p] then fullyRemoveHighlight(p) end
+end)
+
+-- respawn handling
+local function onCharacterAdded(char)
+    local ply = Players:GetPlayerFromCharacter(char)
+    if ply then
+        local hl = selected[ply]
+        if hl and hl:IsA("Highlight") then
+            hl.Adornee = char
+            -- keep enabled/disabled state as before
+        end
+    end
+end
+Players.PlayerAdded:Connect(function(p) p.CharacterAdded:Connect(onCharacterAdded) end)
+for _,p in ipairs(Players:GetPlayers()) do p.CharacterAdded:Connect(onCharacterAdded) end
+
+local instantStompConnection
+instantStompConnection = UIS.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode == Enum.KeyCode.E and instantstomp then
+        local char = LP.Character
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        if hum then
+            pcall(function() MainRemote:FireServer("Stomp") end)
+            pcall(function() MainRemote:FireServer("STOMP") end)
+
+            if not stompAnimPlaying then
+                local animator = hum:FindFirstChildOfClass("Animator") or Instance.new("Animator", hum)
+                -- Ngăn Stepped loop
+                inStomp = true
+
+                -- Stop các anim đang chạy
+                for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
+                    track:Stop()
+                end
+
+                -- Play stomp anim
+                local anim = Instance.new("Animation")
+                anim.AnimationId = "rbxassetid://92249489340640"
+                local track = animator:LoadAnimation(anim)
+                track:Play()
+                stompAnimPlaying = true
+                track.Stopped:Connect(function()
+                    stompAnimPlaying = false
+                    inStomp = false -- cho phép anim khác chạy lại
+                end)
+            end
+        end
+        return
+    end
+end)
+
+-- Fly function for CFrame movement
+local function updateFly()
+    local char = LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not char or not hrp then return end
+
+    if not flyEnabled then return end
+    
+    local moveDirection = Vector3.new(0, 0, 0)
+
+    if UIS.TouchEnabled then
+        -- 📱 Mobile: Joystick + hướng nhìn
+        local joystick = UIS:GetJoystickState(Enum.UserInputType.Touch)
+        for _, state in ipairs(joystick) do
+            moveDirection = moveDirection + Vector3.new(state.Position.X, 0, -state.Position.Y)
+        end
+        local lookDir = Cam.CFrame.LookVector
+        if lookDir.Y > 0.1 then
+            moveDirection = moveDirection + Vector3.new(0, 1, 0)
+        elseif lookDir.Y < -0.1 then
+            moveDirection = moveDirection + Vector3.new(0, -1, 0)
+        end
+    else
+        -- 💻 PC: Space lên, Ctrl xuống
+        if UIS:IsKeyDown(Enum.KeyCode.Space) then
+            moveDirection = moveDirection + Vector3.new(0, 1, 0)
+        end
+        if UIS:IsKeyDown(Enum.KeyCode.LeftControl) then
+            moveDirection = moveDirection + Vector3.new(0, -1, 0)
+        end
+
+        -- Camera hướng nhìn
+        local camLook = Cam.CFrame.LookVector
+        local camRight = Cam.CFrame.RightVector
+
+        local input = Vector3.new(
+            (UIS:IsKeyDown(Enum.KeyCode.D) and 1 or 0) - (UIS:IsKeyDown(Enum.KeyCode.A) and 1 or 0),
+            0,
+            (UIS:IsKeyDown(Enum.KeyCode.S) and 1 or 0) - (UIS:IsKeyDown(Enum.KeyCode.W) and 1 or 0)
+        )
+
+        -- Dùng hướng camera để tính toán vector di chuyển
+        moveDirection = moveDirection + (camLook * -input.Z + camRight * input.X)
+    end
+
+    -- Áp dụng tốc độ bay
+    if moveDirection.Magnitude > 0 then
+        hrp.Velocity = moveDirection.Unit * flySpeed
+    else
+        hrp.Velocity = Vector3.new(0, 0, 0)
+    end
+end
+
+-- Fly toggle function
+local function toggleFly(state)
+    flyEnabled = state
+    local char = LocalPlayer.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not char or not hum or not hrp then return end
+    if flyEnabled then
+        Notify("Fly: ON", 2)
+    else
+        hrp.Velocity = Vector3.new(0, 0, 0)
+        Notify("Fly: OFF", 2)
+    end
+end
+
+-- Mobile UI
+local Sigmaballs = Instance.new("ScreenGui")
+Sigmaballs.Name = "Sigmaballs"
+Sigmaballs.Parent = game.CoreGui
+Sigmaballs.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+Sigmaballs.ResetOnSpawn = false
+
+local lockid = "rbxassetid://140623923630784"
+
+local function untarget()
+    if selected then
+        Notify("Untargeted ", 2)
+        if chamsTargetEnabled then removeHighlightFromPlayer(selected) end
+        if tracerTargetEnabled then removeTracer(selected) end
+        selected = nil
+        if UIS.TouchEnabled then
+            lockid = "rbxassetid://140623923630784"
+            if ImageButton then
+                ImageButton.Image = lockid
+            end
+        end
+    end
+end
+
+local function selectNearestTarget()
+    local center = UIS.TouchEnabled and Vector2.new(Cam.ViewportSize.X/2, Cam.ViewportSize.Y/2) or UIS:GetMouseLocation()
+    local best, bestDist = nil, math.huge
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LP and p.Character then
+            local root = p.Character:FindFirstChild("HumanoidRootPart")
+            if root and root.Position then
+                local v = Cam:WorldToViewportPoint(root.Position)
+                local onScreen = v.Z > 0 and v.X >= 0 and v.X <= Cam.ViewportSize.X and v.Y >= 0 and v.Y <= Cam.ViewportSize.Y
+                if onScreen then
+                    local d = (Vector2.new(v.X, v.Y) - center).Magnitude
+                    if d < bestDist then
+                        bestDist = d
+                        best = p
+                    end
+                end
+            end
+        end
+    end
+    if best then
+        selected = best
+        if chamsTargetEnabled then
+            addHighlightToPlayer(best)
+        end
+        if tracerTargetEnabled then
+            createTracer(best)
+        end
+        Notify(string.format("Selected %s (@%s)", best.DisplayName or best.Name, best.Name), 3)
+        if UIS.TouchEnabled then
+            lockid = "rbxassetid://96086736054343"
+            if ImageButton then
+                ImageButton.Image = lockid
+            end
+        end
+    else
+        Notify("No valid target found.", 2)
+    end
+end
+
+if UIS.TouchEnabled then
+    local ImageButton = Instance.new("ImageButton")
+    ImageButton.Name = "ImageButton"
+    ImageButton.Parent = Sigmaballs
+    ImageButton.Active = true
+    ImageButton.Draggable = true
+    ImageButton.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+    ImageButton.BackgroundTransparency = 0.5
+    ImageButton.Size = UDim2.new(0, 90, 0, 90)
+    ImageButton.Image = lockid
+    ImageButton.Position = UDim2.new(0.5, -25, 0.5, -25)
+    local Ui2corner = Instance.new("UICorner")
+    Ui2corner.CornerRadius = UDim.new(0.2, 0)
+    Ui2corner.Parent = ImageButton
+    ImageButton.MouseButton1Click:Connect(function()
+        if selected then
+            untarget()
+        else
+            selectNearestTarget()
+        end
+    end)
+end
+UIS.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.UserInputType == Enum.UserInputType.Keyboard then
+        if input.KeyCode == selectKey then
+            if selected then
+                untarget()
+            else
+                selectNearestTarget()
+            end
+            return
+        end
+        if input.KeyCode == viewKey then
+            toggleViewTarget(not viewEnabled)
+            return
+        end
+    end
+end)
+
+local dog = false -- Biến cho WalkSpeed
+local howmany = 0 -- Đếm số nút
+
+local MakeButton
+if UIS.TouchEnabled then
+    -- Trên mobile: Load đầy đủ MakeButton với UI
+    MakeButton = function(ButtonName, Color, callback, keycode)
+        howmany = howmany + 1
+
+        local Frame = Instance.new("Frame")
+        local TextButton = Instance.new("ImageLabel")
+        local TextLabel = Instance.new("TextButton")
+        local UITextSizeConstraint = Instance.new("UITextSizeConstraint")
+
+        Frame.Parent = Sigmaballs -- Sử dụng Sigmaballs đã tạo
+        Frame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+        Frame.BackgroundTransparency = 0.3
+        Frame.Position = UDim2.new(0.85, -120, 0.1, (howmany - 1) * 50)
+        Frame.Size = UDim2.new(0, 120, 0, 40)
+
+        local uiStroke = Instance.new("UIStroke")
+        uiStroke.Parent = Frame
+        uiStroke.Color = Color
+        uiStroke.Thickness = 1.2
+        uiStroke.Transparency = 0
+
+        TextButton.Parent = Frame
+        TextButton.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+        TextButton.BackgroundTransparency = 1
+        TextButton.Size = UDim2.new(0, 28, 0, 28)
+        TextButton.AnchorPoint = Vector2.new(0, 0.5)
+        TextButton.Position = UDim2.new(0.05, 0, 0.5, 0)
+        TextButton.Image = "rbxassetid://10734923214"
+        TextButton.ImageColor3 = Color
+
+        TextLabel.Parent = Frame
+        TextLabel.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+        TextLabel.BackgroundTransparency = 1
+        TextLabel.Size = UDim2.new(0, 80, 0, 28)
+        TextLabel.AnchorPoint = Vector2.new(0.5, 0.5)
+        TextLabel.Position = UDim2.new(0.65, 0, 0.5, 0)
+        TextLabel.Font = Enum.Font.Arimo
+        TextLabel.Text = ButtonName
+        TextLabel.TextColor3 = Color
+        TextLabel.TextScaled = true
+        TextLabel.TextSize = 25
+        TextLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+        TextLabel.TextStrokeTransparency = 1
+
+        local uiCorner = Instance.new("UICorner", Frame)
+        uiCorner.CornerRadius = UDim.new(0, 8)
+
+        local buttonState = false
+
+        TextLabel.Activated:Connect(function()
+            buttonState = not buttonState
+            callback(buttonState)
+            if buttonState then
+                TextButton.Image = "rbxassetid://10735024209"
+            else
+                TextButton.Image = "rbxassetid://10734923214"
+            end
+        end)
+
+        if keycode then
+            UIS.InputBegan:Connect(function(input, gameProcessed)
+                if gameProcessed then return end
+                if input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode == keycode then
+                    buttonState = not buttonState
+                    callback(buttonState)
+                    if buttonState then
+                        TextButton.Image = "rbxassetid://10735024209"
+                    else
+                        TextButton.Image = "rbxassetid://10734923214"
+                    end
+                end
+            end)
+        end
+
+        local dragStart, startPos
+        TextLabel.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                dragStart = input.Position
+                startPos = Frame.Position
+                input.Changed:Connect(function()
+                    if input.UserInputState == Enum.UserInputState.End then
+                        dragStart = nil
+                    end
+                end)
+            end
+        end)
+
+        TextLabel.InputChanged:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+                if dragStart then
+                    local delta = input.Position - dragStart
+                    Frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+                end
+            end
+        end)
+
+        UITextSizeConstraint.Parent = TextLabel
+        UITextSizeConstraint.MaxTextSize = 25
+    end
+else
+    -- Trên PC: Chỉ load logic phím của MakeButton
+    MakeButton = function(ButtonName, Color, callback, keycode)
+        local buttonState = false
+        if keycode then
+            UIS.InputBegan:Connect(function(input, gameProcessed)
+                if gameProcessed then return end
+                if input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode == keycode then
+                    buttonState = not buttonState
+                    callback(buttonState)
+                end
+            end)
+        end
+    end
+end
+
+-- Hàm áp dụng WalkSpeed & JumpPower
+local function applyStats(humanoid)
+    if not humanoid then return end
+
+    if dog then
+        humanoid.WalkSpeed = SpeedAmount
+        humanoid.JumpPower = 80
+    else
+        humanoid.WalkSpeed = 18
+        humanoid.JumpPower = 55
+    end
+
+    -- Bảo vệ nếu bị game set lại
+    humanoid:GetPropertyChangedSignal("WalkSpeed"):Connect(function()
+        if dog then
+            humanoid.WalkSpeed = SpeedAmount
+        end
+    end)
+    humanoid:GetPropertyChangedSignal("JumpPower"):Connect(function()
+        if dog then
+            humanoid.JumpPower = 80
+        end
+    end)
+end
+
+-- Khi ấn nút bật/tắt
+MakeButton("WalkSpeed", Color3.fromRGB(244, 112, 122), function(state)
+    dog = state
+
+    local humanoid = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+    applyStats(humanoid)
+
+    if dog then
+        Notify("WalkSpeed ON", 2)
+    else
+        Notify("WalkSpeed OFF", 2)
+    end
+end, Enum.KeyCode.T)
+
+-- Khi respawn, áp dụng lại
+LocalPlayer.CharacterAdded:Connect(function(char)
+    char:WaitForChild("Humanoid")
+    applyStats(char:FindFirstChildOfClass("Humanoid"))
+end)
+
+-- Sửa nút Stomp
+local stompAnimId = "rbxassetid://92249489340640"
+local stompAnimTrack = nil
+local stompAnimPlaying = false
+
+local stompAnimId = "rbxassetid://92249489340640"
+local stompAnimTrack = nil
+local stompAnimPlaying = false
+
+local function playStompAnim(hum)
+    if not hum or stompAnimPlaying then return end -- Bỏ qua nếu không có humanoid hoặc anim đang chạy
+
+    -- Dừng tất cả các animation hiện tại
+    for _, track in ipairs(hum:GetPlayingAnimationTracks()) do
+        pcall(function()
+            track:Stop()
+        end)
+    end
+
+    -- Tạo và chạy animation Stomp
+    local anim = Instance.new("Animation")
+    anim.AnimationId = stompAnimId
+    stompAnimTrack = hum:LoadAnimation(anim)
+    stompAnimTrack:Play()
+    stompAnimPlaying = true
+
+    -- Khi animation dừng, cho phép chạy lại
+    stompAnimTrack.Stopped:Connect(function()
+        stompAnimPlaying = false
+        stompAnimTrack = nil -- Xóa track để tránh memory leak
+        anim:Destroy() -- Xóa animation instance
+    end)
+end
+
+local function toggleStomp()
+    stomptarget = not stomptarget
+    if stomptarget then
+        Notify("Stomp: ON", 2)
+        local connection
+        connection = Run.Heartbeat:Connect(function()
+            if not stomptarget then
+                connection:Disconnect()
+                return
+            end
+            local char = LP.Character
+            local hum = char and char:FindFirstChildOfClass("Humanoid")
+            local hrp = char and char:FindFirstChild("HumanoidRootPart")
+            if not hum or not hrp then return end
+            if selected and selected.Character then
+                local targetChar = selected.Character
+                local targetHum = targetChar:FindFirstChildOfClass("Humanoid")
+                local targetHrp = targetChar:FindFirstChild("HumanoidRootPart")
+                if targetHum and isKO(selected) and targetHrp then
+                    local dist = (hrp.Position - targetHrp.Position).Magnitude
+                    if dist <= 20 then
+                        pcall(function() MainRemote:FireServer("Stomp") end)
+                        pcall(function() MainRemote:FireServer("STOMP") end)
+                        playStompAnim(hum)
+                    end
+                end
+            end
+        end)
+    else
+        Notify("Stomp: OFF", 2)
+        stomptarget = false
+        if stompAnimTrack then
+            stompAnimTrack:Stop()
+            stompAnimTrack = nil
+            stompAnimPlaying = false
+        end
+    end
+end
+
+Players.PlayerRemoving:Connect(function(p)
+    if selected == p then
+        removeHighlightFromPlayer(p)
+        removeTracer(p)
+        selected = nil
+        if UIS.TouchEnabled then
+            lockid = "rbxassetid://140623923630784"
+            if ImageButton then
+                ImageButton.Image = lockid
+            end
+        end
+        Notify("Target left the game, deselected.", 2)
+    end
+end)
+
+-- Biến autoshoot
+local tbEnabled = false
+local fovRadius = 20
+local targetOnly = false
+local triggerbotKey = Enum.KeyCode.Z
+
+-- Danh sách các bộ phận có thể bắn
+local hitParts = {
+    "Head", "HumanoidRootPart", "UpperTorso", "LowerTorso", "LeftUpperArm", "LeftLowerArm", "LeftHand",
+    "RightUpperArm", "RightLowerArm", "RightHand", "LeftUpperLeg", "LeftLowerLeg", "LeftFoot",
+    "RightUpperLeg", "RightLowerLeg", "RightFoot", "Torso", "Left Arm", "Right Arm", "Left Leg", "Right Leg"
+}
+
+local function validPart(p)
+    if not p or not p.Parent or not p.Parent:FindFirstChild("Humanoid") then return false end
+    local player = Players:GetPlayerFromCharacter(p.Parent)
+    if not player then return false end
+    if targetOnly and player ~= selected then return false end
+    for _, n in ipairs(hitParts) do
+        if p.Name:lower() == n:lower() then return true end
+    end
+    return false
+end
+
+local function distToCursor(part)
+    local v, vis = Cam:WorldToViewportPoint(part.Position)
+    if not vis then return math.huge end
+    local m = UIS.TouchEnabled and Vector2.new(Cam.ViewportSize.X / 2, Cam.ViewportSize.Y / 2) or UIS:GetMouseLocation()
+    return (Vector2.new(v.X, v.Y) - Vector2.new(m.X, m.Y)).Magnitude
+end
+
+local function GetBestTargetPart(target)
+    local bestPart, bestDist = nil, fovRadius
+    if target and target.Character and isAlive(target) then
+        for _, partName in ipairs(hitParts) do
+            local part = target.Character:FindFirstChild(partName)
+            if part and part:IsA("BasePart") then
+                local dist = distToCursor(part)
+                if dist < bestDist then
+                    bestPart = part
+                    bestDist = dist
+                end
+            end
+        end
+    end
+    if not bestPart then
+        Notify("No valid target part found.", 2)
+    end
+    return bestPart
+end
+
+local function toolActivate()
+    local char = LocalPlayer.Character
+    if char then
+        local tool = char:FindFirstChildWhichIsA("Tool")
+        if tool then
+            pcall(function() tool:Activate() end)
+        end
+    end
+end
+
+-- ===== CHAT COMMANDS =====
+local antiStompActive = false
+local flashbackActive = false
+local lastPosition = nil
+
+-- Logic AntiStomp + Flashback
+local function startAntiStomp()
+    local function checkAndKill(chr)
+        local hum = chr:WaitForChild("Humanoid", 5)
+        local bodyEffects = chr:WaitForChild("BodyEffects", 5)
+        if not hum or not bodyEffects then return end
+        local koValue = bodyEffects:WaitForChild("K.O", 5)
+        if not koValue then return end
+
+        local connection
+        connection = Run.Heartbeat:Connect(function()
+            if not antiStompActive then
+                connection:Disconnect()
+                return
+            end
+            if koValue.Value == true and hum.Health > 0 then
+                if flashbackActive then
+                    lastPosition = chr:GetPrimaryPartCFrame()
+                end
+                hum.Health = 0
+            end
+        end)
+    end
+
+    if LocalPlayer.Character then
+        checkAndKill(LocalPlayer.Character)
+    end
+    LocalPlayer.CharacterAdded:Connect(function(newChar)
+        if antiStompActive then
+            checkAndKill(newChar)
+            if flashbackActive and lastPosition then
+                local root = newChar:WaitForChild("HumanoidRootPart", 5)
+                if root then
+                    while (root.Position - lastPosition.Position).Magnitude > 5 do
+                        root.CFrame = lastPosition
+                        task.wait()
+                    end
+                end
+                lastPosition = nil
+            end
+        end
+    end)
+end
+
+-- Biến autoshoot
+local autoReload = true -- Mặc định on cho autoreload
+
+-- Thêm nút MakeButton cho autoshoot
+MakeButton("AutoShoot", Color3.fromRGB(244, 112, 122), function(state)
+    tbEnabled = state
+    if tbEnabled then
+        Notify("AutoShoot: ON", 2)
+    else
+        Notify("AutoShoot: OFF", 2)
+    end
+end, triggerbotKey) -- Phím Z để bật/tắt
+
+Run.RenderStepped:Connect(function()
+    if not tbEnabled then return end
+    local target = nil
+    if targetOnly then
+        if not selected or not isAlive(selected) then return end
+        target = selected
+    else
+        local best, bestDist = nil, fovRadius
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer and p.Character and isAlive(p) then
+                for _, partName in ipairs(hitParts) do
+                    local part = p.Character:FindFirstChild(partName)
+                    if part and part:IsA("BasePart") then
+                        local dist = distToCursor(part)
+                        if dist < bestDist then
+                            best = p
+                            bestDist = dist
+                        end
+                    end
+                end
+            end
+        end
+        target = best
+    end
+    if not target then
+        return
+    end
+    local part = GetBestTargetPart(target) -- Modified to accept target parameter
+    if part then
+        local dist = distToCursor(part)
+        if dist <= fovRadius then
+            local origin = Cam.CFrame.Position
+            local direction = (part.Position - origin)
+            local rayParams = RaycastParams.new()
+            rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+            rayParams.FilterDescendantsInstances = {LocalPlayer.Character or {}}
+            local result = workspace:Raycast(origin, direction, rayParams)
+
+            if not result or result.Instance:IsDescendantOf(part.Parent) then
+                toolActivate()
+            end
+        end
+    end
+end)
+
+local key = Enum.KeyCode.Y
+
+UIS.InputBegan:Connect(function(input, gpe)
+    if gpe then return end
+    if input.KeyCode == key then
+        local char = LP.Character
+        if char then
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            if hum then
+                hum.Health = 0
+                Notify("Died", 2)
+            end
+        end
+    end
+end)
+
+Run.Heartbeat:Connect(function()
+
+    if flyEnabled then
+        updateFly()
+    end
+    if AutoPingSets then
+        -- Lấy giá trị ping
+        local pingvalue, ping
+        local success = pcall(function()
+            pingvalue = game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValueString()
+            local split = string.split(pingvalue, "(")
+            ping = tonumber(split[1])
+        end)
+        if not success or not ping then
+            ping = 60 -- Giá trị mặc định nếu lỗi
+        end
+
+        if ping > 110 then
+            predictionTime = 0.1502
+        elseif ping > 100 then
+            predictionTime = 0.1475
+        elseif ping > 90 then
+            predictionTime = 0.1446
+        elseif ping > 80 then
+            predictionTime = 0.1403
+        elseif ping > 70 then
+            predictionTime = 0.13892
+        elseif ping > 60 then
+            predictionTime = 0.13598
+        elseif ping > 50 then
+            predictionTime = 0.1357
+        elseif ping > 40 then
+            predictionTime = 0.13544
+        elseif ping > 30 then
+            predictionTime = 0.1130
+        elseif ping > 20 then
+            predictionTime = 0.10036
+        else
+            predictionTime = 0.12588
+        end
+    end
+end)
+
+Run.RenderStepped:Connect(function()
+    local char = LocalPlayer.Character
+    if not char then return end
+    local tool = char:FindFirstChildWhichIsA("Tool")
+    if not tool then return end
+    local ammo = tool:FindFirstChild("Ammo")
+    if ammo and ammo.Value <= 0 and autoReload then
+        MainRemote:FireServer("Reload", tool)
+        task.wait(3.7)
+    end
+end)
+
+Run.RenderStepped:Connect(function(dt)
+    if not aimlockEnabled or not selected then return end
+    local isValid, reason = filterTarget(selected)
+    if not isValid then return end
+    local targetPart = selected.Character:FindFirstChild(GetPart(selected))
+    if not targetPart then return end
+    if resolverEnabled then
+        pcall(function()
+            targetPart.Velocity = Vector3.new(targetPart.Velocity.X, 0, targetPart.Velocity.Z)
+            targetPart.AssemblyLinearVelocity = Vector3.new(targetPart.AssemblyLinearVelocity.X, 0, targetPart.AssemblyLinearVelocity.Z)
+        end)
+    end
+    if resolverEnabled and selected.Character:FindFirstChild("HumanoidRootPart") and
+        selected.Character.HumanoidRootPart.Velocity.Magnitude > targetPart.Velocity.Magnitude then
+        pcall(function()
+            targetPart.Velocity = Vector3.new(0, 0, 0)
+            targetPart.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+        end)
+    end
+    local vel = targetPart.Velocity or Vector3.new(0, 0, 0)
+    local predicted = targetPart.Position + vel * predictionTime
+    local camPos = Cam.CFrame.Position
+    local desiredCFrame = CFrame.new(camPos, predicted)
+    local alpha = math.clamp(aimSmoothing, 0, 1)
+    local newCFrame = Cam.CFrame:Lerp(desiredCFrame, alpha)
+    pcall(function()
+        Cam.CFrame = newCFrame
+    end, function(err)
+        warn("Aimlock: Failed to set Cam.CFrame - " .. tostring(err))
+    end)
+end)
+
+Run.Heartbeat:Connect(function()
+    local character = LocalPlayer.Character
+    if character then
+        local bodyEffects = character:FindFirstChild("BodyEffects")
+        if bodyEffects then
+            local movement = bodyEffects:FindFirstChild("Movement")
+            if movement then
+                local noJumping = movement:FindFirstChild("NoJumping")
+                if noJumping then noJumping:Destroy() end
+                
+                local reduceWalk = movement:FindFirstChild("ReduceWalk")
+                if reduceWalk then reduceWalk:Destroy() end
+                
+                local noWalkSpeed = movement:FindFirstChild("NoWalkSpeed")
+                if noWalkSpeed then noWalkSpeed:Destroy() end
+            end
+            
+            local reload = bodyEffects:FindFirstChild("Reload")
+            if reload and reload.Value then
+                reload.Value = false
+            end
+        end
+    end
+end)
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local TeleportService = game:GetService("TeleportService")
+local TextChatService = game:GetService("TextChatService")
+
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local LocalPlayer = game:GetService("Players").LocalPlayer
+
+desync_setback = Instance.new("Part")
+desync_setback.Name = "Desync Setback"
+desync_setback.Parent = workspace
+desync_setback.Size = Vector3.new(2, 2, 1)
+desync_setback.CanCollide = false
+desync_setback.Anchored = true
+desync_setback.Transparency = 1
+
+desync = {
+    enabled = false,
+    mode = "DestroyCheaters",
+    teleportCFrame = CFrame.new(0, 0, 0),
+    old_position = nil,
+    voidSpamActive = false,
+    toggleEnabled = false
+}
+
+function resetCamera()
+    if LocalPlayer.Character then
+        local humanoid = LocalPlayer.Character:FindFirstChild("Humanoid")
+        if humanoid then
+            workspace.CurrentCamera.CameraSubject = humanoid
+        end
+    end
+end
+
+function toggleDesync(state)
+    desync.enabled = state
+    if desync.enabled then
+        workspace.CurrentCamera.CameraSubject = desync_setback
+    else
+        resetCamera()
+    end
+end
+
+function setDesyncMode(mode)
+    desync.mode = mode
+end
+
+RunService.Heartbeat:Connect(function()
+    if desync.enabled and LocalPlayer.Character then
+        local rootPart = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if rootPart then
+            desync.old_position = rootPart.CFrame
+
+            local teleportPosition = Vector3.new(0, 0, 0)
+            local teleportRotation = CFrame.new()
+
+            if desync.mode == "DestroyCheaters" then
+                teleportPosition = Vector3.new(11223344556677889900, 1, 1)
+
+            elseif desync.mode == "Underground" then
+                teleportPosition = rootPart.Position - Vector3.new(0, 12, 0)
+
+            elseif desync.mode == "VoidSpam" then
+                teleportPosition = math.random(1, 2) == 1 and desync.old_position.Position or Vector3.new(
+                    math.random(10000, 50000),
+                    math.random(10000, 50000),
+                    math.random(10000, 50000)
+                )
+
+            elseif desync.mode == "Void" then
+                teleportPosition = Vector3.new(
+                    rootPart.Position.X + math.random(-444444, 444444),
+                    rootPart.Position.Y + math.random(-444444, 444444),
+                    rootPart.Position.Z + math.random(-44444, 44444)
+                )
+            end
+
+            if desync.mode ~= "Rotation" then
+                rootPart.CFrame = desync.teleportCFrame
+                workspace.CurrentCamera.CameraSubject = desync_setback
+
+                RunService.RenderStepped:Wait()
+
+                desync_setback.CFrame = desync.old_position * CFrame.new(0, rootPart.Size.Y / 2 + 0.5, 0)
+                rootPart.CFrame = desync.old_position
+            end
+        end
+    end
+end)
+
+-- Thêm nút Desync
+MakeButton("Desync", Color3.fromRGB(244, 112,122), function(state)
+    toggleDesync(state)
+    Notify("Desync: " .. (state and "ON" or "OFF"), 2)
+end, Enum.KeyCode.V)
+
+monitorKOandGrab()
+
+LocalPlayer.CharacterAdded:Connect(function(char)
+    task.wait(0.2)
+    checkStatus(char)
+end)
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local TeleportService = game:GetService("TeleportService")
+local TextChatService = game:GetService("TextChatService")
+
+-- Chat Commands
+local commands = {
+    "walkspeed", "jumppower", "aimlock", "triggerbot", "autostomp",
+    "autoreload", "antistomp", "flashback", "prediction", "fov",
+    "reset", "rejoin", "desync", "demode", "autopingsets", "hitpart",
+    "tp", "target", "spychat", "help", "instantstomp", "rapidfire"
+}
+
+local function levenshtein(s, t)
+    local m, n = #s, #t
+    if m == 0 then return n end
+    if n == 0 then return m end
+    local d = {}
+    for i = 0, m do d[i] = {[0] = i} end
+    for j = 0, n do d[0][j] = j end
+    for i = 1, m do
+        for j = 1, n do
+            local cost = (s:sub(i,i) == t:sub(j,j)) and 0 or 1
+            d[i][j] = math.min(
+                d[i-1][j] + 1,
+                d[i][j-1] + 1,
+                d[i-1][j-1] + cost
+            )
+        end
+    end
+    return d[m][n]
+end
+
+local function findClosestCommand(input)
+    input = string.lower(input)
+    local best, bestDist
+    for _, cmd in ipairs(commands) do
+        if cmd:find(input, 1, true) == 1 then
+            return cmd
+        end
+        local dist = levenshtein(input, cmd)
+        if not bestDist or dist < bestDist then
+            best, bestDist = cmd, dist
+        end
+    end
+    return best
+end
+
+local function findClosestHitPart(input)
+    input = string.lower(input)
+    local best, bestDist
+    for _, part in ipairs(hitParts) do
+        if part:lower():find(input, 1, true) == 1 then
+            return part
+        end
+        local dist = levenshtein(input, part:lower())
+        if not bestDist or dist < bestDist then
+            best, bestDist = part, dist
+        end
+    end
+    return best
+end
+
+local function findClosestPlayer(query)
+    query = string.lower(query)
+    local bestMatch, bestScore = nil, math.huge
+    for _, plr in pairs(Players:GetPlayers()) do
+        local uname = string.lower(plr.Name)
+        local dname = string.lower(plr.DisplayName)
+        if string.find(uname, query) or string.find(dname, query) then
+            return plr
+        end
+        local score = math.min(levenshtein(uname, query), levenshtein(dname, query))
+        if score < bestScore then
+            bestScore = score
+            bestMatch = plr
+        end
+    end
+    return bestMatch
+end
+
+local function handleCommandText(raw)
+    if not raw then return end
+    local msg = tostring(raw):match("^%s*(.-)%s*$")
+    if msg == "" or msg:sub(1,1) ~= "." then return end
+    local body = msg:sub(2)
+    if body == "" then return end
+    local args = {}
+    for w in body:gmatch("%S+") do table.insert(args, w) end
+    local cmd = args[1] or ""
+    local val = tonumber(args[2])
+    local mainCmd = findClosestCommand(cmd)
+    if not mainCmd then
+        Notify("Unknown command: " .. cmd, 2)
+        return
+    end
+    if cmd == "target" then
+        if args[2] then
+            local target = findClosestPlayer(args[2])
+            if target then
+                if selected == target then
+                    untarget()
+                else
+                    if selected then
+                        untarget()
+                    end
+                    selected = target
+                    if chamsTargetEnabled then
+                        addHighlightToPlayer(target)
+                    end
+                    if tracerTargetEnabled then
+                        createTracer(target)
+                    end
+                    Notify(string.format("Selected %s (@%s)", target.DisplayName or target.Name, target.Name), 3)
+                end
+            else
+                Notify("Player not found!", 2)
+            end
+        else
+            Notify("Usage: .target <name>", 2)
+        end
+    elseif cmd == "tp" then
+        if args[2] then
+            local target = findClosestPlayer(args[2])
+            if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+                local myChar = LocalPlayer.Character
+                local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
+                if myHRP then
+                    myHRP.CFrame = target.Character.HumanoidRootPart.CFrame + Vector3.new(0, 3, 0)
+                    Notify("Teleported to " .. target.DisplayName .. "(@" .. target.Name .. ")", 3)
+                end
+            else
+                Notify("Player not found!", 2)
+            end
+        else
+            Notify("Usage: .tp <name>", 2)
+        end
+    elseif mainCmd == "help" then
+        local helpText = [[
+    ⭐ Betuyen.cc Help ⭐
+    Q: Select/Unselect Target
+    H: Toggle Aimlock
+    B: Toggle View Target
+    T: WalkSpeed
+    Z: AutoShoot
+    V: Desync
+    Y: Kill self
+    E: Instant Stomp (if enabled)
+
+    Chat commands:
+    .rapidfire
+    .autostomp
+    .instantstomp
+    .autoreload
+    .antistomp
+    .flashback
+    .prediction <num>
+    .fov <num>
+    .reset
+    .rejoin
+    .tp <name>
+    .target <name>
+    .spychat
+    .desync
+    .demode <mode>
+    .hitpart <part>
+    .autopingsets
+    ]]
+        Notify(helpText, 10)
+    elseif mainCmd == "autostomp" then
+        toggleStomp()
+    elseif mainCmd == "autoreload" then
+        autoReload = not autoReload
+        Notify("AutoReload: " .. tostring(autoReload), 2)
+    elseif mainCmd == "autopingsets" then
+        AutoPingSets = not AutoPingSets
+        Notify("AutoPingSets: " .. tostring(AutoPingSets), 2)
+    elseif mainCmd == "antistomp" then
+        antiStompActive = not antiStompActive
+        Notify("AntiStomp: " .. tostring(antiStompActive), 2)
+        if antiStompActive then startAntiStomp() end
+    elseif cmd == "spychat" then
+        local TextChatService = game:GetService("TextChatService")
+        local chatWindow = TextChatService:FindFirstChild("ChatWindowConfiguration")
+        if chatWindow then
+            chatWindow.Enabled = not chatWindow.Enabled
+            Notify("SpyChat: " .. (chatWindow.Enabled and "ON" or "OFF"), 3)
+        else
+            Notify("ChatWindowConfiguration not found!", 2)
+        end
+    elseif mainCmd == "flashback" then
+        flashbackActive = not flashbackActive
+        Notify("Flashback: " .. tostring(flashbackActive), 2)
+    elseif mainCmd == "rapidfire" then
+        RapidFireEnabled = not RapidFireEnabled
+        Notify("RapidFireEnabled: " .. tostring(RapidFireEnabled), 2)
+    elseif mainCmd == "prediction" then
+        if val then
+            predictionTime = val
+            Notify("Prediction set to " .. val, 2)
+        else
+            Notify("Usage: .prediction <number>", 2)
+        end
+    elseif mainCmd == "fov" then
+        if val then
+            workspace.CurrentCamera.FieldOfView = val
+            Notify("FOV set to " .. val, 2)
+        else
+            Notify("Usage: .fov <number>", 2)
+        end
+    elseif mainCmd == "reset" then
+        local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+        if hum then
+            hum.Health = 0
+            Notify("Character reset!", 2)
+        end
+    elseif mainCmd == "instantstomp" then
+        instantstomp = not instantstomp
+        Notify("InstantStomp: " .. (instantstomp and "ON" or "OFF"), 2)
+    elseif mainCmd == "rejoin" then
+        Notify("Rejoining...", 2)
+        game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
+    elseif mainCmd == "desync" then
+        toggleDesync(not desync.enabled)
+        Notify("Desync: " .. (desync.enabled and "ON" or "OFF"), 2)
+    elseif mainCmd == "demode" then
+        if args[2] then
+            setDesyncMode(args[2])
+            Notify("Desync mode set to " .. args[2], 2)
+        else
+            Notify("Usage: .demode <mode>", 2)
+        end
+    elseif mainCmd == "hitpart" then
+        if args[2] then
+            local inputPart = args[2]
+            local bestPart = findClosestHitPart(inputPart)
+            if bestPart then
+                currentHitPart = bestPart
+                Notify("Hitpart set to " .. bestPart, 2)
+            else
+                Notify("No matching hitpart found.", 2)
+            end
+        else
+            Notify("Usage: .hitpart <part>", 2)
+        end
+    end
+end
+
+if game:GetService("TextChatService") and game:GetService("TextChatService").SendingMessage then
+    game:GetService("TextChatService").SendingMessage:Connect(function(message)
+        pcall(function()
+            handleCommandText(message.Text)
+        end)
+    end)
+else
+    LocalPlayer.Chatted:Connect(function(msg)
+        pcall(function()
+            handleCommandText(msg)
+        end)
+    end)
+end
+
+-- Thay UI bằng WindUI
+local g = loadstring(game:HttpGet("https://raw.githubusercontent.com/depthso/Dear-ReGui/main/ReGui.lua"))()
+local win = g:TabsWindow({ Title = "Betuyen.cc | anhchangm52", Size = UDim2.fromOffset(580, 490), Position = UDim2.fromOffset(100, 100) })
+
+-- Các Tab mới theo yêu cầu
+local AimlockTab = win:CreateTab({ Name = "Aimlock" })
+local VisualESPTab = win:CreateTab({ Name = "Visual ESP" })
+local MiscTab = win:CreateTab({ Name = "Misc" })
+local WorldTab = win:CreateTab({ Name = "World" })
+local SettingsTab = win:CreateTab({ Name = "Settings" })
+
+-- Logic antilock
+RunService.Heartbeat:Connect(function()
+    if getgenv().antilock then 
+        local abc = game.Players.LocalPlayer.Character.HumanoidRootPart.Velocity
+        game.Players.LocalPlayer.Character.HumanoidRootPart.Velocity = Vector3.new(-1,-1,-1) * (2^16)
+        game:GetService("RunService").RenderStepped:Wait()
+        game.Players.LocalPlayer.Character.HumanoidRootPart.Velocity = abc
+    end 
+end)
+
+-- ESP functions (modified)
+local ESP = {}
+
+local function createESP(plr)
+    if plr == LocalPlayer then return end
+    if ESP[plr] then return end
+    local t = {}
+    t.boxOutline = Drawing.new("Square")
+    t.boxOutline.Color = Color3.fromRGB(0, 0, 0)
+    t.boxOutline.Thickness = 2
+    t.boxOutline.Filled = false
+    t.boxOutline.Visible = false
+    t.box = Drawing.new("Square")
+    t.box.Color = boxESPColor
+    t.box.Thickness = 1
+    t.box.Filled = false
+    t.box.Visible = false
+    t.healthLine = Drawing.new("Line")
+    t.healthLine.Color = healthBoxESPColor
+    t.healthLine.Thickness = 2
+    t.healthLine.Visible = false
+    t.name = Drawing.new("Text")
+    t.name.Color = nameESPColor
+    t.name.Size = 14
+    t.name.Center = true
+    t.name.Outline = true
+    t.name.Visible = false
+    t.healthText = Drawing.new("Text")
+    t.healthText.Color = healthBoxESPColor
+    t.healthText.Size = 13
+    t.healthText.Center = true
+    t.healthText.Outline = true
+    t.healthText.Visible = false
+    ESP[plr] = t
+end
+
+local function updateESP()
+    for plr, draws in pairs(ESP) do
+        draws.boxOutline.Color = Color3.fromRGB(0, 0, 0)
+        draws.box.Color = boxESPColor
+        draws.name.Color = nameESPColor
+        draws.healthLine.Color = healthBoxESPColor
+        draws.healthText.Color = healthBoxESPColor
+
+        if isAlive(plr) and plr.Character then
+            local root = plr.Character:FindFirstChild("HumanoidRootPart") or plr.Character:FindFirstChild("Torso")
+            local head = plr.Character:FindFirstChild("Head") or root
+            local hum = plr.Character:FindFirstChildOfClass("Humanoid")
+            if root and head and hum then
+                local top, onScreenTop = Cam:WorldToViewportPoint(head.Position + Vector3.new(0,0.4,0))
+                local bottom, onScreenBottom = Cam:WorldToViewportPoint(root.Position - Vector3.new(0,1,0))
+                if not onScreenTop or not onScreenBottom then
+                    for _,v in pairs(draws) do v.Visible = false end
+                else
+                    local sizeY = math.abs(bottom.Y - top.Y)
+                    if sizeY < 2 then
+                        for _,v in pairs(draws) do v.Visible = false end
+                    else
+                        local sizeX = sizeY / 2
+                        local posX, posY = top.X - sizeX/2, top.Y
+
+                        draws.boxOutline.Visible = boxESPEnabled
+                        draws.boxOutline.Position = Vector2.new(posX, posY)
+                        draws.boxOutline.Size = Vector2.new(sizeX, sizeY)
+
+                        draws.box.Visible = boxESPEnabled
+                        draws.box.Position = Vector2.new(posX, posY)
+                        draws.box.Size = Vector2.new(sizeX, sizeY)
+
+                        draws.name.Visible = nameESPEnabled
+                        draws.name.Text = plr.Name
+                        draws.name.Position = Vector2.new(posX + sizeX/2, posY - 14)
+
+                        local hp = hum.Health or 0
+                        local maxhp = hum.MaxHealth or 100
+                        local ratio = math.clamp(hp / (maxhp ~= 0 and maxhp or 1), 0, 1)
+                        local from = Vector2.new(posX - 6, posY + sizeY)
+                        local to = Vector2.new(posX - 6, posY + sizeY * (1 - ratio))
+                        draws.healthLine.Visible = healthBoxESPEnabled
+                        draws.healthLine.From = from
+                        draws.healthLine.To = to
+
+                        draws.healthText.Visible = healthBoxESPEnabled
+                        draws.healthText.Text = tostring(math.floor(hp))
+                        draws.healthText.Position = Vector2.new(posX - 18, (to.Y - 8))
+                    end
+                end
+            else
+                for _,v in pairs(draws) do v.Visible = false end
+            end
+        else
+            for _,v in pairs(draws) do v.Visible = false end
+        end
+    end
+end
+
+-- Replace old connections and calls
+Players.PlayerAdded:Connect(createESP)
+for _, plr in pairs(Players:GetPlayers()) do
+    if plr ~= LocalPlayer then
+        createESP(plr)
+    end
+end
+
+Players.PlayerRemoving:Connect(function(plr)
+    if ESP[plr] then
+        for _, v in pairs(ESP[plr]) do
+            v:Remove()
+        end
+        ESP[plr] = nil
+    end
+end)
+
+Run.RenderStepped:Connect(updateESP)
+
+-- UI với Dear ReGui (bỏ các phần không hỗ trợ như Colorpicker, Keybind, Input, Theme; bỏ AppearanceSection và nút Show GUI)
+AimlockTab:Checkbox({
+	Label = "Aimlock",
+	Value = aimlockEnabled,
+	Callback = function(_, v) 
+        aimlockEnabled = v
+        Notify("Aimlock: " .. (v and "ON" or "OFF"), 2)
+    end
+})
+
+AimlockTab:Checkbox({
+	Label = "View Target",
+	Value = viewEnabled,
+	Callback = function(_, v) toggleViewTarget(v) end
+})
+
+AimlockTab:SliderFloat({
+	Label = "Smoothing",
+	Minimum = 0.1,
+	Maximum = 1,
+	Value = aimSmoothing,
+	Callback = function(_, v) 
+        aimSmoothing = v
+        Notify("Smoothing set to " .. v, 2)
+    end
+})
+
+AimlockTab:Checkbox({
+	Label = "Use Air Part",
+	Value = useAirPart,
+	Callback = function(_, v) 
+        useAirPart = v
+        Notify("Use Air Part: " .. (v and "ON" or "OFF"), 2)
+    end
+})
+
+AimlockTab:Combo({
+	Label = "Air Part",
+	Selected = airPart,
+	Items = airPartsR15,
+	Callback = function(_, v) 
+        airPart = v
+        Notify("Air Part set to " .. v, 2)
+    end
+})
+
+AimlockTab:Checkbox({
+	Label = "Antilock",
+	Value = getgenv().antilock,
+	Callback = function(_, v) 
+        getgenv().antilock = v
+        Notify("Antilock: " .. (v and "ON" or "OFF"), 2)
+    end
+})
+
+AimlockTab:Checkbox({
+	Label = "Resolver",
+	Value = resolverEnabled,
+	Callback = function(_, v) 
+        resolverEnabled = v
+        Notify("Resolver: " .. (v and "ON" or "OFF"), 2)
+    end
+})
+
+AimlockTab:Checkbox({
+	Label = "Auto Ping Sets",
+	Value = AutoPingSets,
+	Callback = function(_, v) 
+        AutoPingSets = v
+        Notify("Auto Ping Sets: " .. (v and "ON" or "OFF"), 2)
+    end
+})
+
+AimlockTab:Checkbox({
+	Label = "Chams",
+	Value = chamsTargetEnabled,
+	Callback = function(_, v) 
+        chamsTargetEnabled = v
+        if selected then
+            local hl = createOrGetHighlightForPlayer(selected)
+            hl.Enabled = v and selected.Character ~= nil
+        end
+        Notify("Chams: " .. (v and "ON" or "OFF"), 2)
+    end
+})
+
+AimlockTab:Checkbox({
+	Label = "Tracer",
+	Value = tracerTargetEnabled,
+	Callback = function(_, v) 
+        tracerTargetEnabled = v
+        if selected then
+            if v and selected.Character then
+                createTracer(selected)
+            else
+                removeTracer(selected)
+            end
+        end
+        Notify("Tracer: " .. (v and "ON" or "OFF"), 2)
+    end
+})
+
+AimlockTab:Checkbox({
+	Label = "AutoShoot",
+	Value = tbEnabled,
+	Callback = function(_, v) 
+        tbEnabled = v
+        Notify("AutoShoot: " .. (v and "ON" or "OFF"), 2)
+    end
+})
+
+AimlockTab:SliderFloat({
+	Label = "Triggerbot FOV",
+	Minimum = 5,
+	Maximum = 50,
+	Value = fovRadius,
+	Callback = function(_, v) 
+        fovRadius = v
+        Notify("Triggerbot FOV set to " .. v, 2)
+    end
+})
+
+AimlockTab:Checkbox({
+	Label = "Target Only",
+	Value = targetOnly,
+	Callback = function(_, v) 
+        targetOnly = v
+        Notify("Target Only: " .. (v and "ON" or "OFF"), 2)
+    end
+})
+
+VisualESPTab:Checkbox({
+	Label = "Box ESP",
+	Value = boxESPEnabled,
+	Callback = function(_, v) 
+        boxESPEnabled = v
+        Notify("Box ESP: " .. (v and "ON" or "OFF"), 2)
+    end
+})
+
+VisualESPTab:Checkbox({
+	Label = "Health Box ESP",
+	Value = healthBoxESPEnabled,
+	Callback = function(_, v) 
+        healthBoxESPEnabled = v
+        Notify("Health Box ESP: " .. (v and "ON" or "OFF"), 2)
+    end
+})
+
+VisualESPTab:Checkbox({
+	Label = "Name ESP",
+	Value = nameESPEnabled,
+	Callback = function(_, v) 
+        nameESPEnabled = v
+        Notify("Name ESP: " .. (v and "ON" or "OFF"), 2)
+    end
+})
+
+MiscTab:SliderFloat({
+	Label = "FOV",
+	Minimum = 40,
+	Maximum = 120,
+	Value = workspace.CurrentCamera.FieldOfView,
+	Callback = function(_, v) 
+        workspace.CurrentCamera.FieldOfView = v
+        Notify("FOV set to " .. v, 2)
+    end
+})
+
+MiscTab:Checkbox({
+	Label = "Autoreload",
+	Value = autoReload,
+	Callback = function(_, v) 
+        autoReload = v
+        Notify("Autoreload: " .. (v and "ON" or "OFF"), 2)
+    end
+})
+
+MiscTab:Checkbox({
+	Label = "Autostomp",
+	Value = stomptarget,
+	Callback = function(_, v) 
+        stomptarget = v
+        toggleStomp()
+    end
+})
+
+MiscTab:Checkbox({
+	Label = "Antistomp",
+	Value = antiStompActive,
+	Callback = function(_, v) 
+        antiStompActive = v
+        if v then startAntiStomp() end
+        Notify("Antistomp: " .. (v and "ON" or "OFF"), 2)
+    end
+})
+
+MiscTab:Checkbox({
+	Label = "Flashback",
+	Value = flashbackActive,
+	Callback = function(_, v) 
+        flashbackActive = v
+        Notify("Flashback: " .. (v and "ON" or "OFF"), 2)
+    end
+})
+
+MiscTab:Checkbox({
+	Label = "No Jump Cooldown",
+	Value = nn_nojumpcooldown,
+	Callback = function(_, v) 
+        nn_nojumpcooldown = v
+        Notify("No Jump Cooldown: " .. (v and "ON" or "OFF"), 2)
+    end
+})
+
+MiscTab:Checkbox({
+	Label = "Rapid Fire",
+	Value = RapidFireEnabled,
+	Callback = function(_, v) 
+        RapidFireEnabled = v
+        Notify("Rapid Fire: " .. (v and "ON" or "OFF"), 2)
+    end
+})
+
+MiscTab:Checkbox({
+	Label = "Instantstomp (PC)",
+	Value = instantstomp,
+	Callback = function(_, v) 
+        instantstomp = v
+        Notify("Instantstomp: " .. (v and "ON" or "OFF"), 2)
+    end
+})
+
+MiscTab:Checkbox({
+	Label = "SpyChat",
+	Value = false,
+	Callback = function(_, v) 
+        local TextChatService = game:GetService("TextChatService")
+        local chatWindow = TextChatService:FindFirstChild("ChatWindowConfiguration")
+        if chatWindow then
+            chatWindow.Enabled = v
+            Notify("SpyChat: " .. (v and "ON" or "OFF"), 3)
+        else
+            Notify("ChatWindowConfiguration not found!", 2)
+        end
+    end
+})
+
+MiscTab:Checkbox({
+	Label = "Fly",
+	Value = flyEnabled,
+	Callback = function(_, v) toggleFly(v) end
+})
+
+MiscTab:SliderFloat({
+	Label = "Fly Speed",
+	Minimum = 10,
+	Maximum = 500,
+	Value = flySpeed,
+	Callback = function(_, v) 
+        flySpeed = v
+        Notify("Fly Speed set to " .. v, 2)
+    end
+})
+
+MiscTab:SliderFloat({
+	Label = "WalkSpeed",
+	Minimum = 16,
+	Maximum = 500,
+	Value = SpeedAmount,
+	Callback = function(_, v) 
+        SpeedAmount = v
+        Notify("WalkSpeed set to " .. v, 2)
+        if dog then
+            local humanoid = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+            applyStats(humanoid)
+        end
+    end
+})
+
+MiscTab:Combo({
+	Label = "Desync Mode",
+	Selected = desync.mode,
+	Items = {"DestroyCheaters", "Underground", "VoidSpam", "Void"},
+	Callback = function(_, v) 
+        setDesyncMode(v)
+        Notify("Desync Mode: " .. v, 2)
+    end
+})
+
+WorldTab:Combo({
+	Label = "Theme",
+	Selected = "Default",
+	Items = {"Neon", "Sunset", "Nature", "DarkViolet", "Cyberpunk", "Ocean", "Lava", "Default"},
+	Callback = function(_, themeName)
+    local theme = themes[themeName]
+    Lighting.Ambient = theme.WorldAmbient
+    Lighting.OutdoorAmbient = theme.WorldOutdoor
+    Lighting.FogColor = theme.Fog
+
+    boxESPColor = theme.BoxColor
+    nameESPColor = theme.NameColor
+    healthBoxESPColor = theme.HealthColor
+    targetChamsColor = theme.targetChamsColor
+    targetTracerColor = theme.targetTracerColor
+    if selected and chamsTargetEnabled then
+        local hl = createOrGetHighlightForPlayer(selected)
+        hl.FillColor = theme.targetChamsColor
+        hl.OutlineColor = theme.targetChamsColor
+    end
+    if selected and tracerTargetEnabled then
+        removeTracer(selected)
+        createTracer(selected)
+    end
+end })
+
+WorldTab:SliderFloat({
+	Label = "Brightness",
+	Minimum = 0,
+	Maximum = 10,
+	Value = Lighting.Brightness,
+	Callback = function(_, v) Lighting.Brightness = v end
+})
+
+WorldTab:SliderFloat({
+	Label = "Clock Time",
+	Minimum = 0,
+	Maximum = 24,
+	Value = Lighting.ClockTime,
+	Callback = function(_, v) Lighting.ClockTime = v end
+})
+
+WorldTab:SliderFloat({
+	Label = "Exposure",
+	Minimum = -10,
+	Maximum = 10,
+	Value = Lighting.ExposureCompensation,
+	Callback = function(_, v) Lighting.ExposureCompensation = v end
+})
+
+SettingsTab:Button({
+	Text = "Rejoin Server",
+	Callback = function()
+    game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer) 
+end })
+
+SettingsTab:Button({
+	Text = "Server Hop",
+	Callback = function()
+    local servers = game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100")
+    local serverList = game:GetService("HttpService"):JSONDecode(servers)
+    local randomServer = serverList.data[math.random(1, #serverList.data)]
+    game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, randomServer.id)
+end })
+
+SettingsTab:Button({
+	Text = "Unload Script",
+	Callback = function() 
+    win:Destroy() 
+end })
+
+Notify("Betuyen.cc Loaded!", 5)
