@@ -44,7 +44,7 @@ if not getgenv().MTXClient_Settings then
             ["Notifications"] = true
         },
         ["Predict"] = {
-            ["PredictMovement"] = true,
+            ["PredictMovement"] = false,
             ["PredictionVelocity"] = 7,
             ["AirPrediction"] = true,
             ["AirPredictionValue"] = 0.145
