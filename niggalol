@@ -2,7 +2,7 @@
 local repo = 'https://raw.githubusercontent.com/mstudio45/LinoriaLib/main/'
 
 local Library = loadstring(game:HttpGet(repo .. 'Library.lua'))()
-local ThemeManager = loadstring(game:HttpGet(repo .. 'addons/ThemeManager.lua'))()
+local ThemeManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/FakeAngles/PasteWare/refs/heads/main/manage2.lua"))()
 local SaveManager = loadstring(game:HttpGet(repo .. 'addons/SaveManager.lua'))()
 local Options = Library.Options
 local Toggles = Library.Toggles
@@ -794,7 +794,8 @@ end)
 
 local StarterGui = game:GetService("StarterGui")
 RapidFireEnabled = false
-RapidFireDelay = 0.01
+RapidFireDelay = 0
+local hyperFireEnabled = false
 local utility = {}
 utility.get_gun = function()
     local char = LocalPlayer.Character
@@ -843,6 +844,41 @@ GunMods:AddToggle("RapidFireToggle", {
         RapidFireEnabled = Value
     end
 })
+
+local function updateHyperFire()
+    for _, obj in ipairs(game:GetDescendants()) do
+        if obj.Name == "ToleranceCooldown" and obj:IsA("ValueBase") then
+            obj.Value = 0 
+        end
+    end
+end
+
+GunMods:AddToggle("HyperFireToggle", {
+    Text = "Rapid Fire v2",
+    Default = false,
+    Callback = function(Value)
+        hyperFireEnabled = Value
+        updateHyperFire()
+    end
+})
+
+game.DescendantAdded:Connect(function(obj)
+    if obj.Name == "ToleranceCooldown" and obj:IsA("ValueBase") then
+        obj.Value = hyperFireEnabled and 0 or 3
+    end
+end)
+
+RunService.RenderStepped:Connect(function()
+    if hyperFireEnabled and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then
+        local character = LocalPlayer.Character
+        if character then
+            local tool = character:FindFirstChildOfClass("Tool")
+            if tool and tool:FindFirstChild("Ammo") then
+                tool:Activate()
+            end
+        end
+    end
+end)
 
 local HBE = Tabs.Main:AddRightGroupbox('HBE')
 
@@ -1021,6 +1057,328 @@ RunService.Heartbeat:Connect(function()
 end)
 
 local LegitBox = Tabs.Main:AddRightGroupbox('Legit')
+
+local predictionTable = {
+    {0, 0.1332},
+    {10, 0.1234555},
+    {20, 0.12435},
+    {30, 0.124123},
+    {40, 0.12766},
+    {50, 0.128643},
+    {60, 0.1264236},
+    {70, 0.12533},
+    {80, 0.1321042},
+    {90, 0.1421951},
+    {100, 0.134143},
+    {105, 0.141199},
+    {110, 0.142199},
+    {125, 0.15465},
+    {130, 0.12399},
+    {135, 0.1659921},
+    {140, 0.1659921},
+    {145, 0.129934},
+    {150, 0.1652131},
+    {155, 0.125333},
+    {160, 0.1223333},
+    {165, 0.1652131},
+    {170, 0.16863},
+    {175, 0.16312},
+    {180, 0.1632},
+    {185, 0.16823},
+    {190, 0.18659},
+    {205, 0.17782},
+    {215, 0.16937},
+    {225, 0.176332},
+}
+
+local Blatant = {
+    {50, 0.12758545757236864},
+    {60, 0.12593338424986178},
+    {70, 0.1416310605747206},
+    {80, 0.1441481061236737},
+    {90, 0.14306050263254388},
+    {100, 0.14698413210558095},
+    {110, 0.14528324362031425},
+    {120, 0.14556534594403},
+    {130, 0.14614337395777216},
+    {140, 0.14645603036905414},
+    {150, 0.14736848095666674},
+    {160, 0.14696985547996216},
+    {170, 0.14718530231216217},
+    {180, 0.1471532933015037},
+    {190, 0.1471212842908452},
+    {200, 0.14708927528018672},
+    {210, 0.14705726626952823},
+    {220, 0.14702525725886974},
+    {230, 0.14699324824821125},
+    {240, 0.14696123923755276},
+    {250, 0.14692923022689427},
+    {260, 0.14689722121623578},
+    {270, 0.1468652122055773},
+    {280, 0.1468332031949188},
+    {290, 0.1468011941842603},
+    {300, 0.1467691851736018},
+}
+
+getgenv().CamLock = {
+    Enabled = false,
+    AutoPrediction = true,
+    AutoPredMode = "PingBased",
+    HorizontalPrediction = 0.1,
+    VerticalPrediction = 0.1,
+    JumpOffset = -1,
+    NoGroundShot = true,
+    Resolver = false,
+    HitPart = "Head",
+    Smoothness = 1
+}
+
+local function calculateAdvancePrediction(target, cameraPosition, pingBase)
+    local character = target.Character
+    if character then
+        local hrp = character:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            local vel = hrp.Velocity
+            local dist = (cameraPosition - hrp.Position).Magnitude
+            local advancePrediction = pingBase + (dist / 1000) * (vel.Magnitude / 50)
+            return advancePrediction
+        end
+    end
+    return pingBase
+end
+
+local function updatePredictionValue()
+    if getgenv().CamLock.AutoPrediction then
+        local pingValue = game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValueString()
+        local split = string.split(pingValue, '(')
+        local ping = tonumber(split[1])
+        if ping then
+            if getgenv().CamLock.AutoPredMode == "PingBased" then
+                for i = 1, #predictionTable do
+                    if ping < predictionTable[i][1] then
+                        local value = predictionTable[i][2]
+                        getgenv().CamLock.HorizontalPrediction = value
+                        getgenv().CamLock.VerticalPrediction = value
+                        break
+                    end
+                end
+            elseif getgenv().CamLock.AutoPredMode == "Calculation" then
+                local calculatedValue = 0.1 + (ping / 1000) * 0.32
+                getgenv().CamLock.HorizontalPrediction = calculatedValue
+                getgenv().CamLock.VerticalPrediction = calculatedValue
+            elseif getgenv().CamLock.AutoPredMode == "AdvanceCalculation" then
+                for i = 1, #predictionTable do
+                    if ping < predictionTable[i][1] then
+                        local pingBase = predictionTable[i][2]
+                        local advancePredictionValue = calculateAdvancePrediction(camLockTarget, workspace.CurrentCamera.CFrame.Position, pingBase)
+                        getgenv().CamLock.HorizontalPrediction = advancePredictionValue
+                        getgenv().CamLock.VerticalPrediction = advancePredictionValue
+                        break
+                    end
+                end
+            elseif getgenv().CamLock.AutoPredMode == "Blatant" then
+                for i = 1, #Blatant do
+                    if ping < Blatant[i][1] then
+                        local value = Blatant[i][2]
+                        getgenv().CamLock.HorizontalPrediction = value
+                        getgenv().CamLock.VerticalPrediction = value
+                        break
+                    end
+                end
+            end
+        end
+    end
+end
+
+local function ApplyAntiGround(character)
+    if not getgenv().CamLock.NoGroundShot then return end
+    local hrp = character and character:FindFirstChild("HumanoidRootPart")
+    if hrp then
+        local velocity = hrp.Velocity
+        local SigmaAir = hrp.Position.Y > 2
+        if not SigmaAir and velocity.Y < -3 then
+            hrp.Velocity = Vector3.new(velocity.X, 0, velocity.Z)
+        end
+    end
+end
+
+LegitBox:AddToggle('CamLockToggle', {
+    Text = 'CamLock',
+    Default = false,
+    Callback = function(state)
+        getgenv().CamLock.Enabled = state
+        if not state then
+            camLockTarget = nil
+        end
+    end,
+}):AddKeyPicker('CamLockKeybind', {
+    Default = 'Q',
+    Text = 'CamLock',
+    Mode = 'Toggle',
+    Callback = function()
+        if UserInputService:GetFocusedTextBox() then return end
+        if not getgenv().CamLock.Enabled then return end
+
+        if camLockTarget then
+            camLockTarget = nil
+        else
+            local closestPlayer = nil
+            local closestDistance = math.huge
+            local mousePos = UserInputService:GetMouseLocation()
+
+            for _, Player in pairs(Players:GetPlayers()) do
+                if Player == LocalPlayer then continue end
+                local character = Player.Character
+                if character then
+                    local screenPart = character:FindFirstChild("Head")
+                    if screenPart then
+                        local screenPos, onScreen = workspace.CurrentCamera:WorldToViewportPoint(screenPart.Position)
+                        if onScreen then
+                            local distance = (Vector2.new(mousePos.X, mousePos.Y) - Vector2.new(screenPos.X, screenPos.Y)).Magnitude
+                            if distance < closestDistance then
+                                closestDistance = distance
+                                closestPlayer = Player
+                            end
+                        end
+                    end
+                end
+            end
+
+            camLockTarget = closestPlayer
+        end
+    end,
+})
+
+LegitBox:AddInput('SmoothnessInput', {
+    Default = '1',
+    Numeric = true,
+    Finished = false,
+    Text = 'Smoothness',
+    Tooltip = 'Controls how smoothly the camera follows the target (0 = instant)',
+    Placeholder = 'Enter smoothness value...',
+    Callback = function(Value)
+        getgenv().CamLock.Smoothness = tonumber(Value) or 1
+    end
+})
+
+LegitBox:AddToggle('AutoPrediction', {
+    Text = 'Auto Prediction',
+    Default = getgenv().CamLock.AutoPrediction,
+    Callback = function(Value)
+        getgenv().CamLock.AutoPrediction = Value
+    end
+})
+
+LegitBox:AddDropdown('AutoPredMode', {
+    Values = { 'AdvanceCalculation', 'PingBased', 'Calculation', 'Blatant' },
+    Default = getgenv().CamLock.AutoPredMode,
+    Text = 'Auto Prediction Mode',
+    Callback = function(Value)
+        getgenv().CamLock.AutoPredMode = Value
+    end
+})
+
+LegitBox:AddInput('HorizontalPrediction', {
+    Default = tostring(getgenv().CamLock.HorizontalPrediction),
+    Numeric = true,
+    Text = 'Horizontal Prediction',
+    Callback = function(Value)
+        if not getgenv().CamLock.AutoPrediction then
+            getgenv().CamLock.HorizontalPrediction = tonumber(Value)
+        end
+    end
+})
+
+LegitBox:AddInput('VerticalPrediction', {
+    Default = tostring(getgenv().CamLock.VerticalPrediction),
+    Numeric = true,
+    Text = 'Vertical Prediction',
+    Callback = function(Value)
+        if not getgenv().CamLock.AutoPrediction then
+            getgenv().CamLock.VerticalPrediction = tonumber(Value)
+        end
+    end
+})
+
+LegitBox:AddInput('JumpOffset', {
+    Default = tostring(getgenv().CamLock.JumpOffset),
+    Numeric = true,
+    Text = 'Jump Offset',
+    Callback = function(Value)
+        getgenv().CamLock.JumpOffset = tonumber(Value)
+    end
+})
+
+LegitBox:AddToggle('NoGroundShot', {
+    Text = 'No Ground Shot',
+    Default = getgenv().CamLock.NoGroundShot,
+    Callback = function(Value)
+        getgenv().CamLock.NoGroundShot = Value
+    end
+})
+
+LegitBox:AddToggle('Resolver', {
+    Text = 'Resolver',
+    Default = getgenv().CamLock.Resolver,
+    Callback = function(Value)
+        getgenv().CamLock.Resolver = Value
+    end
+})
+
+LegitBox:AddDropdown('HitPart', {
+    Values = { 'Head', 'Torso', 'UpperTorso', 'LowerTorso', 'HumanoidRootPart' },
+    Default = getgenv().CamLock.HitPart,
+    Text = 'Hit Part',
+    Callback = function(Value)
+        getgenv().CamLock.HitPart = Value
+    end
+})
+
+RunService.RenderStepped:Connect(function()
+    if getgenv().CamLock.Enabled and camLockTarget then
+        updatePredictionValue()
+        local character = camLockTarget.Character
+        if character then
+            ApplyAntiGround(character)
+            local targetPart = character:FindFirstChild(getgenv().CamLock.HitPart) or character:FindFirstChild("Head") or character:FindFirstChild("Torso")
+            if targetPart then
+                local velocity
+                if getgenv().CamLock.Resolver then
+                    local humanoid = character:FindFirstChildOfClass("Humanoid")
+                    if humanoid then
+                        velocity = humanoid.MoveDirection * humanoid.WalkSpeed
+                    else
+                        velocity = targetPart.Velocity
+                    end
+                else
+                    velocity = targetPart.Velocity
+                end
+
+                local appliedVerticalOffset = 0
+                local verticalVelocity = velocity.Y
+                if verticalVelocity > 0 then
+                    appliedVerticalOffset = getgenv().CamLock.JumpOffset
+                end
+
+                local horizontalPrediction = getgenv().CamLock.HorizontalPrediction
+                local verticalPrediction = getgenv().CamLock.VerticalPrediction
+
+                local targetPosition = Vector3.new(
+                    targetPart.Position.X + (velocity.X * horizontalPrediction),
+                    targetPart.Position.Y + (velocity.Y * verticalPrediction) + appliedVerticalOffset,
+                    targetPart.Position.Z + (velocity.Z * horizontalPrediction)
+                )
+
+                local camera = workspace.CurrentCamera
+                local currentCFrame = camera.CFrame
+                local lookVector = (targetPosition - currentCFrame.Position).Unit
+                local currentLookVector = currentCFrame.LookVector
+                local smoothedLookVector = currentLookVector:Lerp(lookVector, getgenv().CamLock.Smoothness)
+                camera.CFrame = CFrame.new(currentCFrame.Position, currentCFrame.Position + smoothedLookVector)
+            end
+        end
+    end
+end)
 
 local function gettargetsticky()
     if lockedTarget then
@@ -5743,49 +6101,10 @@ SaveManager:SetFolder('MaddieHack/configs')
 SaveManager:BuildConfigSection(Tabs['UI Settings'])
 ThemeManager:ApplyToTab(Tabs['UI Settings'])
 SaveManager:LoadAutoloadConfig()
-Library:SetWatermarkVisibility(true)
+Library:SetWatermarkVisibility(false)
 
 local StatsService = game:GetService("Stats")
 local MarketplaceService = game:GetService("MarketplaceService")
-
-local FrameTimer = tick()
-local FrameCounter = 0
-local FPS = 60
-local StartTime = tick()
-
-local function getExecutor()
-    if syn then return "Synapse X"
-    elseif secure_call then return "ScriptWare"
-    elseif identifyexecutor then return identifyexecutor()
-    else return "Unknown" end
-end
-
-local function getGameName(placeId)
-    local success, result = pcall(function()
-        return MarketplaceService:GetProductInfo(placeId).Name
-    end)
-    return success and result or "Unknown Game"
-end
-
-local WatermarkConnection = RunService.RenderStepped:Connect(function()
-    FrameCounter += 1
-    if (tick() - FrameTimer) >= 1 then
-        FPS = FrameCounter
-        FrameTimer = tick()
-        FrameCounter = 0
-    end
-
-    local Ping = math.floor(StatsService.Network.ServerStatsItem["Data Ping"]:GetValue())
-    local Executor = getExecutor()
-    local Uptime = math.floor(tick() - StartTime)
-    local UptimeFormatted = string.format("%02d:%02d", math.floor(Uptime / 60), Uptime % 60)
-    local GameName = getGameName(game.PlaceId)
-
-    Library:SetWatermark(("[ Nigga.lol ] | $ Anhchangm52 $ |  %s | %s (%d) | Uptime: %s | FPS %d | %d ms"):format(
-        Executor, GameName, game.PlaceId, UptimeFormatted, math.floor(FPS), Ping
-    ))
-end)
-
 
 Library:OnUnload(function()
     WatermarkConnection:Disconnect()
