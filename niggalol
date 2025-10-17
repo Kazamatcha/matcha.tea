@@ -2,7 +2,7 @@
 local repo = 'https://raw.githubusercontent.com/mstudio45/LinoriaLib/main/'
 
 local Library = loadstring(game:HttpGet(repo .. 'Library.lua'))()
-local ThemeManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/FakeAngles/PasteWare/refs/heads/main/manage2.lua"))()
+local ThemeManager = loadstring(game:HttpGet(repo .. 'addons/ThemeManager.lua'))()
 local SaveManager = loadstring(game:HttpGet(repo .. 'addons/SaveManager.lua'))()
 local Options = Library.Options
 local Toggles = Library.Toggles
@@ -6080,20 +6080,20 @@ if not isfolder(themeFolder) then
 end
 
 -- Tạo default.txt nếu chưa có
-if not isfile(themeFolder .. "\\default.txt") then
-    writefile(themeFolder .. "\\default.txt", "pink.json")
+if not isfile(themeFolder .. '/default.txt') then
+    writefile(themeFolder .. '/default.txt', 'matcha.json')
 end
 
--- Tạo pink.json nếu chưa có
-if not isfile(themeFolder .. "\\pink.json") then
+-- Matcha theme (green tones)
+if not isfile(themeFolder .. '/matcha.json') then
     local themeData = {
-        MainColor = "1e1e1e",
-        AccentColor = "ffb3ba",
-        OutlineColor = "141414",
-        BackgroundColor = "232323",
-        FontColor = "d7a1a1"
+        MainColor = "1e1e1e",         -- Dark background
+        AccentColor = "98fb98",        -- Pale green
+        OutlineColor = "141414",       -- Dark outline
+        BackgroundColor = "232323",    -- Medium dark
+        FontColor = "e0ffff"           -- Light cyan for text
     }
-    writefile(themeFolder .. "\\pink.json", game:GetService("HttpService"):JSONEncode(themeData))
+    writefile(themeFolder .. '/matcha.json', game:GetService("HttpService"):JSONEncode(themeData))
 end
 
 SaveManager:SetFolder('MaddieHack/configs')
