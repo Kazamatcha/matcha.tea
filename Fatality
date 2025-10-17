@@ -4453,7 +4453,7 @@ function Fatality.new(Window: Window)
 	HeaderText.Text = Window.Name
 	HeaderText.TextColor3 = Color3.fromRGB(229, 229, 229)
 	HeaderText.TextSize = 21.000
-	HeaderText.TextStrokeColor3 = Color3.fromRGB(205, 67, 218)
+	HeaderText.TextStrokeColor3 = Color3.fromRGB(220,255,220)
 	HeaderText.TextStrokeTransparency = 0.640
 
 	MenuButtonCont.Name = Fatality:RandomString()
@@ -4548,7 +4548,7 @@ function Fatality.new(Window: Window)
 	expire_days.Size = UDim2.new(0, 200, 0, 15)
 	expire_days.ZIndex = 4
 	expire_days.Font = Enum.Font.GothamMedium
-	expire_days.Text = string.format("<font transparency=\"0.5\">expires:</font> <font color=\"#f53174\">%s</font>",Window.Expire)
+	expire_days.Text = string.format("<font transparency=\"0.5\">expires:</font> <font color=\"#46DC6E\">%s</font>",Window.Expire)
 	expire_days.TextColor3 = Color3.fromRGB(255, 255, 255)
 	expire_days.TextSize = 12.000
 	expire_days.TextStrokeTransparency = 0.700
@@ -6506,7 +6506,7 @@ function Fatality:Loader(Config: Loader)
 
 		StartText.Size = UDim2.new(0, baseSIZX + 100, 0, 50)
 
-		UIGradient.Color = ColorSequence.new{ColorSequenceKeypoint.new(0.00, Color3.fromRGB(255, 116, 116)), ColorSequenceKeypoint.new(1.00, Color3.fromRGB(132, 58, 58))}
+		UIGradient.Color = ColorSequence.new{ColorSequenceKeypoint.new(0.00, Color3.fromRGB(173, 255, 47)), ColorSequenceKeypoint.new(1.00, Color3.fromRGB(34, 139, 34))}
 		UIGradient.Rotation = 88
 		UIGradient.Parent = StartText
 
