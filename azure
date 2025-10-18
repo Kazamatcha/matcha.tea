@@ -1,9 +1,4 @@
---[[
-    >rinichi >> did 50% of the work
-    >weda >> did 50% of the work
 
-    >fixed by desktop
-]]
 --[[
 if getgenv().azureloaded then
     return
@@ -18,37 +13,40 @@ repeat
 until game:IsLoaded()
 
 game:GetService("StarterGui"):SetCore("SendNotification",{Title = "azure (temporary notif)",Text = "loading",Duration = 3.6})
+local success, err = pcall(function()
+    local gamerawmetatable = getrawmetatable(game)
+    setreadonly(gamerawmetatable, false)
 
-local gamerawmetatable = getrawmetatable(game)
-setreadonly(gamerawmetatable, false)
+    old__namecall1 = gamerawmetatable.__namecall
+    gamerawmetatable.__namecall = newcclosure(function(self, ...)
+        local args = {...}
+        local remoteName = tostring(args[1])
 
-old__namecall1 = gamerawmetatable.__namecall;gamerawmetatable.__namecall = newcclosure(function(self, ...)
-    local args = {...}
-    if tostring(args[1]) == "TeleportDetect" then
-        return
-    elseif tostring(args[1]) == "CHECKER_1" then
-        return
-    elseif tostring(args[1]) == "CHECKER" then
-        return
-    elseif tostring(args[1]) == "GUI_CHECK" then
-        return
-    elseif tostring(args[1]) == "OneMoreTime" then
-        return
-    elseif tostring(args[1]) == "checkingSPEED" then
-        return
-    elseif tostring(args[1]) == "BANREMOTE" then
-        return
-    elseif tostring(args[1]) == "PERMAIDBAN" then
-        return
-    elseif tostring(args[1]) == "KICKREMOTE" then
-        return
-    elseif tostring(args[1]) == "BR_KICKPC" then
-        return
-    elseif tostring(args[1]) == "BR_KICKMOBILE" then
-        return
-    end
-    return old__namecall1(self, ...)
+        local blockedRemotes = {
+            ["TeleportDetect"] = true,
+            ["CHECKER_1"] = true,
+            ["CHECKER"] = true,
+            ["GUI_CHECK"] = true,
+            ["OneMoreTime"] = true,
+            ["checkingSPEED"] = true,
+            ["BANREMOTE"] = true,
+            ["PERMAIDBAN"] = true,
+            ["KICKREMOTE"] = true,
+            ["BR_KICKPC"] = true,
+            ["BR_KICKMOBILE"] = true
+        }
+
+        if blockedRemotes[remoteName] then
+            return
+        end
+
+        return old__namecall1(self, ...)
+    end)
 end)
+
+if not success then
+    warn("[Anti-RemoteBlock] Executor không hỗ trợ hook metatable (__namecall). Bỏ qua đoạn này.")
+end
 
 function retlibrary()
 
@@ -89,14 +87,14 @@ local utility = {}
 local pages = {}
 local sections = {}
 local theme = {
-    accent = Color3.fromRGB(168,122,207),
-    lightcontrast = Color3.fromRGB(30, 30, 30),
-    darkcontrast = Color3.fromRGB(25, 25, 25),
+    accent = Color3.fromRGB(204,255,255),
+    lightcontrast = Color3.fromRGB(45,45,45),
+    darkcontrast = Color3.fromRGB(35,35,35),
     outline = Color3.fromRGB(0, 0, 0),
-    inline = Color3.fromRGB(50, 50, 50),
+    inline = Color3.fromRGB(40,40,40),
     textcolor = Color3.fromRGB(255, 255, 255),
     textborder = Color3.fromRGB(0, 0, 0),
-    indevcolor = Color3.fromRGB(164, 219, 232),
+    indevcolor = Color3.fromRGB(164,219,232),
     font = Drawing.Fonts.Plex,
     textsize = 13
 }
@@ -5773,23 +5771,6 @@ function library:UpdateColor(ColorType, ColorValue)
     end
 end
 
-
-
-local m_thread = task do
-    setreadonly(m_thread, false)
-
-    function m_thread.spawn_loop(p_time, p_callback)
-        m_thread.spawn(function()
-            while true do
-                p_callback()
-                m_thread.wait(p_time)
-            end
-        end)
-    end
-
-    setreadonly(m_thread, true)
-end
-
 return library, library.pointers, theme
 end
 
@@ -7808,74 +7789,92 @@ task.spawn(function()
     end
 end)
 
-old__namecall2 = gamerawmetatable.__namecall;gamerawmetatable.__namecall = newcclosure(function(...)
-    local arguments = {...}
-    if getnamecallmethod() == "FireServer" and arguments[2] == "UpdateMousePos"
-    then
-        if silentaimPlayer ~= nil and silentaimPlayer.player ~= nil and silentaimPlayer.player.Character ~= nil and library.pointers["!enabled"]:get() then
-            if library.pointers["!closestpart"]:get() then
-                if shared.ClosestPart ~= nil then
-                    local pos = library.pointers["!antigroundshot"]:get() and shared.ClosestPart + Vector3.new(silentaimPlayer.player.Character[library.pointers["!aimpart"]:get()].Velocity.X, -0, silentaimPlayer.player.Character[library.pointers["!aimpart"]:get()].Velocity.Z) * library.pointers["!prediction"]:get() or shared.ClosestPart + silentaimPlayer.player.Character[library.pointers["!aimpart"]:get()].Velocity * library.pointers["!prediction"]:get()
+local success, err = pcall(function()
+    local gamerawmetatable = getrawmetatable(game)
+    setreadonly(gamerawmetatable, false)
+
+    -- Hook __namecall cho Silent Aim
+    old__namecall2 = gamerawmetatable.__namecall
+    gamerawmetatable.__namecall = newcclosure(function(...)
+        local arguments = {...}
+        if getnamecallmethod() == "FireServer" and arguments[2] == "UpdateMousePos" then
+            if silentaimPlayer and silentaimPlayer.player and silentaimPlayer.player.Character and library.pointers["!enabled"]:get() then
+                if library.pointers["!closestpart"]:get() and shared.ClosestPart then
+                    local aimpart = library.pointers["!aimpart"]:get()
+                    local velocity = silentaimPlayer.player.Character[aimpart].Velocity
+                    local pos = library.pointers["!antigroundshot"]:get()
+                        and shared.ClosestPart + Vector3.new(velocity.X, -0, velocity.Z) * library.pointers["!prediction"]:get()
+                        or shared.ClosestPart + velocity * library.pointers["!prediction"]:get()
+                    arguments[3] = pos
+                    return old__namecall2(table.unpack(arguments))
+                else
+                    local aimpart = library.pointers["!aimpart"]:get()
+                    local part = silentaimPlayer.player.Character[aimpart]
+                    local pos = library.pointers["!antigroundshot"]:get()
+                        and part.Position + Vector3.new(part.Velocity.X, -0, part.Velocity.Z) * library.pointers["!prediction"]:get()
+                        or part.Position + part.Velocity * library.pointers["!prediction"]:get()
                     arguments[3] = pos
                     return old__namecall2(table.unpack(arguments))
                 end
-            else
-                local pos = library.pointers["!antigroundshot"]:get() and silentaimPlayer.player.Character[library.pointers["!aimpart"]:get()].Position + Vector3.new(silentaimPlayer.player.Character[library.pointers["!aimpart"]:get()].Velocity.X, -0, silentaimPlayer.player.Character[library.pointers["!aimpart"]:get()].Velocity.Z) * library.pointers["!prediction"]:get() or silentaimPlayer.player.Character[library.pointers["!aimpart"]:get()].Position + silentaimPlayer.player.Character[library.pointers["!aimpart"]:get()].Velocity * library.pointers["!prediction"]:get()
+            end
+        end
+        return old__namecall2(...)
+    end)
+
+    -- Hook __namecall cho Target Aim
+    old__namecall3 = gamerawmetatable.__namecall
+    gamerawmetatable.__namecall = newcclosure(function(...)
+        local arguments = {...}
+        if getnamecallmethod() == "FireServer" and arguments[2] == "UpdateMousePos" then
+            if targetaim__player and targetaim__player.player and targetaim__player.player.Character and library.pointers["#enabled"]:get() and targetaim__enabled then
+                local aimpart = library.pointers["#aimpart"]:get()
+                local part = targetaim__player.player.Character[aimpart]
+                local pos = library.pointers["#jumpoffset"]:get()
+                    and part.Position + Vector3.new(0, shared.JumpOffset, 0) + part.Velocity * targetaim__prediction
+                    or part.Position + part.Velocity * targetaim__prediction
                 arguments[3] = pos
-                return old__namecall2(table.unpack(arguments))
+                shared.shootpos = pos
+                return old__namecall3(table.unpack(arguments))
             end
         end
-    end
-    return old__namecall2(...)
-end)
+        return old__namecall3(...)
+    end)
 
-old__namecall3 = gamerawmetatable.__namecall;gamerawmetatable.__namecall = newcclosure(function(...)
-    local arguments = {...}
-    if getnamecallmethod() == "FireServer" and arguments[2] == "UpdateMousePos"
-    then
-        if targetaim__player ~= nil and targetaim__player.player ~= nil and targetaim__player.player.Character ~= nil and library.pointers["#enabled"]:get() and targetaim__enabled then
-            local pos = library.pointers["#jumpoffset"]:get() and targetaim__player.player.Character[library.pointers["#aimpart"]:get()].Position + Vector3.new(0, shared.JumpOffset, 0) + targetaim__player.player.Character[library.pointers["#aimpart"]:get()].Velocity * targetaim__prediction or targetaim__player.player.Character[library.pointers["#aimpart"]:get()].Position + targetaim__player.player.Character[library.pointers["#aimpart"]:get()].Velocity * targetaim__prediction
-            arguments[3] = pos
-            shared.shootpos = arguments[3]
-            return old__namecall3(table.unpack(arguments))
-        end
-    end
-    return old__namecall3(...)
-end)
-
-old__index = gamerawmetatable.__index;gamerawmetatable.__index = newcclosure(function(self, property)
-    if anticurveBoolean and library.pointers["!anticurve"]:get() then
-        if not checkcaller() then
-            if property == "CFrame" and library.pointers["!anticurve"]:get() and anticurveBoolean and character.isAlive() then
+    -- Hook __index cho Anti Curve
+    old__index = gamerawmetatable.__index
+    gamerawmetatable.__index = newcclosure(function(self, property)
+        if anticurveBoolean and library.pointers["!anticurve"]:get() and not checkcaller() and character.isAlive() then
+            if property == "CFrame" then
                 if self == localplayer.Character.HumanoidRootPart then
-                    return shared.anticurve__currentpos or 
-                    CFrame.new()
+                    return shared.anticurve__currentpos or CFrame.new()
                 elseif self == localplayer.Character.Head then
-                    return shared.anticurve__currentpos and shared.currentPosition + Vector3.new(0, localplayer.Character.HumanoidRootPart.Size / 2 + 0.5, 0) or 
-                    CFrame.new()
+                    return shared.anticurve__currentpos and shared.currentPosition + Vector3.new(0, localplayer.Character.HumanoidRootPart.Size / 2 + 0.5, 0) or CFrame.new()
                 end
             end
         end
-    end
-    return old__index(self, property)
-end)
+        return old__index(self, property)
+    end)
 
-old__index2 = gamerawmetatable.__index;gamerawmetatable.__index = newcclosure(function(self, property)
-    if autobuyBoolean then
-        if not checkcaller() then
-            if property == "CFrame" and autobuyBoolean and character.isAlive() then
+    -- Hook __index cho AutoBuy
+    old__index2 = gamerawmetatable.__index
+    gamerawmetatable.__index = newcclosure(function(self, property)
+        if autobuyBoolean and not checkcaller() and character.isAlive() then
+            if property == "CFrame" then
                 if self == localplayer.Character.HumanoidRootPart then
-                    return shared.currentPosition or 
-                    CFrame.new()
+                    return shared.currentPosition or CFrame.new()
                 elseif self == localplayer.Character.Head then
-                    return shared.currentPosition and shared.currentPosition + Vector3.new(0, localplayer.Character.HumanoidRootPart.Size / 2 + 0.5, 0) or 
-                    CFrame.new()
+                    return shared.currentPosition and shared.currentPosition + Vector3.new(0, localplayer.Character.HumanoidRootPart.Size / 2 + 0.5, 0) or CFrame.new()
                 end
             end
         end
-    end
-    return old__index2(self, property)
+        return old__index2(self, property)
+    end)
 end)
+
+-- Nếu thất bại thì thông báo hoặc bỏ qua
+if not success then
+    warn("Executor không hỗ trợ hook metatable (__namecall / __index). Bỏ qua đoạn này.")
+end
 
 --// desktop fixed this btw
 if library:Initialize() then library:Initialize() end
