@@ -83,6 +83,34 @@ getgenv().matcha = {
     SmoothAimlock = 0.5,
     SmoothMethod = "Linear",
     WallCheck = false,
+    TriggerbotEnabled = false,
+    TriggerKey = Enum.KeyCode.E,
+    TriggerFOV = 20,
+    OnlyTarget = false,
+    TriggerCheckWall = false,
+    TriggerCheckKO = false,
+    TriggerCheckKnife = false,
+    TriggerCheckGrab = false,
+    TriggerCheckTeam = false,
+    TriggerCheckFriend = false,
+    TriggerDelay = 1,
+    HitboxExpanderEnabled = false,
+    HitboxSize = 10,
+    VisualizeHitbox = false,
+    HitboxColor = Color3.new(0, 1, 1),
+    HitboxCheckTeam = false,
+    HitboxOnlyTarget = false,
+    FOVCircleEnabled = false,
+    FOVCircleMode = "center",
+    FOVCircleSize = 100,
+    FOVCircleThickness = 1,
+    FOVCircleColor = Color3.new(1, 0, 0),
+    FOVCircleTransparency = 0.5,
+    FOVCircleFilled = false,
+    FOVCircleLineEnabled = false,
+    FOVCircleLineColor = Color3.new(1, 1, 1),
+    UseAimFOV = false,
+    AutoTargetFOV = false,
 }
 
 -- Hit parts
@@ -157,6 +185,20 @@ local predictionTable = {
     {225, 0.176332},
 }
 
+-- FOV Circle Drawing
+local FOVCircle = Drawing.new("Circle")
+FOVCircle.Visible = false
+FOVCircle.Radius = getgenv().matcha.FOVCircleSize
+FOVCircle.Thickness = getgenv().matcha.FOVCircleThickness
+FOVCircle.Color = getgenv().matcha.FOVCircleColor
+FOVCircle.Transparency = 1 - getgenv().matcha.FOVCircleTransparency
+FOVCircle.Filled = getgenv().matcha.FOVCircleFilled
+
+local FOVLine = Drawing.new("Line")
+FOVLine.Visible = false
+FOVLine.Color = getgenv().matcha.FOVCircleLineColor
+FOVLine.Thickness = 1
+
 -- Functions from old script
 local function getAccountAge(player)
     local joinDate = player.AccountAge
@@ -206,8 +248,8 @@ local function canSeeThroughWall(localPlayer, target)
 end
 
 local function getClosestTarget()
-    local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-    local closestDist = math.huge
+    local center = getgenv().matcha.FOVCircleMode == "center" and Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2) or UserInputService:GetMouseLocation()
+    local closestDist = getgenv().matcha.FOVCircleSize
     local closestPlayer = nil
 
     for _, plr in ipairs(Players:GetPlayers()) do
@@ -221,12 +263,7 @@ local function getClosestTarget()
 
             local screenPos, onScreen = Camera:WorldToViewportPoint(plr.Character.HumanoidRootPart.Position)
             if onScreen then
-                local dist
-                if UserInputService.TouchEnabled then
-                    dist = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
-                else
-                    dist = (Vector2.new(screenPos.X, screenPos.Y) - Vector2.new(Mouse.X, Mouse.Y)).Magnitude
-                end
+                local dist = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
                 if dist < closestDist then
                     closestDist = dist
                     closestPlayer = plr
@@ -593,6 +630,14 @@ local function isValidTarget(target)
     local part = getAimPart(target)
     if not part then return false end
     
+    if getgenv().matcha.UseAimFOV then
+        local center = getgenv().matcha.FOVCircleMode == "center" and Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2) or UserInputService:GetMouseLocation()
+        local screenPos, onScreen = Camera:WorldToViewportPoint(part.Position)
+        if not onScreen then return false end
+        local dist = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
+        if dist > getgenv().matcha.FOVCircleSize then return false end
+    end
+    
     return true
 end
 
@@ -611,6 +656,53 @@ end
 
 RunService.RenderStepped:Connect(function()
     if getgenv().matcha.AutoTarget and getgenv().matcha.TargetLockEnabled then
+        local target = getClosestTarget()
+        if target and (not getgenv().matcha.SelectedTarget or not isAlive(getgenv().matcha.SelectedTarget)) then
+            getgenv().matcha.SelectedTarget = target
+            notifyTarget(target)
+        end
+    end
+
+    if getgenv().matcha.FOVCircleEnabled then
+        FOVCircle.Visible = true
+        FOVCircle.Radius = getgenv().matcha.FOVCircleSize
+        FOVCircle.Thickness = getgenv().matcha.FOVCircleThickness
+        FOVCircle.Color = getgenv().matcha.FOVCircleColor
+        FOVCircle.Transparency = 1 - getgenv().matcha.FOVCircleTransparency
+        FOVCircle.Filled = getgenv().matcha.FOVCircleFilled
+        FOVCircle.Position = getgenv().matcha.FOVCircleMode == "center" and Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2) or UserInputService:GetMouseLocation()
+        
+        if getgenv().matcha.FOVCircleLineEnabled and getgenv().matcha.SelectedTarget and isAlive(getgenv().matcha.SelectedTarget) then
+            local part = getAimPart(getgenv().matcha.SelectedTarget)
+            if part then
+                local screenPos, onScreen = Camera:WorldToViewportPoint(part.Position)
+                if onScreen then
+                    local center = getgenv().matcha.FOVCircleMode == "center" and Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2) or UserInputService:GetMouseLocation()
+                    local dist = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
+                    if dist <= getgenv().matcha.FOVCircleSize then
+                        FOVLine.Visible = true
+                        FOVLine.From = center
+                        FOVLine.To = Vector2.new(screenPos.X, screenPos.Y)
+                        FOVLine.Color = getgenv().matcha.FOVCircleLineColor
+                    else
+                        FOVLine.Visible = false
+                    end
+                else
+                    FOVLine.Visible = false
+                end
+            else
+                FOVLine.Visible = false
+            end
+        else
+            FOVLine.Visible = false
+        end
+    else
+        FOVCircle.Visible = false
+        FOVLine.Visible = false
+    end
+
+    -- AutoTarget with FOV
+    if getgenv().matcha.AutoTargetFOV and getgenv().matcha.TargetLockEnabled then
         local target = getClosestTarget()
         if target and (not getgenv().matcha.SelectedTarget or not isAlive(getgenv().matcha.SelectedTarget)) then
             getgenv().matcha.SelectedTarget = target
@@ -788,22 +880,6 @@ TargetLockGroup:AddDropdown('Whitelist', {
     end
 })
 
--- Add to getgenv().matcha
-getgenv().matcha.TriggerbotEnabled = false
-getgenv().matcha.TriggerKey = Enum.KeyCode.E
-getgenv().matcha.TriggerFOV = 20
-getgenv().matcha.OnlyTarget = false
-getgenv().matcha.TriggerCheckWall = false
-getgenv().matcha.TriggerCheckKO = false
-getgenv().matcha.TriggerCheckKnife = false
-getgenv().matcha.TriggerCheckGrab = false
-getgenv().matcha.TriggerCheckTeam = false
-getgenv().matcha.TriggerCheckFriend = false
-getgenv().matcha.HitboxExpanderEnabled = false
-getgenv().matcha.HitboxSize = 10
-getgenv().matcha.VisualizeHitbox = false
-getgenv().matcha.HitboxColor = Color3.new(0, 1, 1)
-
 -- Triggerbot Functions
 local function isHoldingKnife()
     local char = LocalPlayer.Character
@@ -902,6 +978,11 @@ local function handleCharacter(Character)
         resetCharacter(Character)
         return
     end
+    local player = Players:GetPlayerFromCharacter(Character)
+    if not player then return end
+    if getgenv().matcha.HitboxOnlyTarget and player ~= getgenv().matcha.SelectedTarget then return end
+    if getgenv().matcha.HitboxCheckTeam and player.Team == LocalPlayer.Team then return end
+    
     local HRP = Character:FindFirstChild("HumanoidRootPart") or Character:WaitForChild("HumanoidRootPart", 5)
     if not HRP then return end
 
@@ -968,7 +1049,7 @@ RunService.RenderStepped:Connect(function()
         if part then
             task.spawn(function()
                 local cap = part
-                task.wait(0)
+                task.wait(getgenv().matcha.TriggerDelay / 1000)
                 if getgenv().matcha.TriggerbotEnabled and distToCursor(cap) <= getgenv().matcha.TriggerFOV then
                     local origin = Camera.CFrame.Position
                     local direction = (cap.Position - origin)
@@ -1009,7 +1090,7 @@ RunService.RenderStepped:Connect(function()
 end)
 
 -- UI Additions
-local TriggerbotGroup = Tabs.Main:AddRightGroupbox('Triggerbot')
+local TriggerbotGroup = Tabs.Main:AddLeftGroupbox('Triggerbot')
 
 TriggerbotGroup:AddToggle('TriggerbotEnabled', {
     Text = 'Enabled',
@@ -1093,6 +1174,17 @@ TriggerbotGroup:AddToggle('TriggerCheckFriend', {
     end
 })
 
+TriggerbotGroup:AddSlider('TriggerDelay', {
+    Text = 'Trigger Delay (ms)',
+    Min = 0,
+    Max = 2000,
+    Default = 1,
+    Rounding = 0,
+    Callback = function(Value)
+        getgenv().matcha.TriggerDelay = Value
+    end
+})
+
 local HitboxGroup = Tabs.Main:AddLeftGroupbox('Hitbox')
 
 HitboxGroup:AddToggle('HitboxExpanderToggle', {
@@ -1139,6 +1231,118 @@ HitboxGroup:AddToggle('VisualizerToggle', {
     Default = Color3.new(0, 1, 1),
     Callback = function(color)
         getgenv().matcha.HitboxColor = color
+    end
+})
+
+HitboxGroup:AddToggle('HitboxCheckTeam', {
+    Text = 'Check Team',
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.HitboxCheckTeam = Value
+    end
+})
+
+HitboxGroup:AddToggle('HitboxOnlyTarget', {
+    Text = 'Only Target',
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.HitboxOnlyTarget = Value
+    end
+})
+
+local FOVCircleGroup = Tabs.Main:AddLeftGroupbox('FOV Circle')
+
+FOVCircleGroup:AddToggle('FOVCircleEnabled', {
+    Text = 'Enabled',
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.FOVCircleEnabled = Value
+    end
+}):AddColorPicker('FOVCircleColor', {
+    Text = 'FOV Color',
+    Default = Color3.new(1, 0, 0),
+    Callback = function(Value)
+        getgenv().matcha.FOVCircleColor = Value
+    end
+})
+
+FOVCircleGroup:AddToggle('UseAimFOV', {
+    Text = 'Use Aim FOV',
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.UseAimFOV = Value
+    end
+})
+
+FOVCircleGroup:AddToggle('AutoTargetFOV', {
+    Text = 'Auto Target FOV',
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.AutoTargetFOV = Value
+    end
+})
+
+FOVCircleGroup:AddDropdown('FOVCircleMode', {
+    Values = {'center', 'mouse'},
+    Default = 'center',
+    Text = 'FOV Mode',
+    Callback = function(Value)
+        getgenv().matcha.FOVCircleMode = Value
+    end
+})
+
+FOVCircleGroup:AddSlider('FOVCircleSize', {
+    Text = 'FOV Size',
+    Min = 10,
+    Max = 1000,
+    Default = 100,
+    Rounding = 0,
+    Callback = function(Value)
+        getgenv().matcha.FOVCircleSize = Value
+    end
+})
+
+FOVCircleGroup:AddSlider('FOVCircleThickness', {
+    Text = 'Thickness',
+    Min = 1,
+    Max = 10,
+    Default = 1,
+    Rounding = 0,
+    Callback = function(Value)
+        getgenv().matcha.FOVCircleThickness = Value
+    end
+})
+
+FOVCircleGroup:AddToggle('FOVCircleFilled', {
+    Text = 'Fill Circle',
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.FOVCircleFilled = Value
+    end
+})
+
+FOVCircleGroup:AddSlider('FOVCircleTransparency', {
+    Text = 'Transparency',
+    Min = 0,
+    Max = 1,
+    Default = 0.5,
+    Rounding = 2,
+    Callback = function(Value)
+        getgenv().matcha.FOVCircleTransparency = Value
+    end
+})
+
+FOVCircleGroup:AddToggle('FOVCircleLineEnabled', {
+    Text = 'Line to Target',
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.FOVCircleLineEnabled = Value
+    end
+}):AddColorPicker('FOVCircleLineColor', {
+    Text = 'Line Color',
+    Default = Color3.new(1, 1, 1),
+    Callback = function(Value)
+        getgenv().matcha.FOVCircleLineColor = Value
     end
 })
 
