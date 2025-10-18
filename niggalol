@@ -120,7 +120,47 @@ local function getMainRemote()
     return nil
 end
 
+-- Hàm equip tất cả tool có Ammo
+function equipAllGuns()
+    local player = game.Players.LocalPlayer
+    local backpack = player:WaitForChild("Backpack")
+    local char = player.Character or player.CharacterAdded:Wait()
 
+    local equippedSomething = false
+
+    for _, tool in ipairs(backpack:GetChildren()) do
+        if tool:IsA("Tool") and tool:FindFirstChild("Ammo") then
+            tool.Parent = char
+            equippedSomething = true
+        end
+    end
+
+    if equippedSomething then
+        Library:Notify("✅ Equipped all guns with Ammo")
+    else
+        Library:Notify("❌ No guns with Ammo found")
+    end
+end
+
+-- Hàm unequip tất cả tool có Ammo
+function unequipAllGuns()
+    local player = game.Players.LocalPlayer
+    local char = player.Character
+    if not char then return end
+
+    local unequippedSomething = false
+
+    for _, tool in ipairs(char:GetChildren()) do
+        if tool:IsA("Tool") and tool:FindFirstChild("Ammo") then
+            tool.Parent = player.Backpack
+            unequippedSomething = true
+        end
+    end
+
+    if unequippedSomething then
+        Library:Notify("🛑 Unequipped all guns")
+    end
+end
 local MainRemote = getMainRemote()
 
 function predictPosition(targetRoot, predictionMultiplier)
@@ -836,7 +876,33 @@ UserInputService.InputEnded:Connect(function(i)
         isFiring = false
     end
 end)
+getgenv().EquipAllGun = false
+GunMods:AddToggle('EquipAllGun', {
+    Text = 'Equip All Gun',
+    Default = false,
+    Callback = function(state)
+        getgenv().EquipAllGun = state
 
+        if state then
+            equipAllGuns()
+        else
+            unequipAllGuns()
+        end
+    end
+}):AddKeyPicker("EquipAllGunKeyPicker", {
+    Default = "H",
+    Text = "EquipAllGunKey",
+    Mode = "Toggle",
+    Callback = function(state)
+        getgenv().EquipAllGun = state
+
+        if state then
+            equipAllGuns()
+        else
+            unequipAllGuns()
+        end
+    end
+})
 GunMods:AddToggle("RapidFireToggle", {
     Text = "Rapid Fire",
     Default = false,
