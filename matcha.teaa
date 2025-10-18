@@ -329,25 +329,24 @@ end
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Parent = game.CoreGui
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-ScreenGui.Name = "MatchaMobileButtons"
 ScreenGui.ResetOnSpawn = false
 
 local savedPositions = {}
-if isfile("matcha_positions.json") then
-    savedPositions = HttpService:JSONDecode(readfile("matcha_positions.json"))
+if isfile("button_positions.json") then
+	savedPositions = game:GetService("HttpService"):JSONDecode(readfile("button_positions.json"))
 end
 
-local function SavePositions(pos)
-    writefile("matcha_positions.json", HttpService:JSONEncode(pos))
+local function SavePositions(positions)
+	writefile("button_positions.json", game:GetService("HttpService"):JSONEncode(positions))
 end
 
 local function CreateButton(name, defaultPosition, callback)
     local Button = Instance.new("TextButton")
     Button.Size = UDim2.new(0, 100, 0, 50)
-    Button.Position = savedPositions[name] or defaultPosition
+    Button.Position = savedPositions[name] and UDim2.new(0, savedPositions[name].X, 0, savedPositions[name].Y) or defaultPosition
     Button.Text = name
     Button.Parent = ScreenGui
-    Button.BackgroundColor3 = Color3.fromRGB(0, 128, 0)  -- Matcha green
+    Button.BackgroundColor3 = Color3.fromRGB(0, 128, 0)  -- Màu xanh matcha
     Button.BorderSizePixel = 0
     Button.Font = Enum.Font.Code
     Button.TextColor3 = Color3.new(1, 1, 1)
@@ -361,7 +360,7 @@ local function CreateButton(name, defaultPosition, callback)
     local Shadow = Instance.new("Frame")
     Shadow.Size = UDim2.new(1, 6, 1, 6)
     Shadow.Position = UDim2.new(0, -3, 0, -3)
-    Shadow.BackgroundColor3 = Color3.fromRGB(0, 100, 0)
+    Shadow.BackgroundColor3 = Color3.fromRGB(0, 100, 0)  -- Shadow xanh đậm hơn
     Shadow.BackgroundTransparency = 0.7
     Shadow.ZIndex = -1
     Shadow.Parent = Button
@@ -375,7 +374,7 @@ local function CreateButton(name, defaultPosition, callback)
     local function updateButtonState()
         local targetColor = isActive and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(0, 128, 0)
         local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-        local tween = TweenService:Create(Shadow, tweenInfo, {BackgroundColor3 = targetColor})
+        local tween = game:GetService("TweenService"):Create(Shadow, tweenInfo, {BackgroundColor3 = targetColor})
         tween:Play()
     end
 
@@ -410,7 +409,7 @@ local function CreateButton(name, defaultPosition, callback)
         end
     end)
     
-    return Button
+    return Button, function() return isActive end
 end
 
 -- Owners code
@@ -645,11 +644,17 @@ local function selectTarget()
     if getgenv().matcha.SelectedTarget then
         getgenv().matcha.SelectedTarget = nil
         notifyUntarget()
+        if getgenv().matcha.MobileButton then 
+            getgenv().matcha.MobileButton.Text = "Target Lock"
+        end
     else
         local target = getClosestTarget()
         if target then
             getgenv().matcha.SelectedTarget = target
             notifyTarget(target)
+            if getgenv().matcha.MobileButton then 
+                getgenv().matcha.MobileButton.Text = "Untarget"              
+            end
         end
     end
 end
@@ -761,6 +766,7 @@ local Tabs = {
     Rage = Window:AddTab('Rage'),
     Visual = Window:AddTab('Visual'),
     Character = Window:AddTab('Character'),
+	Misc = Window:AddTab('Misc'),
     Players = Window:AddTab('Players'),
     ['UI Settings'] = Window:AddTab('UI Settings'),
 }
@@ -1099,6 +1105,11 @@ TriggerbotGroup:AddToggle('TriggerbotEnabled', {
     Default = false,
     Callback = function(Value)
         getgenv().matcha.TriggerbotEnabled = Value
+		if Value then 
+		    Library:Notify("Triggerbot Enabled " .. " matcha.tea ", 2)
+		else
+			Library:Notify("Triggerbot Disabled" .. " matcha.tea ", 2)
+		end
     end
 }):AddKeyPicker('TriggerKey', {
     Default = 'E',
@@ -1106,6 +1117,11 @@ TriggerbotGroup:AddToggle('TriggerbotEnabled', {
     Text = 'Trigger Key',
     Callback = function()
         getgenv().matcha.TriggerbotEnabled = not getgenv().matcha.TriggerbotEnabled
+		if getgenv().matcha.TriggerbotEnabled then 
+		    Library:Notify("Triggerbot Enabled " .. "matcha.tea", 2)
+		else
+			Library:Notify("Triggerbot Disabled" .. "matcha.tea", 2)
+        end
     end
 })
 
@@ -1694,6 +1710,15 @@ SaveManager:LoadAutoloadConfig()
 -- Watermark
 Library:SetWatermarkVisibility(true)
 
+-- Add to getgenv().matcha for Watermark settings
+getgenv().matcha.WatermarkEnabled = true
+getgenv().matcha.WatermarkShowFPS = true
+getgenv().matcha.WatermarkShowGameName = false
+getgenv().matcha.WatermarkShowUptime = false
+getgenv().matcha.WatermarkShowExecutor = false
+getgenv().matcha.WatermarkShowPing = true
+
+-- Modified Watermark Logic
 local FrameTimer = tick()
 local FrameCounter = 0
 local FPS = 60
@@ -1713,7 +1738,7 @@ local function getGameName(placeId)
     return success and result or "Unknown Game"
 end
 
-local WatermarkConnection = RunService.RenderStepped:Connect(function()
+local function updateWatermark()
     FrameCounter += 1
     if (tick() - FrameTimer) >= 1 then
         FPS = FrameCounter
@@ -1727,10 +1752,86 @@ local WatermarkConnection = RunService.RenderStepped:Connect(function()
     local UptimeFormatted = string.format("%02d:%02d", math.floor(Uptime / 60), Uptime % 60)
     local GameName = getGameName(game.PlaceId)
 
-    Library:SetWatermark((" matcha.tea  | $ Anhchangm52 $ |  %s | %s (%d) | Uptime: %s | FPS %d | %d ms"):format(
-        Executor, GameName, game.PlaceId, UptimeFormatted, math.floor(FPS), Ping
-    ))
+    local watermarkParts = {"matcha.tea", " Anhchangm52 "}
+    
+    if getgenv().matcha.WatermarkShowExecutor then
+        table.insert(watermarkParts, Executor)
+    end
+    if getgenv().matcha.WatermarkShowGameName then
+        table.insert(watermarkParts, string.format("%s (%d)", GameName, game.PlaceId))
+    end
+    if getgenv().matcha.WatermarkShowUptime then
+        table.insert(watermarkParts, string.format("Uptime: %s", UptimeFormatted))
+    end
+    if getgenv().matcha.WatermarkShowFPS then
+        table.insert(watermarkParts, string.format("FPS %d", math.floor(FPS)))
+    end
+    if getgenv().matcha.WatermarkShowPing then
+        table.insert(watermarkParts, string.format("%d ms", Ping))
+    end
+
+    Library:SetWatermark(table.concat(watermarkParts, " | "))
+    Library:SetWatermarkVisibility(getgenv().matcha.WatermarkEnabled)
+end
+
+local WatermarkConnection = RunService.RenderStepped:Connect(updateWatermark)
+
+Library:OnUnload(function()
+    WatermarkConnection:Disconnect()
+    print('Unloaded!')
+    Library.Unloaded = true
 end)
+
+-- Watermark Customization UI
+local WatermarkGroup = Tabs['UI Settings']:AddRightGroupbox('Watermark')
+
+WatermarkGroup:AddToggle('WatermarkEnabled', {
+    Text = 'Enabled',
+    Default = true,
+    Callback = function(Value)
+        getgenv().matcha.WatermarkEnabled = Value
+    end
+})
+
+WatermarkGroup:AddToggle('WatermarkShowFPS', {
+    Text = 'Show FPS',
+    Default = true,
+    Callback = function(Value)
+        getgenv().matcha.WatermarkShowFPS = Value
+    end
+})
+
+WatermarkGroup:AddToggle('WatermarkShowGameName', {
+    Text = 'Show Game Name',
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.WatermarkShowGameName = Value
+    end
+})
+
+WatermarkGroup:AddToggle('WatermarkShowUptime', {
+    Text = 'Show Uptime',
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.WatermarkShowUptime = Value
+    end
+})
+
+WatermarkGroup:AddToggle('WatermarkShowExecutor', {
+    Text = 'Show Executor',
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.WatermarkShowExecutor = Value
+    end
+})
+
+WatermarkGroup:AddToggle('WatermarkShowPing', {
+    Text = 'Show Ping',
+    Default = true,
+    Callback = function(Value)
+        getgenv().matcha.WatermarkShowPing = Value
+    end
+})
 
 Library:OnUnload(function()
     WatermarkConnection:Disconnect()
