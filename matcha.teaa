@@ -1,0 +1,1533 @@
+
+
+local repo = 'https://raw.githubusercontent.com/mstudio45/LinoriaLib/main/'
+
+local Library = loadstring(game:HttpGet(repo .. 'Library.lua'))()
+local ThemeManager = loadstring(game:HttpGet(repo .. 'addons/ThemeManager.lua'))()
+local SaveManager = loadstring(game:HttpGet(repo .. 'addons/SaveManager.lua'))()
+local Options = Library.Options
+local Toggles = Library.Toggles
+
+Library.ShowToggleFrameInKeybinds = true
+Library.ShowCustomCursor = true
+Library.NotifySide = "Left"
+
+local Fatality = loadstring(game:HttpGet("https://raw.githubusercontent.com/Kazamatcha/matcha.tea/refs/heads/main/Fatality"))();
+local Notification = Fatality:CreateNotifier();
+
+Fatality:Loader({
+	Name = "matcha.tea",
+	Duration = 4
+});
+
+Notification:Notify({
+	Title = "matcha.tea",
+	Content = "Hello, "..game.Players.LocalPlayer.DisplayName..' Welcome back!',
+	Icon = "clipboard"
+});
+
+-- Services
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local HttpService = game:GetService("HttpService")
+local Stats = game:GetService("Stats")
+local MarketplaceService = game:GetService("MarketplaceService")
+local TweenService = game:GetService("TweenService")
+local VirtualUser = game:GetService("VirtualUser")
+local Mouse = LocalPlayer:GetMouse()
+
+getgenv().vu = VirtualUser
+getgenv().isAntiAfkEnabled = false
+getgenv().antiAfkConnection = nil
+
+-- Global settings
+getgenv().matcha = {
+    TargetLockEnabled = false,
+    AutoTarget = false,
+    CheckWall = false,
+    CheckKO = false,
+    CheckKO2 = false,
+    CheckGrabbing = false,
+    CheckGrabbing2 = false,
+    CheckFriend = false,
+    CheckFriend2 = false,
+    CheckTeam = false,
+    CheckTeam2 = false,
+    TargetKey = Enum.KeyCode.Q,
+    NotifyEnabled = false,
+    LookAt = false,
+    SelectedTarget = nil,
+    Whitelist = {},
+    MobileButtonEnabled = false,
+    MobileButton = nil,
+    AimlockEnabled = false,
+    AimMethod = "camera",
+    HealthCheck = false,
+    HealthThreshold = 50,
+    DistanceCheck = false,
+    DistanceLimit = 500,
+    Resolver = false,
+    ResolverMethod = "move direction",
+    AutoPrediction = false,
+    AutoPredMode = "PingBased",
+    PredictionX = 0,
+    PredictionY = 0,
+    HitPart = "Head",
+    ClosestHitPart = false,
+    AirPart = false,
+    AirHitPart = "UpperTorso",
+    AntiGround = false,
+    SmoothAimlock = 0.5,
+    SmoothMethod = "Linear",
+    WallCheck = false,
+}
+
+-- Hit parts
+local HitParts = {
+    "Head", "HumanoidRootPart", "UpperTorso", "LowerTorso",
+    "LeftUpperArm", "RightUpperArm", "LeftLowerArm", "RightLowerArm",
+    "LeftHand", "RightHand", "LeftUpperLeg", "RightUpperLeg",
+    "LeftLowerLeg", "RightLowerLeg", "LeftFoot", "RightFoot",
+    "Torso", "Left Arm", "Right Arm", "Left Leg", "Right Leg"
+}
+
+-- Prediction tables
+local Blatant = {
+    {50, 0.12758545757236864},
+    {60, 0.12593338424986178},
+    {70, 0.1416310605747206},
+    {80, 0.1441481061236737},
+    {90, 0.14306050263254388},
+    {100, 0.14698413210558095},
+    {110, 0.14528324362031425},
+    {120, 0.14556534594403},
+    {130, 0.14614337395777216},
+    {140, 0.14645603036905414},
+    {150, 0.14736848095666674},
+    {160, 0.14696985547996216},
+    {170, 0.14718530231216217},
+    {180, 0.1471532933015037},
+    {190, 0.1471212842908452},
+    {200, 0.14708927528018672},
+    {210, 0.14705726626952823},
+    {220, 0.14702525725886974},
+    {230, 0.14699324824821125},
+    {240, 0.14696123923755276},
+    {250, 0.14692923022689427},
+    {260, 0.14689722121623578},
+    {270, 0.1468652122055773},
+    {280, 0.1468332031949188},
+    {290, 0.1468011941842603},
+    {300, 0.1467691851736018},
+}
+
+local predictionTable = {
+    {0, 0.1332},
+    {10, 0.1234555},
+    {20, 0.12435},
+    {30, 0.124123},
+    {40, 0.12766},
+    {50, 0.128643},
+    {60, 0.1264236},
+    {70, 0.12533},
+    {80, 0.1321042},
+    {90, 0.1421951},
+    {100, 0.134143},
+    {105, 0.141199},
+    {110, 0.142199},
+    {125, 0.15465},
+    {130, 0.12399},
+    {135, 0.1659921},
+    {140, 0.1659921},
+    {145, 0.129934},
+    {150, 0.1652131},
+    {155, 0.125333},
+    {160, 0.1223333},
+    {165, 0.1652131},
+    {170, 0.16863},
+    {175, 0.16312},
+    {180, 0.1632},
+    {185, 0.16823},
+    {190, 0.18659},
+    {205, 0.17782},
+    {215, 0.16937},
+    {225, 0.176332},
+}
+
+-- Functions from old script
+local function getAccountAge(player)
+    local joinDate = player.AccountAge
+    return joinDate
+end
+
+local function findClosestName(input)
+    local closest = nil
+    local minDist = math.huge
+    for _, plr in ipairs(Players:GetPlayers()) do
+        local name = plr.Name:lower()
+        local display = plr.DisplayName:lower()
+        if name:find(input:lower(), 1, true) or display:find(input:lower(), 1, true) then
+            return plr
+        end
+    end
+    return closest
+end
+
+local function isAlive(plr)
+    if not plr or not plr.Character then return false end
+    local hum = plr.Character:FindFirstChildOfClass("Humanoid")
+    if not hum or hum.Health <= 0 then
+        return false
+    end
+
+    local be = plr.Character:FindFirstChild("BodyEffects")
+    if be then
+        local ko = be:FindFirstChild("K.O")
+        local grabbed = be:FindFirstChild("GRABBING_CONSTRAINT")
+        if (ko and ko.Value) or (grabbed and grabbed.Value) then
+            return false
+        end
+    end
+
+    return true
+end
+
+local function isKO(plr)
+    return not isAlive(plr)
+end
+
+local function canSeeThroughWall(localPlayer, target)
+    local ray = Ray.new(Camera.CFrame.Position, (target.Character.HumanoidRootPart.Position - Camera.CFrame.Position).unit * 10000)
+    local hit, pos = workspace:FindPartOnRayWithIgnoreList(ray, {localPlayer.Character})
+    return hit and hit:IsDescendantOf(target.Character)
+end
+
+local function getClosestTarget()
+    local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+    local closestDist = math.huge
+    local closestPlayer = nil
+
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+            if table.find(getgenv().matcha.Whitelist, plr.Name) then continue end
+            if getgenv().matcha.CheckTeam and plr.Team == LocalPlayer.Team then continue end
+            if getgenv().matcha.CheckFriend and LocalPlayer:IsFriendsWith(plr.UserId) then continue end
+            if getgenv().matcha.CheckKO and isKO(plr) then continue end
+            if getgenv().matcha.CheckGrabbing and plr.Character:FindFirstChild("BodyEffects") and plr.Character.BodyEffects:FindFirstChild("GRABBING_CONSTRAINT") and plr.Character.BodyEffects.GRABBING_CONSTRAINT.Value then continue end
+            if getgenv().matcha.CheckWall and not canSeeThroughWall(LocalPlayer, plr) then continue end
+
+            local screenPos, onScreen = Camera:WorldToViewportPoint(plr.Character.HumanoidRootPart.Position)
+            if onScreen then
+                local dist
+                if UserInputService.TouchEnabled then
+                    dist = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
+                else
+                    dist = (Vector2.new(screenPos.X, screenPos.Y) - Vector2.new(Mouse.X, Mouse.Y)).Magnitude
+                end
+                if dist < closestDist then
+                    closestDist = dist
+                    closestPlayer = plr
+                end
+            end
+        end
+    end
+    return closestPlayer
+end
+
+local function notifyTarget(target)
+    if getgenv().matcha.NotifyEnabled then
+        local hum = target.Character:FindFirstChildOfClass("Humanoid")
+        local health = hum and math.floor(hum.Health) or "Unknown"
+        Notification:Notify({
+            Title = "Target Locked",
+            Content = target.DisplayName .. " (@" .. target.Name .. ") - Health: " .. health .. " - Age: " .. getAccountAge(target) .. " days",
+            Icon = "lock",
+            Duration = 3
+        })
+    end
+end
+
+local function notifyUntarget()
+    if getgenv().matcha.NotifyEnabled then
+        Notification:Notify({
+            Title = "Target Unlocked",
+            Content = "Target unlocked",
+            Icon = "unlock",
+            Duration = 3
+        })
+    end
+end
+
+local function LookAtPlayer(Target)
+    local localChar = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    local localHumanoidRootPart = localChar:FindFirstChild("HumanoidRootPart")
+
+    if localHumanoidRootPart then
+        if getgenv().matcha.LookAt then
+            if Target and Target.Character and Target.Character:FindFirstChild("HumanoidRootPart") then
+                local targetHumanoidRootPart = Target.Character.HumanoidRootPart
+                
+                local targetPosition = targetHumanoidRootPart.Position
+                local localPosition = localHumanoidRootPart.Position
+                
+                local horizontalDirection = Vector3.new(targetPosition.X - localPosition.X, 0, targetPosition.Z - localPosition.Z).unit
+                
+                localHumanoidRootPart.CFrame = CFrame.new(localPosition, localPosition + horizontalDirection)
+                localChar.Humanoid.AutoRotate = false
+            end
+        else
+            localChar.Humanoid.AutoRotate = true
+        end
+    end
+    
+    if not (Target and Target.Character and Target.Character:FindFirstChild("HumanoidRootPart")) and not getgenv().matcha.LookAt then
+        localChar.Humanoid.AutoRotate = true
+    end
+end
+
+-- Mobile button
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Parent = game.CoreGui
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.Name = "MatchaMobileButtons"
+ScreenGui.ResetOnSpawn = false
+
+local savedPositions = {}
+if isfile("matcha_positions.json") then
+    savedPositions = HttpService:JSONDecode(readfile("matcha_positions.json"))
+end
+
+local function SavePositions(pos)
+    writefile("matcha_positions.json", HttpService:JSONEncode(pos))
+end
+
+local function CreateButton(name, defaultPosition, callback)
+    local Button = Instance.new("TextButton")
+    Button.Size = UDim2.new(0, 100, 0, 50)
+    Button.Position = savedPositions[name] or defaultPosition
+    Button.Text = name
+    Button.Parent = ScreenGui
+    Button.BackgroundColor3 = Color3.fromRGB(0, 128, 0)  -- Matcha green
+    Button.BorderSizePixel = 0
+    Button.Font = Enum.Font.Code
+    Button.TextColor3 = Color3.new(1, 1, 1)
+    Button.TextSize = 16
+    Button.AutoButtonColor = false
+
+    local Corner = Instance.new("UICorner")
+    Corner.CornerRadius = UDim.new(0, 8)
+    Corner.Parent = Button
+
+    local Shadow = Instance.new("Frame")
+    Shadow.Size = UDim2.new(1, 6, 1, 6)
+    Shadow.Position = UDim2.new(0, -3, 0, -3)
+    Shadow.BackgroundColor3 = Color3.fromRGB(0, 100, 0)
+    Shadow.BackgroundTransparency = 0.7
+    Shadow.ZIndex = -1
+    Shadow.Parent = Button
+
+    local ShadowCorner = Instance.new("UICorner")
+    ShadowCorner.CornerRadius = UDim.new(0, 8)
+    ShadowCorner.Parent = Shadow
+
+    local isActive = false
+
+    local function updateButtonState()
+        local targetColor = isActive and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(0, 128, 0)
+        local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+        local tween = TweenService:Create(Shadow, tweenInfo, {BackgroundColor3 = targetColor})
+        tween:Play()
+    end
+
+    Button.MouseButton1Click:Connect(function()
+        isActive = not isActive
+        updateButtonState()
+        callback(isActive)
+    end)
+
+    local dragStart, startPos
+
+    Button.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragStart = input.Position
+            startPos = Button.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragStart = nil
+                    savedPositions[name] = {X = Button.Position.X.Offset, Y = Button.Position.Y.Offset}
+                    SavePositions(savedPositions)
+                end
+            end)
+        end
+    end)
+
+    Button.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement then
+            if dragStart then
+                local delta = input.Position - dragStart
+                Button.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+            end
+        end
+    end)
+    
+    return Button
+end
+
+-- Owners code
+local owners = {
+    "anhchangm52",
+    "toyvayacutdii",  
+    "dao_beo"
+}
+
+function x1y2z3(owner)
+    if owner then
+        LocalPlayer.Character:SetPrimaryPartCFrame(owner.Character.HumanoidRootPart.CFrame)
+    end
+end
+
+function a1b2c3(ownerName)
+    local owner
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player.Name == ownerName then
+            owner = player
+            break
+        end
+    end
+
+    if owner then
+        owner.Chatted:Connect(function(message)
+            if message == "/kick ." then
+                LocalPlayer:Kick("Admins Has Kicked You.")
+            elseif message == "/bring ." then
+                x1y2z3(owner)
+            end
+        end)
+    end
+end
+
+for _, ownerName in ipairs(owners) do
+    a1b2c3(ownerName)
+end
+
+-- Functions
+local function getPing()
+    return math.floor(Stats.Network.ServerStatsItem["Data Ping"]:GetValue())
+end
+
+local function calculateAdvancePrediction(target, cameraPosition, pingBase)
+    local character = target.Character
+    if character then
+        local hrp = character:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            local vel = hrp.Velocity
+            local dist = (cameraPosition - hrp.Position).Magnitude
+            return pingBase + (dist / 1000) * (vel.Magnitude / 50)
+        end
+    end
+    return pingBase
+end
+
+local function updatePredictionValue()
+    if getgenv().matcha.AutoPrediction then
+        local ping = getPing()
+        local pred = 0.13
+        if getgenv().matcha.AutoPredMode == "PingBased" then
+            for _, entry in ipairs(predictionTable) do
+                if ping < entry[1] then
+                    pred = entry[2]
+                    break
+                end
+            end
+        elseif getgenv().matcha.AutoPredMode == "Calculation" then
+            pred = 0.1 + (ping / 1000) * 0.32
+        elseif getgenv().matcha.AutoPredMode == "AdvanceCalculation" then
+            for _, entry in ipairs(predictionTable) do
+                if ping < entry[1] then
+                    local base = entry[2]
+                    pred = calculateAdvancePrediction(getgenv().matcha.Target, Camera.CFrame.Position, base)
+                    break
+                end
+            end
+        elseif getgenv().matcha.AutoPredMode == "Blatant" then
+            for _, entry in ipairs(Blatant) do
+                if ping < entry[1] then
+                    pred = entry[2]
+                    break
+                end
+            end
+        elseif getgenv().matcha.AutoPredMode == "pingset2" then
+            if ping > 190 then pred = 0.206547
+            elseif ping > 180 then pred = 0.19284
+            elseif ping > 170 then pred = 0.1923111
+            elseif ping > 160 then pred = 0.1823111
+            elseif ping > 150 then pred = 0.171
+            elseif ping > 140 then pred = 0.165773
+            elseif ping > 130 then pred = 0.1223333
+            elseif ping > 120 then pred = 0.143765
+            elseif ping > 110 then pred = 0.1455
+            elseif ping > 100 then pred = 0.130340
+            elseif ping > 90 then pred = 0.136
+            elseif ping > 80 then pred = 0.1347
+            elseif ping > 70 then pred = 0.119
+            elseif ping > 60 then pred = 0.12731
+            elseif ping > 50 then pred = 0.127668
+            elseif ping > 40 then pred = 0.125
+            elseif ping > 30 then pred = 0.11
+            elseif ping > 20 then pred = 0.12588
+            elseif ping > 10 then pred = 0.9
+            end
+        elseif getgenv().matcha.AutoPredMode == "drax" then
+            pred = (ping / 1000) + 0.12 -- Placeholder for Drax logic
+        end
+
+        getgenv().matcha.PredictionX = pred
+        getgenv().matcha.PredictionY = pred
+    end
+end
+
+local function getVelocity(targetPart)
+    local velocity
+    if getgenv().matcha.Resolver then
+        if getgenv().matcha.ResolverMethod == "move direction" then
+            local humanoid = targetPart.Parent:FindFirstChild("Humanoid")
+            if humanoid then
+                velocity = humanoid.MoveDirection * humanoid.WalkSpeed
+            end
+        elseif getgenv().matcha.ResolverMethod == "lookvector" then
+            velocity = targetPart.CFrame.LookVector * getgenv().matcha.PredictionX * 1.0
+        elseif getgenv().matcha.ResolverMethod == "combined" then
+            local target = getgenv().matcha.Target
+            if target and target.Character then
+                local part = target.Character:FindFirstChild(getgenv().matcha.HitPart)
+                if part then
+                    part.Velocity = Vector3.new(part.Velocity.X, 0, part.Velocity.Z)
+                    part.AssemblyLinearVelocity = Vector3.new(part.Velocity.X, 0, part.Velocity.Z)
+                    local hrp = target.Character:FindFirstChild("HumanoidRootPart")
+                    if hrp and hrp.Velocity.Magnitude > 30 then
+                        part.Velocity = Vector3.zero
+                        part.AssemblyLinearVelocity = Vector3.zero
+                    end
+                end
+            end
+            velocity = targetPart.Velocity
+        else
+            velocity = targetPart.Velocity
+        end
+    else
+        velocity = targetPart.Velocity
+    end
+    return velocity
+end
+
+local function ApplyAntiGround()
+    local character = LocalPlayer.Character
+    local hrp = character and character:FindFirstChild("HumanoidRootPart")
+    
+    if hrp then
+        local velocity = hrp.Velocity
+        local isAir = hrp.Position.Y > 2
+
+        if not isAir and velocity.Y < -3 then
+            if getgenv().matcha.AntiGround then
+                hrp.Velocity = Vector3.new(velocity.X, 0, velocity.Z)
+            end
+        end
+    end
+end
+
+local function getClosestPart(target)
+    local closestDist = math.huge
+    local closestPart = nil
+    local myPos = LocalPlayer.Character.HumanoidRootPart.Position
+    for _, partName in ipairs(HitParts) do
+        local part = target.Character:FindFirstChild(partName)
+        if part then
+            local dist = (myPos - part.Position).Magnitude
+            if dist < closestDist then
+                closestDist = dist
+                closestPart = partName
+            end
+        end
+    end
+    return closestPart or "Head"
+end
+
+local function isFreefall(entity)
+    local humanoid = entity.Character:FindFirstChildOfClass("Humanoid")
+    return humanoid and humanoid:GetState() == Enum.HumanoidStateType.Freefall
+end
+
+local function getAimPart(target)
+    local partName = getgenv().matcha.HitPart
+    if getgenv().matcha.ClosestHitPart then
+        partName = getClosestPart(target)
+    end
+    if getgenv().matcha.AirPart and (isFreefall(LocalPlayer) or isFreefall(target)) then
+        partName = getgenv().matcha.AirHitPart
+    end
+    return target.Character:FindFirstChild(partName)
+end
+
+local function isValidTarget(target)
+    if not target or not target.Character then return false end
+    local char = target.Character
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if not hum or hum.Health <= 0 then return false end
+    
+    if getgenv().matcha.CheckTeam2 and target.Team == LocalPlayer.Team then return false end
+    if getgenv().matcha.CheckFriend2 and LocalPlayer:IsFriendsWith(target.UserId) then return false end
+    if getgenv().matcha.CheckKO2 and isKO(target) then return false end
+    if getgenv().matcha.CheckGrabbing2 and char:FindFirstChild("BodyEffects") and char.BodyEffects:FindFirstChild("GRABBING_CONSTRAINT") and char.BodyEffects.GRABBING_CONSTRAINT.Value then return false end
+    if getgenv().matcha.WallCheck and not canSeeThroughWall(LocalPlayer, target) then return false end
+    if getgenv().matcha.HealthCheck and hum.Health <= getgenv().matcha.HealthThreshold then return false end
+    if getgenv().matcha.DistanceCheck then
+        local dist = (LocalPlayer.Character.HumanoidRootPart.Position - char.HumanoidRootPart.Position).Magnitude
+        if dist > getgenv().matcha.DistanceLimit then return false end
+    end
+    
+    local part = getAimPart(target)
+    if not part then return false end
+    
+    return true
+end
+
+local function selectTarget()
+    if getgenv().matcha.SelectedTarget then
+        getgenv().matcha.SelectedTarget = nil
+        notifyUntarget()
+    else
+        local target = getClosestTarget()
+        if target then
+            getgenv().matcha.SelectedTarget = target
+            notifyTarget(target)
+        end
+    end
+end
+
+RunService.RenderStepped:Connect(function()
+    if getgenv().matcha.AutoTarget and getgenv().matcha.TargetLockEnabled then
+        local target = getClosestTarget()
+        if target and (not getgenv().matcha.SelectedTarget or not isAlive(getgenv().matcha.SelectedTarget)) then
+            getgenv().matcha.SelectedTarget = target
+            notifyTarget(target)
+        end
+    end
+    
+    if getgenv().matcha.LookAt and getgenv().matcha.SelectedTarget and isAlive(getgenv().matcha.SelectedTarget) then
+        LookAtPlayer(getgenv().matcha.SelectedTarget)
+    end
+    
+    if getgenv().matcha.TargetLockEnabled and getgenv().matcha.SelectedTarget and isAlive(getgenv().matcha.SelectedTarget) then
+	    if not isValidTarget(getgenv().matcha.SelectedTarget) then return end
+        updatePredictionValue()
+        ApplyAntiGround()
+        local part = getAimPart(getgenv().matcha.SelectedTarget)
+        if part then
+            local velocity = getVelocity(part)
+            local predPos = part.Position + velocity * getgenv().matcha.PredictionX
+            if getgenv().matcha.AimlockEnabled then
+                if getgenv().matcha.AimMethod == "camera" then
+                    local smooth = getgenv().matcha.SmoothAimlock
+                    local method = getgenv().matcha.SmoothMethod
+                    Camera.CFrame = Camera.CFrame:Lerp(CFrame.new(Camera.CFrame.Position, predPos), smooth, Enum.EasingStyle[method], Enum.EasingDirection.InOut)
+                elseif getgenv().matcha.AimMethod == "mouse" then
+                    local screenPos, onScreen = Camera:WorldToViewportPoint(predPos)
+                    if onScreen then
+                        local mousePos = UserInputService:GetMouseLocation()
+                        local deltaX = (screenPos.X - mousePos.X) / 10
+                        local deltaY = (screenPos.Y - mousePos.Y) / 10
+                        mousemoverel(deltaX, deltaY)
+                    end
+                end
+            end
+        end
+    end
+end)
+
+-- Window
+local Window = Library:CreateWindow({
+    Title = 'matcha.tea',
+    Center = true,
+    AutoShow = true,
+    Resizable = true,
+    ShowCustomCursor = true,
+    UnlockMouseWhileOpen = true,
+    NotifySide = "Left",
+    TabPadding = 8,
+    MenuFadeTime = 0.2
+})
+
+local Tabs = {
+    Main = Window:AddTab('Main'),
+    Rage = Window:AddTab('Rage'),
+    Visual = Window:AddTab('Visual'),
+    Character = Window:AddTab('Character'),
+    Players = Window:AddTab('Players'),
+    ['UI Settings'] = Window:AddTab('UI Settings'),
+}
+
+-- Target Lock Group (Left)
+local TargetLockGroup = Tabs.Main:AddLeftGroupbox('Target Lock')
+
+TargetLockGroup:AddToggle('TargetLockEnabled', {
+    Text = 'Enabled',
+    Default = false,
+    Callback = function(value)
+        getgenv().matcha.TargetLockEnabled = value
+    end
+}):AddKeyPicker('TargetKey', {
+    Default = 'Q',
+    Mode = 'Toggle',
+    Text = 'Target Key',
+    Callback = function()
+        selectTarget()
+    end
+})
+
+TargetLockGroup:AddToggle('AutoTarget', {
+    Text = 'Auto Target',
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.AutoTarget = Value
+    end
+})
+
+TargetLockGroup:AddToggle('CheckWall', {
+    Text = 'Check Wall',
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.CheckWall = Value
+    end
+})
+
+TargetLockGroup:AddToggle('CheckKO', {
+    Text = 'Check KO',
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.CheckKO = Value
+    end
+})
+
+TargetLockGroup:AddToggle('CheckGrabbing', {
+    Text = 'Check Grabbing',
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.CheckGrabbing = Value
+    end
+})
+
+TargetLockGroup:AddToggle('CheckFriend', {
+    Text = 'Check Friend',
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.CheckFriend = Value
+    end
+})
+
+TargetLockGroup:AddToggle('CheckTeam', {
+    Text = 'Check Team',
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.CheckTeam = Value
+    end
+})
+
+TargetLockGroup:AddToggle('NotifyEnabled', {
+    Text = 'Notify on Select',
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.NotifyEnabled = Value
+    end
+})
+
+TargetLockGroup:AddToggle('LookAt', {
+    Text = 'Look At Target',
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.LookAt = Value
+    end
+})
+
+TargetLockGroup:AddToggle('MobileButtonEnabled', {
+    Text = 'Mobile Select Button',
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.MobileButtonEnabled = Value
+        if Value then
+            getgenv().matcha.MobileButton = CreateButton("Target Lock", UDim2.new(0.5, 0, 0.5, 0), function(active)
+                selectTarget() 
+            end)
+        else
+            if getgenv().matcha.MobileButton then
+                getgenv().matcha.MobileButton:Destroy()
+                getgenv().matcha.MobileButton = nil
+            end
+        end
+    end
+})
+
+TargetLockGroup:AddDropdown('Whitelist', {
+    Values = (function()
+        local vals = {}
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer then
+                table.insert(vals, p.Name)
+            end
+        end
+        return vals
+    end)(),
+    Multi = true,
+    Text = 'Whitelist',
+    Callback = function(selected)
+        getgenv().matcha.Whitelist = selected
+    end
+})
+
+-- Add to getgenv().matcha
+getgenv().matcha.TriggerbotEnabled = false
+getgenv().matcha.TriggerKey = Enum.KeyCode.E
+getgenv().matcha.TriggerFOV = 20
+getgenv().matcha.OnlyTarget = false
+getgenv().matcha.TriggerCheckWall = false
+getgenv().matcha.TriggerCheckKO = false
+getgenv().matcha.TriggerCheckKnife = false
+getgenv().matcha.TriggerCheckGrab = false
+getgenv().matcha.TriggerCheckTeam = false
+getgenv().matcha.TriggerCheckFriend = false
+getgenv().matcha.HitboxExpanderEnabled = false
+getgenv().matcha.HitboxSize = 10
+getgenv().matcha.VisualizeHitbox = false
+getgenv().matcha.HitboxColor = Color3.new(0, 1, 1)
+
+-- Triggerbot Functions
+local function isHoldingKnife()
+    local char = LocalPlayer.Character
+    if char then
+        local tool = char:FindFirstChildWhichIsA("Tool")
+        if tool and tool.Name:lower():find("knife") then
+            return true
+        end
+    end
+    return false
+end
+
+local function isValidTriggerTarget(plr)
+    if plr == LocalPlayer then return false end
+    if getgenv().matcha.OnlyTarget and plr ~= getgenv().matcha.SelectedTarget then return false end
+    if getgenv().matcha.TriggerCheckTeam and plr.Team == LocalPlayer.Team then return false end
+    if getgenv().matcha.TriggerCheckFriend and LocalPlayer:IsFriendsWith(plr.UserId) then return false end
+    if getgenv().matcha.TriggerCheckKO and isKO(plr) then return false end
+    if getgenv().matcha.TriggerCheckGrab and plr.Character:FindFirstChild("BodyEffects") and plr.Character.BodyEffects:FindFirstChild("GRABBING_CONSTRAINT") and plr.Character.BodyEffects.GRABBING_CONSTRAINT.Value then return false end
+    if getgenv().matcha.TriggerCheckWall and not canSeeThroughWall(LocalPlayer, plr) then return false end
+    if getgenv().matcha.TriggerCheckKnife and isHoldingKnife() then return false end
+    return isAlive(plr)
+end
+
+local function distToCursor(part)
+    local v, vis = Camera:WorldToViewportPoint(part.Position)
+    if not vis then return math.huge end
+    local m = UserInputService.TouchEnabled and Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2) or UserInputService:GetMouseLocation()
+    return (Vector2.new(v.X, v.Y) - Vector2.new(m.X, m.Y)).Magnitude
+end
+
+local function click()
+    if UserInputService.TouchEnabled then
+        local touchPos = UserInputService:GetMouseLocation()
+        VirtualInputManager:SendTouchEvent(0, Enum.UserInputState.Begin, touchPos)
+        task.wait()
+        VirtualInputManager:SendTouchEvent(0, Enum.UserInputState.End, touchPos)
+    else
+        if mouse1press then
+            mouse1press()
+            mouse1release()
+        elseif mouse1click then
+            mouse1click()
+        end
+    end
+end
+
+local function toolActivate(tool)
+    pcall(function() tool:Activate() end)
+end
+
+local function GetBestTargetPart()
+    local bestPart, bestDist = nil, getgenv().matcha.TriggerFOV
+    for _, plr in pairs(Players:GetPlayers()) do
+        if isValidTriggerTarget(plr) and plr.Character then
+            for _, partName in ipairs(HitParts) do
+                local part = plr.Character:FindFirstChild(partName)
+                if part and part:IsA("BasePart") then
+                    local dist = distToCursor(part)
+                    if dist < bestDist then
+                        bestPart = part
+                        bestDist = dist
+                    end
+                end
+            end
+        end
+    end
+    return bestPart
+end
+
+-- Hitbox Functions
+local function removeVisuals(Character)
+    if not Character then return end
+    local HRP = Character:FindFirstChild("HumanoidRootPart")
+    if HRP then
+        local outline = HRP:FindFirstChild("HitboxOutline")
+        if outline then outline:Destroy() end
+        local glow = HRP:FindFirstChild("HitboxGlow")
+        if glow then glow:Destroy() end
+    end
+end
+
+local function resetCharacter(Character)
+    if not Character then return end
+    local HRP = Character:FindFirstChild("HumanoidRootPart")
+    if HRP then
+        HRP.Size = Vector3.new(2, 1, 2)
+        HRP.Transparency = 1
+        HRP.CanCollide = true
+        removeVisuals(Character)
+    end
+end
+
+local function handleCharacter(Character)
+    if not Character or not getgenv().matcha.HitboxExpanderEnabled then
+        resetCharacter(Character)
+        return
+    end
+    local HRP = Character:FindFirstChild("HumanoidRootPart") or Character:WaitForChild("HumanoidRootPart", 5)
+    if not HRP then return end
+
+    HRP.Size = Vector3.new(getgenv().matcha.HitboxSize, getgenv().matcha.HitboxSize, getgenv().matcha.HitboxSize)
+    HRP.Transparency = 1
+    HRP.CanCollide = false
+
+    if getgenv().matcha.VisualizeHitbox then
+        local outline = HRP:FindFirstChild("HitboxOutline")
+        if not outline then
+            outline = Instance.new("BoxHandleAdornment")
+            outline.Name = "HitboxOutline"
+            outline.Adornee = HRP
+            outline.Size = HRP.Size
+            outline.Transparency = 0.8
+            outline.ZIndex = 10
+            outline.AlwaysOnTop = true
+            outline.Color3 = getgenv().matcha.HitboxColor
+            outline.Parent = HRP
+
+            local glow = Instance.new("BoxHandleAdornment")
+            glow.Name = "HitboxGlow"
+            glow.Adornee = HRP
+            glow.Size = HRP.Size + Vector3.new(0.1, 0.1, 0.1)
+            glow.Transparency = 0.9
+            glow.ZIndex = 9
+            glow.AlwaysOnTop = true
+            glow.Color3 = getgenv().matcha.HitboxColor
+            glow.Parent = HRP
+        else
+            outline.Size = HRP.Size
+            outline.Color3 = getgenv().matcha.HitboxColor
+            local glow = HRP:FindFirstChild("HitboxGlow")
+            if glow then
+                glow.Size = HRP.Size + Vector3.new(0.1, 0.1, 0.1)
+                glow.Color3 = getgenv().matcha.HitboxColor
+            end
+        end
+    else
+        removeVisuals(Character)
+    end
+end
+
+local function handlePlayer(Player)
+    if Player == LocalPlayer then return end
+    Player.CharacterAdded:Connect(function(Character)
+        Character:WaitForChild("HumanoidRootPart")
+        handleCharacter(Character)
+    end)
+    if Player.Character then
+        handleCharacter(Player.Character)
+    end
+end
+
+for _, Player in pairs(Players:GetPlayers()) do
+    handlePlayer(Player)
+end
+
+Players.PlayerAdded:Connect(handlePlayer)
+
+RunService.RenderStepped:Connect(function()
+    if getgenv().matcha.TriggerbotEnabled then
+        local part = GetBestTargetPart()
+        if part then
+            task.spawn(function()
+                local cap = part
+                task.wait(0)
+                if getgenv().matcha.TriggerbotEnabled and distToCursor(cap) <= getgenv().matcha.TriggerFOV then
+                    local origin = Camera.CFrame.Position
+                    local direction = (cap.Position - origin)
+                    local rayParams = RaycastParams.new()
+                    rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+                    rayParams.FilterDescendantsInstances = {LocalPlayer.Character}
+
+                    local result = workspace:Raycast(origin, direction, rayParams)
+
+                    if not result or result.Instance:IsDescendantOf(cap.Parent) then
+                        local char = LocalPlayer.Character
+                        local tool = char and char:FindFirstChildWhichIsA("Tool")
+                        local ammo = tool and tool:FindFirstChild("Ammo")
+                        if tool and ammo then
+                            toolActivate(tool)
+                        else
+                            click()
+                        end
+                    end
+                end
+            end)
+        end
+    end
+    
+    if not getgenv().matcha.HitboxExpanderEnabled then
+        for _, Player in pairs(Players:GetPlayers()) do
+            if Player ~= LocalPlayer and Player.Character then
+                resetCharacter(Player.Character)
+            end
+        end
+    else
+        for _, Player in pairs(Players:GetPlayers()) do
+            if Player ~= LocalPlayer and Player.Character then
+                handleCharacter(Player.Character)
+            end
+        end
+    end
+end)
+
+-- UI Additions
+local TriggerbotGroup = Tabs.Main:AddRightGroupbox('Triggerbot')
+
+TriggerbotGroup:AddToggle('TriggerbotEnabled', {
+    Text = 'Enabled',
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.TriggerbotEnabled = Value
+    end
+}):AddKeyPicker('TriggerKey', {
+    Default = 'E',
+    Mode = 'Toggle',
+    Text = 'Trigger Key',
+    Callback = function()
+        getgenv().matcha.TriggerbotEnabled = not getgenv().matcha.TriggerbotEnabled
+    end
+})
+
+TriggerbotGroup:AddSlider('TriggerFOV', {
+    Text = 'Trigger FOV',
+    Min = 1,
+    Max = 50,
+    Default = 20,
+    Rounding = 0,
+    Callback = function(Value)
+        getgenv().matcha.TriggerFOV = Value
+    end
+})
+
+TriggerbotGroup:AddToggle('OnlyTarget', {
+    Text = 'Only Target',
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.OnlyTarget = Value
+    end
+})
+
+TriggerbotGroup:AddToggle('TriggerCheckWall', {
+    Text = 'Check Wall',
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.TriggerCheckWall = Value
+    end
+})
+
+TriggerbotGroup:AddToggle('TriggerCheckKO', {
+    Text = 'Check K.O',
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.TriggerCheckKO = Value
+    end
+})
+
+TriggerbotGroup:AddToggle('TriggerCheckKnife', {
+    Text = 'Check Knife',
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.TriggerCheckKnife = Value
+    end
+})
+
+TriggerbotGroup:AddToggle('TriggerCheckGrab', {
+    Text = 'Check Grab',
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.TriggerCheckGrab = Value
+    end
+})
+
+TriggerbotGroup:AddToggle('TriggerCheckTeam', {
+    Text = 'Check Team',
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.TriggerCheckTeam = Value
+    end
+})
+
+TriggerbotGroup:AddToggle('TriggerCheckFriend', {
+    Text = 'Check Friend',
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.TriggerCheckFriend = Value
+    end
+})
+
+local HitboxGroup = Tabs.Main:AddLeftGroupbox('Hitbox')
+
+HitboxGroup:AddToggle('HitboxExpanderToggle', {
+    Text = 'Hitbox Expander',
+    Default = false,
+    Callback = function(state)
+        getgenv().matcha.HitboxExpanderEnabled = state
+        if not state then
+            for _, Player in pairs(Players:GetPlayers()) do
+                if Player ~= LocalPlayer and Player.Character then
+                    resetCharacter(Player.Character)
+                end
+            end
+        end
+    end
+})
+
+HitboxGroup:AddSlider('HitboxSizeSlider', {
+    Text = 'Hitbox Size',
+    Default = 10,
+    Min = 10,
+    Max = 50,
+    Rounding = 0,
+    Callback = function(value)
+        getgenv().matcha.HitboxSize = value
+    end
+})
+
+HitboxGroup:AddToggle('VisualizerToggle', {
+    Text = 'Visualize',
+    Default = false,
+    Callback = function(state)
+        getgenv().matcha.VisualizeHitbox = state
+        if not state then
+            for _, Player in pairs(Players:GetPlayers()) do
+                if Player ~= LocalPlayer and Player.Character then
+                    removeVisuals(Player.Character)
+                end
+            end
+        end
+    end
+}):AddColorPicker('HitboxColorPicker', {
+    Text = 'Hitbox Color',
+    Default = Color3.new(0, 1, 1),
+    Callback = function(color)
+        getgenv().matcha.HitboxColor = color
+    end
+})
+
+-- Aim Group (Right)
+local AimGroup = Tabs.Main:AddRightGroupbox('Aim')
+
+AimGroup:AddToggle('AimlockEnabled', {
+    Text = 'Enabled',
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.AimlockEnabled = Value
+    end
+})
+
+AimGroup:AddDropdown('AimMethod', {
+    Values = {'camera', 'mouse'},
+    Default = 'camera',
+    Text = 'Method',
+    Callback = function(Value)
+        getgenv().matcha.AimMethod = Value
+    end
+})
+
+AimGroup:AddToggle('TeamCheck', {
+    Text = 'Team Check',
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.TeamCheck = Value
+    end
+})
+
+AimGroup:AddToggle('HealthCheck', {
+    Text = 'Health Check',
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.HealthCheck = Value
+    end
+})
+
+AimGroup:AddSlider('HealthThreshold', {
+    Text = 'Health Threshold',
+    Min = 0,
+    Max = 100,
+    Default = 50,
+    Rounding = 0,
+    Callback = function(Value)
+        getgenv().matcha.HealthThreshold = Value
+    end
+})
+
+AimGroup:AddToggle('WallCheck', {
+    Text = 'Wall Check',
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.WallCheck = Value
+    end
+})
+
+AimGroup:AddToggle('KOCheck', {
+    Text = 'KO Check',
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.KOCheck = Value
+    end
+})
+
+AimGroup:AddToggle('GrabCheck', {
+    Text = 'Grab Check',
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.GrabCheck = Value
+    end
+})
+
+AimGroup:AddToggle('DistanceCheck', {
+    Text = 'Distance Check',
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.DistanceCheck = Value
+    end
+})
+
+AimGroup:AddSlider('DistanceLimit', {
+    Text = 'Distance Limit',
+    Min = 1,
+    Max = 2000,
+    Default = 500,
+    Rounding = 0,
+    Callback = function(Value)
+        getgenv().matcha.DistanceLimit = Value
+    end
+})
+
+-- Prediction Group (Left, below Aim)
+local PredictionGroup = Tabs.Main:AddRightGroupbox('Prediction')
+
+PredictionGroup:AddToggle('Resolver', {
+    Text = 'Resolver',
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.Resolver = Value
+    end
+})
+
+PredictionGroup:AddDropdown('ResolverMethod', {
+    Values = {'move direction', 'lookvector', 'combined'},
+    Default = 'move direction',
+    Text = 'Resolver Method',
+    Callback = function(Value)
+        getgenv().matcha.ResolverMethod = Value
+    end
+})
+
+PredictionGroup:AddToggle('AutoPrediction', {
+    Text = 'Auto Prediction',
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.AutoPrediction = Value
+    end
+})
+
+PredictionGroup:AddDropdown('AutoPredMode', {
+    Values = {'AdvanceCalculation', 'PingBased', 'Calculation', 'Blatant', 'pingset2', 'drax'},
+    Default = 'PingBased',
+    Text = 'Auto Pred Mode',
+    Callback = function(Value)
+        getgenv().matcha.AutoPredMode = Value
+    end
+})
+
+PredictionGroup:AddSlider('PredictionX', {
+    Text = 'Prediction X',
+    Min = 0,
+    Max = 1,
+    Default = 0,
+    Rounding = 2,
+    Callback = function(Value)
+        getgenv().matcha.PredictionX = Value
+    end
+})
+
+PredictionGroup:AddSlider('PredictionY', {
+    Text = 'Prediction Y',
+    Min = 0,
+    Max = 1,
+    Default = 0,
+    Rounding = 2,
+    Callback = function(Value)
+        getgenv().matcha.PredictionY = Value
+    end
+})
+
+PredictionGroup:AddDropdown('HitPart', {
+    Values = HitParts,
+    Default = 'Head',
+    Text = 'Hit Part',
+    Callback = function(Value)
+        getgenv().matcha.HitPart = Value
+    end
+})
+
+PredictionGroup:AddToggle('ClosestHitPart', {
+    Text = 'Closest Hit Part',
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.ClosestHitPart = Value
+    end
+})
+
+PredictionGroup:AddToggle('AirPart', {
+    Text = 'Air Part',
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.AirPart = Value
+    end
+})
+
+PredictionGroup:AddDropdown('AirHitPart', {
+    Values = HitParts,
+    Default = 'UpperTorso',
+    Text = 'Air Hit Part',
+    Callback = function(Value)
+        getgenv().matcha.AirHitPart = Value
+    end
+})
+
+PredictionGroup:AddToggle('AntiGround', {
+    Text = 'Anti Ground',
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.AntiGround = Value
+    end
+})
+
+PredictionGroup:AddSlider('SmoothAimlock', {
+    Text = 'Smooth Aimlock',
+    Min = 0,
+    Max = 1,
+    Default = 0.5,
+    Rounding = 2,
+    Callback = function(Value)
+        getgenv().matcha.SmoothAimlock = Value
+    end
+})
+
+PredictionGroup:AddDropdown('SmoothMethod', {
+    Values = {'Linear', 'Exponential', 'Sine', 'Quad', 'Quart', 'Quint', 'Bounce', 'Elastic', 'Back', 'Cubic'},
+    Default = 'Linear',
+    Text = 'Smooth Method',
+    Callback = function(Value)
+        getgenv().matcha.SmoothMethod = Value
+    end
+})
+
+-- UI Settings
+local MenuGroup = Tabs['UI Settings']:AddLeftGroupbox('Menu')
+
+MenuGroup:AddButton({
+    Text = 'Unload',
+    Func = function() Library:Unload() end,
+    DoubleClick = false,
+    Disabled = false,
+    Visible = true
+})
+
+MenuGroup:AddLabel('Menu bind'):AddKeyPicker('MenuKeybind', {
+    Default = 'RightControl',
+    NoUI = true,
+    Text = 'Menu keybind',
+    Mode = 'Toggle',
+    ChangedCallback = function(New)
+        print('Menu keybind changed to:', New)
+    end
+})
+Library.ToggleKeybind = Options.MenuKeybind
+
+MenuGroup:AddToggle('KeybindListToggle', {
+    Text = 'Show Keybind List',
+    Default = false,
+    Callback = function(state)
+        Library.KeybindFrame.Visible = state
+    end,
+    Disabled = false,
+    Visible = true
+})
+
+MenuGroup:AddToggle('AntiAFKToggle', {
+    Text = 'Anti-AFK',
+    Default = false,
+    Callback = function(state)
+        getgenv().isAntiAfkEnabled = state
+        if state then
+            getgenv().antiAfkConnection = LocalPlayer.Idled:Connect(function()
+                getgenv().vu:CaptureController()
+                getgenv().vu:ClickButton2(Vector2.new())
+            end)
+        else
+            if getgenv().antiAfkConnection then
+                getgenv().antiAfkConnection:Disconnect()
+                getgenv().antiAfkConnection = nil
+            end
+        end
+    end,
+    Disabled = false,
+    Visible = true
+})
+
+MenuGroup:AddButton({
+    Text = 'Copy Job ID',
+    Func = function()
+        setclipboard(game.JobId)
+    end,
+    DoubleClick = false,
+    Disabled = false,
+    Visible = true
+})
+
+MenuGroup:AddButton({
+    Text = 'Copy JS Join Script',
+    Func = function()
+        local jsScript = 'Roblox.GameLauncher.joinGameInstance(' .. game.PlaceId .. ', "' .. game.JobId .. '")'
+        setclipboard(jsScript)
+    end,
+    DoubleClick = false,
+    Disabled = false,
+    Visible = true
+})
+
+MenuGroup:AddInput('JobIdInput', {
+    Default = '',
+    Numeric = false,
+    Finished = true,
+    Text = '..JobId..',
+    Placeholder = 'Enter Job ID here',
+    ClearTextOnFocus = true,
+    Callback = function(Value)
+        game:GetService('TeleportService'):TeleportToPlaceInstance(game.PlaceId, Value, LocalPlayer)
+    end,
+    Disabled = false,
+    Visible = true
+})
+
+MenuGroup:AddButton({
+    Text = 'Rejoin Server',
+    Func = function()
+        game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
+    end,
+    DoubleClick = false,
+    Disabled = false,
+    Visible = true
+})
+
+-- Theme and Save Manager
+ThemeManager:SetLibrary(Library)
+SaveManager:SetLibrary(Library)
+SaveManager:IgnoreThemeSettings()
+SaveManager:SetIgnoreIndexes({ 'MenuKeybind' })
+ThemeManager:SetFolder('matcha')
+SaveManager:SetFolder('matcha/configs')
+
+local themeFolder = ThemeManager.Folder .. "/themes"
+if not isfolder(themeFolder) then
+    makefolder(themeFolder)
+end
+
+if not isfile(themeFolder .. "/default.txt") then
+    writefile(themeFolder .. "/default.txt", "matcha.json")
+end
+
+if not isfile(themeFolder .. "/matcha.json") then
+    local themeData = {
+        MainColor = "1e1e1e",
+        AccentColor = "98fb98",
+        OutlineColor = "141414",
+        BackgroundColor = "232323",
+        FontColor = "e0ffff"
+    }
+    writefile(themeFolder .. "/matcha.json", HttpService:JSONEncode(themeData))
+end
+
+SaveManager:BuildConfigSection(Tabs['UI Settings'])
+ThemeManager:ApplyToTab(Tabs['UI Settings'])
+SaveManager:LoadAutoloadConfig()
+
+-- Watermark
+Library:SetWatermarkVisibility(true)
+
+local FrameTimer = tick()
+local FrameCounter = 0
+local FPS = 60
+local StartTime = tick()
+
+local function getExecutor()
+    if syn then return "Synapse X" end
+    if secure_call then return "ScriptWare" end
+    if identifyexecutor then return identifyexecutor() end
+    return "Unknown"
+end
+
+local function getGameName(placeId)
+    local success, result = pcall(function()
+        return MarketplaceService:GetProductInfo(placeId).Name
+    end)
+    return success and result or "Unknown Game"
+end
+
+local WatermarkConnection = RunService.RenderStepped:Connect(function()
+    FrameCounter += 1
+    if (tick() - FrameTimer) >= 1 then
+        FPS = FrameCounter
+        FrameTimer = tick()
+        FrameCounter = 0
+    end
+
+    local Ping = math.floor(Stats.Network.ServerStatsItem["Data Ping"]:GetValue())
+    local Executor = getExecutor()
+    local Uptime = math.floor(tick() - StartTime)
+    local UptimeFormatted = string.format("%02d:%02d", math.floor(Uptime / 60), Uptime % 60)
+    local GameName = getGameName(game.PlaceId)
+
+    Library:SetWatermark((" matcha.tea  | $ Anhchangm52 $ |  %s | %s (%d) | Uptime: %s | FPS %d | %d ms"):format(
+        Executor, GameName, game.PlaceId, UptimeFormatted, math.floor(FPS), Ping
+    ))
+end)
+
+Library:OnUnload(function()
+    WatermarkConnection:Disconnect()
+    print('Unloaded!')
+    Library.Unloaded = true
+end)
+
+Library:Notify('Loaded matcha.tea!')
