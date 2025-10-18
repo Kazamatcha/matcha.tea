@@ -104,11 +104,11 @@ getgenv().matcha = {
     FOVCircleMode = "center",
     FOVCircleSize = 100,
     FOVCircleThickness = 1,
-    FOVCircleColor = Color3.new(1, 0, 0),
+    FOVCircleColor = Color3.fromRGB(70,220,110),
     FOVCircleTransparency = 0.5,
     FOVCircleFilled = false,
     FOVCircleLineEnabled = false,
-    FOVCircleLineColor = Color3.new(1, 1, 1),
+    FOVCircleLineColor = Color3.fromRGB(200, 255, 250),
     UseAimFOV = false,
     AutoTargetFOV = false,
 }
@@ -694,7 +694,9 @@ RunService.RenderStepped:Connect(function()
                 FOVLine.Visible = false
             end
         else
-            FOVLine.Visible = false
+            if getgenv().matcha.FOVCircleLineEnabled then
+                FOVLine.Visible = true
+            end
         end
     else
         FOVCircle.Visible = false
@@ -704,7 +706,7 @@ RunService.RenderStepped:Connect(function()
     -- AutoTarget with FOV
     if getgenv().matcha.AutoTargetFOV and getgenv().matcha.TargetLockEnabled then
         local target = getClosestTarget()
-        if target and (not getgenv().matcha.SelectedTarget or not isAlive(getgenv().matcha.SelectedTarget)) then
+        if target then
             getgenv().matcha.SelectedTarget = target
             notifyTarget(target)
         end
@@ -1260,9 +1262,10 @@ FOVCircleGroup:AddToggle('FOVCircleEnabled', {
     end
 }):AddColorPicker('FOVCircleColor', {
     Text = 'FOV Color',
-    Default = Color3.new(1, 0, 0),
-    Callback = function(Value)
-        getgenv().matcha.FOVCircleColor = Value
+    Default = Color3.fromRGB(70,220,110),
+    Callback = function(color)
+        getgenv().matcha.FOVCircleColor = color
+        FOVCircle.Color = getgenv().matcha.FOVCircleColor
     end
 })
 
@@ -1340,9 +1343,10 @@ FOVCircleGroup:AddToggle('FOVCircleLineEnabled', {
     end
 }):AddColorPicker('FOVCircleLineColor', {
     Text = 'Line Color',
-    Default = Color3.new(1, 1, 1),
-    Callback = function(Value)
-        getgenv().matcha.FOVCircleLineColor = Value
+    Default = Color3.fromRGB(200, 255, 250),
+    Callback = function(color)
+        getgenv().matcha.FOVCircleLineColor = color
+        FOVLine.Color = getgenv().matcha.FOVCircleLineColor
     end
 })
 
