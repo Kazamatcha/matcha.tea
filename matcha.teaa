@@ -2523,7 +2523,7 @@ local esp = {}; do
 		new_esp.head_dot_inline.Thickness = 1
 		new_esp.head_dot_inline.Visible = false
 		
-		new_esp.health_bar_outline.Thickness = 1
+		new_esp.health_bar_outline.Thickness = 3
 		new_esp.health_bar_outline.Visible = false
 		new_esp.health_bar_outline.Color = Color3.new(0, 0, 0)
 		
@@ -2585,340 +2585,456 @@ local esp = {}; do
 		if (player == LocalPlayer and not getgenv().matcha.ESPSelf) then continue end;
 		esp.add_player(player);
 	end;
+end;
 	
-	-- Logic update
-	RunService.Heartbeat:Connect(function()
-		if not getgenv().matcha.ESPEnabled then return end
+RunService.Heartbeat:Connect(function(dt)
+	if not getgenv().matcha.ESPEnabled then return end
+
+	-- Add ESP if not present and conditions met
+	for _, player in ipairs(Players:GetPlayers()) do
+		if not esp.players[player] then
+			if (player ~= LocalPlayer or getgenv().matcha.ESPSelf) then
+				local char = player.Character
+				if char and char:FindFirstChild("HumanoidRootPart") and char:FindFirstChild("Head") then
+					local _, on_screen = Camera:WorldToViewportPoint(char.HumanoidRootPart.Position)
+					local is_target = getgenv().matcha.SelectedTarget == player
+					local team_check = getgenv().matcha.ESPTeamCheck
+					local only_target = getgenv().matcha.ESPOnlyTarget
+					if on_screen and (not only_target or is_target) and (not team_check or player.Team ~= LocalPlayer.Team) then
+						esp.add_player(player)
+					end
+				end
+			end
+		end
+	end
+
+	-- Lấy settings từ getgenv().matcha
+	local boxes_enabled = getgenv().matcha.ESPBoxes
+	local boxes_color = getgenv().matcha.ESPBoxesColor
+	local boxes_outline_color = getgenv().matcha.ESPBoxesOutlineColor
+	local boxes_target_color = getgenv().matcha.ESPBoxesTargetColor
+	local boxes_type = getgenv().matcha.ESPBoxesType  -- 'Full' or 'UICorner'
+	local box_fill = getgenv().matcha.ESPBoxFill
+	local box_fill_color = getgenv().matcha.ESPBoxFillColor
+	local box_fill_transparency = getgenv().matcha.ESPBoxFillTransparency
+	local box_fill_target_color = getgenv().matcha.ESPBoxFillTargetColor
+	local names_enabled = getgenv().matcha.ESPName
+	local names_color = getgenv().matcha.ESPNameColor
+	local name_type = getgenv().matcha.ESPNameType  -- 'Name' or 'DisplayName'
+	local head_dots_enabled = getgenv().matcha.ESPHeadDot
+	local head_dots_color = getgenv().matcha.ESPHeadDotColor
+	local head_dots_size = getgenv().matcha.ESPHeadDotSize
+	local health_bar_enabled = getgenv().matcha.ESPHealthBar
+	local health_bar_health_based_color = getgenv().matcha.ESPHealthBasedColor
+	local health_bar_color = getgenv().matcha.ESPHealthBarColor
+	local health_text_enabled = getgenv().matcha.ESPHealthText
+	local health_text_color = getgenv().matcha.ESPHealthTextColor
+	local distance_enabled = getgenv().matcha.ESPDistance
+	local distance_color = getgenv().matcha.ESPDistanceColor
+	local equipped_item_enabled = getgenv().matcha.ESPEquippedItem
+	local equipped_item_color = getgenv().matcha.ESPEquippedItemColor
+	local skeleton_enabled = getgenv().matcha.ESPSkeleton
+	local skeleton_color = getgenv().matcha.ESPSkeletonColor
+	local esp_faded = getgenv().matcha.ESPFaded
+	local fade_speed = getgenv().matcha.ESPFadeSpeed / 100  -- Adjust speed
+	local chams_enabled = getgenv().matcha.ESPChams
+	local chams_outline_color = getgenv().matcha.ESPChamsOutlineColor
+	local chams_fill_color = getgenv().matcha.ESPChamsFillColor
+	local chams_fill_highlight = getgenv().matcha.ESPChamsFillHighlight
+	local chams_material_enabled = getgenv().matcha.ESPChamsMaterial
+	local chams_material_type = getgenv().matcha.ESPChamsMaterialType
+	local self_chams = getgenv().matcha.ESPSelfChams
+	local self_material = getgenv().matcha.ESPSelfMaterial
+	local tool_material = getgenv().matcha.ESPToolMaterial
+	local self_chams_color = getgenv().matcha.ESPSelfChamsColor
+	local tracer_enabled = getgenv().matcha.ESPTracer
+	local tracer_color = getgenv().matcha.ESPTracerColor
+	local tracer_type = getgenv().matcha.ESPTracerType  -- 'Cursor', 'Bottom Screen', 'Top Screen'
+	local tracer_thickness = getgenv().matcha.ESPTracerThickness
+	local team_check = getgenv().matcha.ESPTeamCheck
+	local only_target = getgenv().matcha.ESPOnlyTarget
+	local self_esp = getgenv().matcha.ESPSelf
+	
+	local players_esp = esp.players
+	
+	for player, esp_obj in pairs(players_esp) do
+		if player == LocalPlayer and not self_esp then continue end
+		if only_target and player ~= getgenv().matcha.SelectedTarget then continue end
+		if team_check and player.Team == LocalPlayer.Team then continue end
+		if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") or not player.Character:FindFirstChild("Head") then 
+			esp.remove_player(player)
+			continue 
+		end
 		
-		-- L?y settings t? getgenv().matcha
-		local boxes_enabled = getgenv().matcha.ESPBoxes
-		local boxes_color = getgenv().matcha.ESPBoxesColor
-		local boxes_outline_color = getgenv().matcha.ESPBoxesOutlineColor
-		local boxes_target_color = getgenv().matcha.ESPBoxesTargetColor
-		local boxes_type = getgenv().matcha.ESPBoxesType  -- 'Full' or 'UICorner'
-		local box_fill = getgenv().matcha.ESPBoxFill
-		local box_fill_color = getgenv().matcha.ESPBoxFillColor
-		local box_fill_transparency = getgenv().matcha.ESPBoxFillTransparency
-		local box_fill_target_color = getgenv().matcha.ESPBoxFillTargetColor
-		local names_enabled = getgenv().matcha.ESPName
-		local names_color = getgenv().matcha.ESPNameColor
-		local name_type = getgenv().matcha.ESPNameType  -- 'Name' or 'DisplayName'
-		local head_dots_enabled = getgenv().matcha.ESPHeadDot
-		local head_dots_color = getgenv().matcha.ESPHeadDotColor
-		local head_dots_size = getgenv().matcha.ESPHeadDotSize
-		local health_bar_enabled = getgenv().matcha.ESPHealthBar
-		local health_bar_health_based_color = getgenv().matcha.ESPHealthBasedColor
-		local health_bar_color = getgenv().matcha.ESPHealthBarColor
-		local health_text_enabled = getgenv().matcha.ESPHealthText
-		local health_text_color = getgenv().matcha.ESPHealthTextColor
-		local distance_enabled = getgenv().matcha.ESPDistance
-		local distance_color = getgenv().matcha.ESPDistanceColor
-		local equipped_item_enabled = getgenv().matcha.ESPEquippedItem
-		local equipped_item_color = getgenv().matcha.ESPEquippedItemColor
-		local skeleton_enabled = getgenv().matcha.ESPSkeleton
-		local skeleton_color = getgenv().matcha.ESPSkeletonColor
-		local esp_faded = getgenv().matcha.ESPFaded
-		local fade_speed = getgenv().matcha.ESPFadeSpeed / 100  -- Adjust speed
-		local chams_enabled = getgenv().matcha.ESPChams
-		local chams_outline_color = getgenv().matcha.ESPChamsOutlineColor
-		local chams_fill_color = getgenv().matcha.ESPChamsFillColor
-		local chams_fill_highlight = getgenv().matcha.ESPChamsFillHighlight
-		local chams_material_enabled = getgenv().matcha.ESPChamsMaterial
-		local chams_material_type = getgenv().matcha.ESPChamsMaterialType
-		local self_chams = getgenv().matcha.ESPSelfChams
-		local self_material = getgenv().matcha.ESPSelfMaterial
-		local tool_material = getgenv().matcha.ESPToolMaterial
-		local self_chams_color = getgenv().matcha.ESPSelfChamsColor
-		local tracer_enabled = getgenv().matcha.ESPTracer
-		local tracer_color = getgenv().matcha.ESPTracerColor
-		local tracer_type = getgenv().matcha.ESPTracerType  -- 'Cursor', 'Bottom Screen', 'Top Screen'
-		local tracer_thickness = getgenv().matcha.ESPTracerThickness
-		local team_check = getgenv().matcha.ESPTeamCheck
-		local only_target = getgenv().matcha.ESPOnlyTarget
-		local self_esp = getgenv().matcha.ESPSelf
+		local character = player.Character
+		local hrp = character.HumanoidRootPart
+		local head = character:FindFirstChild("Head")
+		local humanoid = character:FindFirstChildOfClass("Humanoid")
+		local tool = character:FindFirstChildOfClass("Tool")
 		
-		local players_esp = esp.players
+		local screen_pos, on_screen = Camera:WorldToViewportPoint(hrp.Position)
+		local screen_pos_head, on_screen_head = Camera:WorldToViewportPoint(head.Position)
 		
-		for player, esp_obj in pairs(players_esp) do
-			if player == LocalPlayer and not self_esp then continue end
-			if only_target and player ~= getgenv().matcha.SelectedTarget then continue end
-			if team_check and player.Team == LocalPlayer.Team then continue end
-			if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") or not player.Character:FindFirstChild("Head") then continue end
+		if not on_screen then 
+			esp.remove_player(player)
+			continue 
+		end
+		
+		local scale = 1000 / (Camera.CFrame.Position - hrp.Position).Magnitude
+		local box_size = Vector2.new(3 * scale, 4.5 * scale)
+		local box_position = Vector2.new(screen_pos.X - box_size.X / 2, screen_pos.Y - box_size.Y / 2)
+		
+		local outline_offset = 2
+		local box_outline_size = box_size + Vector2.new(outline_offset, outline_offset)
+		local box_outline_position = box_position - Vector2.new(outline_offset / 2, outline_offset / 2)
+		
+		local is_target = getgenv().matcha.SelectedTarget == player
+		
+		-- Áp dụng fade cho các phần ảnh hưởng (boxes, name, head dot, health, distance, equipped, skeleton)
+		local transparency = 1
+		if esp_faded then
+			transparency = updateFading(player, dt)
+		end
+		
+		-- Boxes
+		if boxes_enabled then
+			esp_obj.box_outline.Size = box_outline_size
+			esp_obj.box_outline.Position = box_outline_position
+			esp_obj.box_outline.Color = boxes_outline_color
+			esp_obj.box_outline.Transparency = transparency
+			esp_obj.box_outline.Visible = true
 			
-			local character = player.Character
-			local hrp = character.HumanoidRootPart
-			local head = character:FindFirstChild("Head")
-			local humanoid = character:FindFirstChildOfClass("Humanoid")
-			local tool = character:FindFirstChildOfClass("Tool")
+			esp_obj.box_inline.Size = box_size
+			esp_obj.box_inline.Position = box_position
+			esp_obj.box_inline.Color = is_target and boxes_target_color or boxes_color
+			esp_obj.box_inline.Transparency = transparency
+			esp_obj.box_inline.Visible = true
 			
-			local screen_pos, on_screen = Camera:WorldToViewportPoint(hrp.Position)
-			local screen_pos_head, on_screen_head = Camera:WorldToViewportPoint(head.Position)
+			-- UICorner nếu chọn (nhung Drawing không hỗ trợ trực tiếp, có thể bỏ hoặc dùng square)
+			-- Note: Drawing không có UICorner, giữ full square
+		else
+			esp_obj.box_outline.Visible = false
+			esp_obj.box_inline.Visible = false
+		end
+		
+		-- Box Fill
+		if box_fill then
+			esp_obj.box_inline.Filled = true
+			esp_obj.box_inline.Color = is_target and box_fill_target_color or box_fill_color
+			esp_obj.box_inline.Transparency = box_fill_transparency * transparency
+		else
+			esp_obj.box_inline.Filled = false
+		end
+		
+		-- Name
+		if names_enabled then
+			esp_obj.name.Visible = true
+			esp_obj.name.Text = name_type == 'DisplayName' and player.DisplayName or player.Name
+			esp_obj.name.Position = Vector2.new(box_size.X / 2 + box_position.X, box_position.Y - 16)
+			esp_obj.name.Color = names_color
+			esp_obj.name.Transparency = transparency
+		else
+			esp_obj.name.Visible = false
+		end
+		
+		-- Head Dot
+		if head_dots_enabled and on_screen_head then
+			esp_obj.head_dot_inline.Position = Vector2.new(screen_pos_head.X, screen_pos_head.Y)
+			esp_obj.head_dot_inline.Radius = head_dots_size
+			esp_obj.head_dot_inline.Color = head_dots_color
+			esp_obj.head_dot_inline.Transparency = transparency
+			esp_obj.head_dot_inline.Visible = true
 			
-			if not on_screen then 
-				for k,v in pairs(esp_obj) do 
-                    if typeof(v) == "table" then
-                        for _, sub in pairs(v) do sub.Visible = false end
-                    elseif typeof(v) ~= "Instance" then 
-                        v.Visible = false 
-                    end 
-                end
-				esp_obj.chams.Enabled = false
-				continue 
-			end
+			esp_obj.head_dot_outline.Position = Vector2.new(screen_pos_head.X, screen_pos_head.Y)
+			esp_obj.head_dot_outline.Radius = head_dots_size + 2
+			esp_obj.head_dot_outline.Transparency = transparency
+			esp_obj.head_dot_outline.Visible = true
+		else
+			esp_obj.head_dot_inline.Visible = false
+			esp_obj.head_dot_outline.Visible = false
+		end
+		
+		-- Health Bar
+		if health_bar_enabled and humanoid then
+			local health_percentage = humanoid.Health / humanoid.MaxHealth
+			local health_bar_height = health_percentage * box_size.Y
 			
-			local scale = 1000 / (Camera.CFrame.Position - hrp.Position).Magnitude
-			local box_size = Vector2.new(3 * scale, 4.5 * scale)
-			local box_position = Vector2.new(screen_pos.X - box_size.X / 2, screen_pos.Y - box_size.Y / 2)
+			esp_obj.health_bar_outline.From = Vector2.new(box_position.X - 5, box_position.Y + box_size.Y)
+			esp_obj.health_bar_outline.To = Vector2.new(box_position.X - 5, box_position.Y)
+			esp_obj.health_bar_outline.Transparency = transparency
+			esp_obj.health_bar_outline.Visible = true
 			
-			local outline_offset = 2
-			local box_outline_size = box_size + Vector2.new(outline_offset, outline_offset)
-			local box_outline_position = box_position - Vector2.new(outline_offset / 2, outline_offset / 2)
-			
-			local is_target = getgenv().matcha.SelectedTarget == player
-			
-			-- Áp d?ng fade cho các ph?n ?nh hu?ng (boxes, name, head dot, health, distance, equipped, skeleton)
-			local transparency = 1
-			if esp_faded then
-				if not esp.fading[player] then esp.fading[player] = 1 end
-				esp.fading[player] = math.max(0, esp.fading[player] - fade_speed)
-				transparency = esp.fading[player]
-				if transparency <= 0 then transparency = 1; esp.fading[player] = 1 end  -- Reset fade
-			end
-			
-			-- Boxes
-			if boxes_enabled then
-				esp_obj.box_outline.Size = box_outline_size
-				esp_obj.box_outline.Position = box_outline_position
-				esp_obj.box_outline.Color = boxes_outline_color
-				esp_obj.box_outline.Transparency = transparency
-				esp_obj.box_outline.Visible = true
-				
-				esp_obj.box_inline.Size = box_size
-				esp_obj.box_inline.Position = box_position
-				esp_obj.box_inline.Color = is_target and boxes_target_color or boxes_color
-				esp_obj.box_inline.Transparency = transparency
-				esp_obj.box_inline.Visible = true
-				
-				-- UICorner n?u ch?n (nhung Drawing không h? tr? tr?c ti?p, có th? b? ho?c dùng square)
-				-- Note: Drawing không có UICorner, gi? full square
-			else
-				esp_obj.box_outline.Visible = false
-				esp_obj.box_inline.Visible = false
-			end
-			
-			-- Box Fill
-			if box_fill then
-				esp_obj.box_inline.Filled = true
-				esp_obj.box_inline.Color = is_target and box_fill_target_color or box_fill_color
-				esp_obj.box_inline.Transparency = box_fill_transparency * transparency
-			else
-				esp_obj.box_inline.Filled = false
-			end
-			
-			-- Name
-			if names_enabled then
-				esp_obj.name.Visible = true
-				esp_obj.name.Text = name_type == 'DisplayName' and player.DisplayName or player.Name
-				esp_obj.name.Position = Vector2.new(box_size.X / 2 + box_position.X, box_position.Y - 16)
-				esp_obj.name.Color = names_color
-				esp_obj.name.Transparency = transparency
-			else
-				esp_obj.name.Visible = false
-			end
-			
-			-- Head Dot
-			if head_dots_enabled and on_screen_head then
-				esp_obj.head_dot_inline.Position = Vector2.new(screen_pos_head.X, screen_pos_head.Y)
-				esp_obj.head_dot_inline.Radius = head_dots_size
-				esp_obj.head_dot_inline.Color = head_dots_color
-				esp_obj.head_dot_inline.Transparency = transparency
-				esp_obj.head_dot_inline.Visible = true
-				
-				esp_obj.head_dot_outline.Position = Vector2.new(screen_pos_head.X, screen_pos_head.Y)
-				esp_obj.head_dot_outline.Radius = head_dots_size + 2
-				esp_obj.head_dot_outline.Transparency = transparency
-				esp_obj.head_dot_outline.Visible = true
-			else
-				esp_obj.head_dot_inline.Visible = false
-				esp_obj.head_dot_outline.Visible = false
-			end
-			
-			-- Health Bar
-			if health_bar_enabled and humanoid then
-				local health_percentage = humanoid.Health / humanoid.MaxHealth
-				local health_bar_height = health_percentage * box_size.Y
-				
-				esp_obj.health_bar_outline.From = Vector2.new(box_position.X - 5, box_position.Y + box_size.Y)
-				esp_obj.health_bar_outline.To = Vector2.new(box_position.X - 5, box_position.Y)
-				esp_obj.health_bar_outline.Transparency = transparency
-				esp_obj.health_bar_outline.Visible = true
-				
-				esp_obj.health_bar_inline.From = Vector2.new(box_position.X - 5, box_position.Y + box_size.Y)
-				esp_obj.health_bar_inline.To = Vector2.new(box_position.X - 5, box_position.Y + box_size.Y - health_bar_height)
-				esp_obj.health_bar_inline.Color = health_bar_health_based_color and Color3.new(1 - health_percentage, health_percentage, 0) or health_bar_color
-				esp_obj.health_bar_inline.Transparency = transparency
-				esp_obj.health_bar_inline.Visible = true
-			else
-				esp_obj.health_bar_outline.Visible = false
-				esp_obj.health_bar_inline.Visible = false
-			end
-			
-			-- Health Text
-			if health_text_enabled and humanoid then
-				esp_obj.health_text.Visible = true
-				esp_obj.health_text.Text = tostring(math.floor(humanoid.Health))
-				esp_obj.health_text.Position = Vector2.new(box_position.X - 5 - esp_obj.health_text.TextBounds.X / 2, box_position.Y + box_size.Y - (humanoid.Health / humanoid.MaxHealth * box_size.Y))
-				esp_obj.health_text.Color = health_text_color
-				esp_obj.health_text.Transparency = transparency
-			else
-				esp_obj.health_text.Visible = false
-			end
-			
-			-- Distance
-			if distance_enabled then
-				local dist = (LocalPlayer.Character.HumanoidRootPart.Position - hrp.Position).Magnitude
-				esp_obj.distance.Visible = true
-				esp_obj.distance.Text = tostring(math.floor(dist)) .. " studs"
-				esp_obj.distance.Position = Vector2.new(box_size.X / 2 + box_position.X, box_position.Y + box_size.Y + 5)
-				esp_obj.distance.Color = distance_color
-				esp_obj.distance.Transparency = transparency
-			else
-				esp_obj.distance.Visible = false
-			end
-			
-			-- Equipped Item
-			if equipped_item_enabled and tool then
-				esp_obj.equipped_item.Visible = true
-				esp_obj.equipped_item.Text = tool.Name
-				esp_obj.equipped_item.Position = Vector2.new(box_size.X / 2 + box_position.X, box_position.Y + box_size.Y + 20)
-				esp_obj.equipped_item.Color = equipped_item_color
-				esp_obj.equipped_item.Transparency = transparency
-			else
-				esp_obj.equipped_item.Visible = false
-			end
-			
-			-- Skeleton
-			if skeleton_enabled then
-                local parts = {
-                    head = head,
-                    upper_torso = character:FindFirstChild("UpperTorso"),
-                    lower_torso = character:FindFirstChild("LowerTorso"),
-                    left_upper_arm = character:FindFirstChild("LeftUpperArm"),
-                    left_lower_arm = character:FindFirstChild("LeftLowerArm"),
-                    left_hand = character:FindFirstChild("LeftHand"),
-                    right_upper_arm = character:FindFirstChild("RightUpperArm"),
-                    right_lower_arm = character:FindFirstChild("RightLowerArm"),
-                    right_hand = character:FindFirstChild("RightHand"),
-                    left_upper_leg = character:FindFirstChild("LeftUpperLeg"),
-                    left_lower_leg = character:FindFirstChild("LeftLowerLeg"),
-                    left_foot = character:FindFirstChild("LeftFoot"),
-                    right_upper_leg = character:FindFirstChild("RightUpperLeg"),
-                    right_lower_leg = character:FindFirstChild("RightLowerLeg"),
-                    right_foot = character:FindFirstChild("RightFoot")
+			esp_obj.health_bar_inline.From = Vector2.new(box_position.X - 5, box_position.Y + box_size.Y)
+			esp_obj.health_bar_inline.To = Vector2.new(box_position.X - 5, box_position.Y + box_size.Y - health_bar_height)
+			esp_obj.health_bar_inline.Color = health_bar_health_based_color and Color3.new(1 - health_percentage, health_percentage, 0) or health_bar_color
+			esp_obj.health_bar_inline.Transparency = transparency
+			esp_obj.health_bar_inline.Visible = true
+		else
+			esp_obj.health_bar_outline.Visible = false
+			esp_obj.health_bar_inline.Visible = false
+		end
+		
+		-- Health Text
+		if health_text_enabled and humanoid then
+			esp_obj.health_text.Visible = true
+			esp_obj.health_text.Text = tostring(math.floor(humanoid.Health))
+			esp_obj.health_text.Position = Vector2.new(box_position.X - 5 - esp_obj.health_text.TextBounds.X / 2, box_position.Y + box_size.Y - (humanoid.Health / humanoid.MaxHealth * box_size.Y))
+			esp_obj.health_text.Color = health_text_color
+			esp_obj.health_text.Transparency = transparency
+		else
+			esp_obj.health_text.Visible = false
+		end
+		
+		-- Distance
+		if distance_enabled then
+			local dist = (LocalPlayer.Character.HumanoidRootPart.Position - hrp.Position).Magnitude
+			esp_obj.distance.Visible = true
+			esp_obj.distance.Text = tostring(math.floor(dist)) .. " studs"
+			esp_obj.distance.Position = Vector2.new(box_size.X / 2 + box_position.X, box_position.Y + box_size.Y + 5)
+			esp_obj.distance.Color = distance_color
+			esp_obj.distance.Transparency = transparency
+		else
+			esp_obj.distance.Visible = false
+		end
+		
+		-- Equipped Item
+		if equipped_item_enabled and tool then
+			esp_obj.equipped_item.Visible = true
+			esp_obj.equipped_item.Text = tool.Name
+			esp_obj.equipped_item.Position = Vector2.new(box_size.X / 2 + box_position.X, box_position.Y + box_size.Y + 20)
+			esp_obj.equipped_item.Color = equipped_item_color
+			esp_obj.equipped_item.Transparency = transparency
+		else
+			esp_obj.equipped_item.Visible = false
+		end
+		
+		-- Skeleton
+		if skeleton_enabled then
+            local parts = {
+                head = head,
+                upper_torso = character:FindFirstChild("UpperTorso"),
+                lower_torso = character:FindFirstChild("LowerTorso"),
+                left_upper_arm = character:FindFirstChild("LeftUpperArm"),
+                left_lower_arm = character:FindFirstChild("LeftLowerArm"),
+                left_hand = character:FindFirstChild("LeftHand"),
+                right_upper_arm = character:FindFirstChild("RightUpperArm"),
+                right_lower_arm = character:FindFirstChild("RightLowerArm"),
+                right_hand = character:FindFirstChild("RightHand"),
+                left_upper_leg = character:FindFirstChild("LeftUpperLeg"),
+                left_lower_leg = character:FindFirstChild("LeftLowerLeg"),
+                left_foot = character:FindFirstChild("LeftFoot"),
+                right_upper_leg = character:FindFirstChild("RightUpperLeg"),
+                right_lower_leg = character:FindFirstChild("RightLowerLeg"),
+                right_foot = character:FindFirstChild("RightFoot")
+            }
+
+            if parts.upper_torso and parts.lower_torso and parts.head and parts.left_upper_arm and parts.left_lower_arm and parts.left_hand and parts.right_upper_arm and parts.right_lower_arm and parts.right_hand and parts.left_upper_leg and parts.left_lower_leg and parts.left_foot and parts.right_upper_leg and parts.right_lower_leg and parts.right_foot then
+                local connections = {
+                    {parts.head, parts.upper_torso, 1},
+                    {parts.upper_torso, parts.lower_torso, 2},
+                    {parts.upper_torso, parts.left_upper_arm, 3},
+                    {parts.left_upper_arm, parts.left_lower_arm, 4},
+                    {parts.left_lower_arm, parts.left_hand, 5},
+                    {parts.upper_torso, parts.right_upper_arm, 6},
+                    {parts.right_upper_arm, parts.right_lower_arm, 7},
+                    {parts.right_lower_arm, parts.right_hand, 8},
+                    {parts.lower_torso, parts.left_upper_leg, 9},
+                    {parts.left_upper_leg, parts.left_lower_leg, 10},
+                    {parts.left_lower_leg, parts.left_foot, 11},
+                    {parts.lower_torso, parts.right_upper_leg, 12},
+                    {parts.right_upper_leg, parts.right_lower_leg, 13},
+                    {parts.right_lower_leg, parts.right_foot, 14}
                 }
 
-                if parts.upper_torso and parts.lower_torso and parts.head and parts.left_upper_arm and parts.left_lower_arm and parts.left_hand and parts.right_upper_arm and parts.right_lower_arm and parts.right_hand and parts.left_upper_leg and parts.left_lower_leg and parts.left_foot and parts.right_upper_leg and parts.right_lower_leg and parts.right_foot then
-                    local connections = {
-                        {parts.head, parts.upper_torso, 1},
-                        {parts.upper_torso, parts.lower_torso, 2},
-                        {parts.upper_torso, parts.left_upper_arm, 3},
-                        {parts.left_upper_arm, parts.left_lower_arm, 4},
-                        {parts.left_lower_arm, parts.left_hand, 5},
-                        {parts.upper_torso, parts.right_upper_arm, 6},
-                        {parts.right_upper_arm, parts.right_lower_arm, 7},
-                        {parts.right_lower_arm, parts.right_hand, 8},
-                        {parts.lower_torso, parts.left_upper_leg, 9},
-                        {parts.left_upper_leg, parts.left_lower_leg, 10},
-                        {parts.left_lower_leg, parts.left_foot, 11},
-                        {parts.lower_torso, parts.right_upper_leg, 12},
-                        {parts.right_upper_leg, parts.right_lower_leg, 13},
-                        {parts.right_lower_leg, parts.right_foot, 14}
-                    }
-
-                    for _, conn in ipairs(connections) do
-                        local from_pos, from_on_screen = Camera:WorldToViewportPoint(conn[1].Position)
-                        local to_pos, to_on_screen = Camera:WorldToViewportPoint(conn[2].Position)
-                        if from_on_screen and to_on_screen then
-                            esp_obj.skeleton_lines[conn[3]].From = Vector2.new(from_pos.X, from_pos.Y)
-                            esp_obj.skeleton_lines[conn[3]].To = Vector2.new(to_pos.X, to_pos.Y)
-                            esp_obj.skeleton_lines[conn[3]].Color = skeleton_color
-                            esp_obj.skeleton_lines[conn[3]].Transparency = transparency
-                            esp_obj.skeleton_lines[conn[3]].Visible = true
-                        else
-                            esp_obj.skeleton_lines[conn[3]].Visible = false
-                        end
-                    end
-                else
-                    for _, line in ipairs(esp_obj.skeleton_lines) do
-                        line.Visible = false
+                for _, conn in ipairs(connections) do
+                    local from_pos, from_on_screen = Camera:WorldToViewportPoint(conn[1].Position)
+                    local to_pos, to_on_screen = Camera:WorldToViewportPoint(conn[2].Position)
+                    if from_on_screen and to_on_screen then
+                        esp_obj.skeleton_lines[conn[3]].From = Vector2.new(from_pos.X, from_pos.Y)
+                        esp_obj.skeleton_lines[conn[3]].To = Vector2.new(to_pos.X, to_pos.Y)
+                        esp_obj.skeleton_lines[conn[3]].Color = skeleton_color
+                        esp_obj.skeleton_lines[conn[3]].Transparency = transparency
+                        esp_obj.skeleton_lines[conn[3]].Visible = true
+                    else
+                        esp_obj.skeleton_lines[conn[3]].Visible = false
                     end
                 end
-			else
+            else
                 for _, line in ipairs(esp_obj.skeleton_lines) do
                     line.Visible = false
                 end
+            end
+		else
+            for _, line in ipairs(esp_obj.skeleton_lines) do
+                line.Visible = false
+            end
+		end
+		
+		-- Các phần không fade: Chams, Self Chams, Tracer
+		-- Chams
+		if chams_enabled then
+			esp_obj.chams.Adornee = character
+			esp_obj.chams.OutlineColor = chams_outline_color
+			esp_obj.chams.FillColor = chams_fill_color
+			esp_obj.chams.FillTransparency = chams_fill_highlight and 0.5 or 1
+			esp_obj.chams.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+			esp_obj.chams.Enabled = true
+			if chams_material_enabled then
+				for _, part in pairs(character:GetDescendants()) do
+					if part:IsA("BasePart") then
+						part.Material = Enum.Material[chams_material_type]
+					end
+				end
 			end
-			
-			-- Các ph?n không fade: Chams, Self Chams, Tracer
-			-- Chams
-			if chams_enabled then
-				esp_obj.chams.Adornee = character
-				esp_obj.chams.OutlineColor = chams_outline_color
-				esp_obj.chams.FillColor = chams_fill_color
-				esp_obj.chams.FillTransparency = chams_fill_highlight and 0.5 or 1
-				esp_obj.chams.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-				esp_obj.chams.Enabled = true
-				if chams_material_enabled then
-					for _, part in pairs(character:GetDescendants()) do
-						if part:IsA("BasePart") then
+		else
+			esp_obj.chams.Enabled = false
+		end
+		
+		-- Self Chams
+		if self_chams and player == LocalPlayer then
+			local self_char = LocalPlayer.Character
+			if self_char then
+				for _, part in pairs(self_char:GetDescendants()) do
+					if part:IsA("BasePart") then
+						local hl = Instance.new("Highlight", part)
+						hl.FillColor = self_chams_color
+						hl.Enabled = true
+						if self_material then
+							part.Material = Enum.Material[chams_material_type]
+						end
+						if tool_material and part.Parent:IsA("Tool") then
 							part.Material = Enum.Material[chams_material_type]
 						end
 					end
 				end
-			else
-				esp_obj.chams.Enabled = false
-			end
-			
-			-- Self Chams
-			if self_chams and player == LocalPlayer then
-				local self_char = LocalPlayer.Character
-				if self_char then
-					for _, part in pairs(self_char:GetDescendants()) do
-						if part:IsA("BasePart") then
-							local hl = Instance.new("Highlight", part)
-							hl.FillColor = self_chams_color
-							hl.Enabled = true
-							if self_material then
-								part.Material = Enum.Material[chams_material_type]
-							end
-							if tool_material and part.Parent:IsA("Tool") then
-								part.Material = Enum.Material[chams_material_type]
-							end
-						end
-					end
-				end
-			end
-			
-			-- Tracer
-			if tracer_enabled then
-				local from_pos
-				if tracer_type == 'Cursor' then
-					from_pos = UserInputService:GetMouseLocation()
-				elseif tracer_type == 'Bottom Screen' then
-					from_pos = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
-				elseif tracer_type == 'Top Screen' then
-					from_pos = Vector2.new(Camera.ViewportSize.X / 2, 0)
-				end
-				esp_obj.tracer.From = from_pos
-				esp_obj.tracer.To = Vector2.new(screen_pos.X, screen_pos.Y)
-				esp_obj.tracer.Color = tracer_color
-				esp_obj.tracer.Thickness = tracer_thickness
-				esp_obj.tracer.Visible = true
-			else
-				esp_obj.tracer.Visible = false
 			end
 		end
-	end);
+		
+		-- Tracer
+		if tracer_enabled then
+			local from_pos
+			if tracer_type == 'Cursor' then
+				from_pos = UserInputService:GetMouseLocation()
+			elseif tracer_type == 'Bottom Screen' then
+				from_pos = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
+			elseif tracer_type == 'Top Screen' then
+				from_pos = Vector2.new(Camera.ViewportSize.X / 2, 0)
+			end
+			esp_obj.tracer.From = from_pos
+			esp_obj.tracer.To = Vector2.new(screen_pos.X, screen_pos.Y)
+			esp_obj.tracer.Color = tracer_color
+			esp_obj.tracer.Thickness = tracer_thickness
+			esp_obj.tracer.Visible = true
+		else
+			esp_obj.tracer.Visible = false
+		end
+	end
+end)
+
+esp.add_player = function(player)
+	if esp.players[player] then 
+		esp.remove_player(player) 
+	end
+	local new_esp = {
+		box_outline = Drawing.new("Square"),
+		box_inline = Drawing.new("Square"),
+		name = Drawing.new("Text"),
+		head_dot_outline = Drawing.new("Circle"),
+		head_dot_inline = Drawing.new("Circle"),
+		health_bar_outline = Drawing.new("Line"),
+		health_bar_inline = Drawing.new("Line"),
+		health_text = Drawing.new("Text"),
+		distance = Drawing.new("Text"),
+		equipped_item = Drawing.new("Text"),
+		skeleton_lines = {
+			Drawing.new("Line"), -- 1: head to upper torso
+			Drawing.new("Line"), -- 2: upper torso to lower torso
+			Drawing.new("Line"), -- 3: upper torso to left upper arm
+			Drawing.new("Line"), -- 4: left upper arm to left lower arm
+			Drawing.new("Line"), -- 5: left lower arm to left hand
+			Drawing.new("Line"), -- 6: upper torso to right upper arm
+			Drawing.new("Line"), -- 7: right upper arm to right lower arm
+			Drawing.new("Line"), -- 8: right lower arm to right hand
+			Drawing.new("Line"), -- 9: lower torso to left upper leg
+			Drawing.new("Line"), -- 10: left upper leg to left lower leg
+			Drawing.new("Line"), -- 11: left lower leg to left foot
+			Drawing.new("Line"), -- 12: lower torso to right upper leg
+			Drawing.new("Line"), -- 13: right upper leg to right lower leg
+			Drawing.new("Line")  -- 14: right lower leg to right foot
+		},
+		chams = Instance.new("Highlight"),  -- Sử dụng Highlight cho chams
+		tracer = Drawing.new("Line")
+	};
+	
+	-- Cấu hình mặc định
+	new_esp.box_outline.Thickness = 1
+	new_esp.box_outline.Filled = false
+	new_esp.box_outline.Visible = false
+	
+	new_esp.box_inline.Thickness = 1
+	new_esp.box_inline.Filled = false
+	new_esp.box_inline.Visible = false
+	
+	new_esp.name.Outline = true
+	new_esp.name.Center = true
+	new_esp.name.Size = 13
+	new_esp.name.Visible = false
+	
+	new_esp.head_dot_outline.Radius = 10
+	new_esp.head_dot_outline.Thickness = 1
+	new_esp.head_dot_outline.Visible = false
+	new_esp.head_dot_outline.Color = Color3.new(0, 0, 0)
+	
+	new_esp.head_dot_inline.Radius = 10
+	new_esp.head_dot_inline.Thickness = 1
+	new_esp.head_dot_inline.Visible = false
+	
+	new_esp.health_bar_outline.Thickness = 1
+	new_esp.health_bar_outline.Visible = false
+	new_esp.health_bar_outline.Color = Color3.new(0, 0, 0)
+	
+	new_esp.health_bar_inline.Thickness = 3
+	new_esp.health_bar_inline.Visible = false
+	
+	new_esp.health_text.Color = Color3.new(1, 1, 1)
+	new_esp.health_text.Size = 12
+	new_esp.health_text.Outline = true
+	new_esp.health_text.Center = true
+	
+	new_esp.distance.Color = Color3.new(1, 1, 1)
+	new_esp.distance.Size = 12
+	new_esp.distance.Outline = true
+	new_esp.distance.Center = true
+	
+	new_esp.equipped_item.Color = Color3.new(1, 1, 1)
+	new_esp.equipped_item.Size = 12
+	new_esp.equipped_item.Outline = true
+	new_esp.equipped_item.Center = true
+
+	for _, line in ipairs(new_esp.skeleton_lines) do
+		line.Thickness = 1
+		line.Visible = false
+	end
+
+	new_esp.chams.Enabled = false
+	new_esp.chams.Parent = game.CoreGui
+	
+	new_esp.tracer.Thickness = 1
+	new_esp.tracer.Visible = false
+	
+	esp.players[player] = new_esp;
+end;
+
+esp.remove_player = function(player)			
+	for _, drawing in pairs(esp.players[player]) do
+		if typeof(drawing) == "table" then
+			for _, sub in pairs(drawing) do sub:Remove() end
+		else
+			drawing:Remove();
+		end
+	end;
+	esp.players[player] = nil;
+	esp.fading[player] = nil;
 end;
 
 
