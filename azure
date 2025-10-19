@@ -6166,7 +6166,7 @@ getgenv().esp = {
     espfadespeed = 5,
 
     box = false,
-    boxcolor = Color3.fromRGB(255,255,255),
+    boxcolor = Color3.fromRGB(204,255,255),
     boxoutline = Color3.fromRGB(0,0,0),
     boxtransparency = 0,
     boxoutlinetransparency = 0,
@@ -6178,7 +6178,7 @@ getgenv().esp = {
     healthoutlinetransparency = 0,
 
     chams = false,
-    chamscolor = Color3.fromRGB(255,255,255),
+    chamscolor = Color3.fromRGB(204,255,255),
     chamsoutline = Color3.fromRGB(0,0,0),
     chamstransparencyinline = 0.5,
     chamstransparencyoutline = 0.5,
