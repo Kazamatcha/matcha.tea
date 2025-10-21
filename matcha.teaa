@@ -1447,16 +1447,7 @@ local function refreshEmote()
     end
 end
 
--- Respawn handler
-LocalPlayer.CharacterAdded:Connect(function(char)
-    task.wait(0.5)
-    refreshEmote()
-end)
 
--- Nếu đang có nhân vật
-if LocalPlayer.Character then
-    refreshEmote()
-end
 
 -- Nếu Normal mode thì dừng khi di chuyển
 RunService.RenderStepped:Connect(function()
@@ -2587,7 +2578,6 @@ esp.add_player(player);
 end;
 
 RunService.Heartbeat:Connect(function(dt)
-if not matcha.ESPEnabled then return end
 
 if matcha.ESPFaded then
     fading_value = fading_value + fading_direction * (matcha.ESPFadeSpeed / 100) * dt * 60
