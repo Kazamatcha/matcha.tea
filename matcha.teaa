@@ -159,7 +159,7 @@ getgenv().matcha = {
     ESPSelf = false,
     ESPBoxes = false,
     ESPBoxesColor = Color3.fromRGB(70, 220, 110),
-    ESPBoxesOutlineColor = Color3.fromRGB(255, 255, 255),
+    ESPBoxesOutlineColor = Color3.fromRGB(0, 0, 0),
     ESPBoxesTargetColor = Color3.fromRGB(255, 0, 0),
     ESPBoxesType = "Full",
     ESPBoxFill = false,
@@ -1968,11 +1968,11 @@ RunService.Heartbeat:Connect(function(dt)
     local hum = char:FindFirstChildOfClass("Humanoid")
     if not hrp or not hum then return end
 
-    -- 🛸 Fly (PC + Mobile)
     if getgenv().matcha.FlyEnabled then
         local moveDirection = hum.MoveDirection
         local addY = 0
 
+        -- Logic cho PC
         if not UserInputService.TouchEnabled then
             -- ⚙️ PC: điều khiển bằng phím Space và Ctrl
             if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
@@ -1983,15 +1983,24 @@ RunService.Heartbeat:Connect(function(dt)
         else
             -- 📱 Mobile: bay theo hướng nhìn + di chuyển theo MoveDirection
             local lookDir = Camera.CFrame.LookVector
-            moveDirection = Vector3.new(moveDirection.X, 0, moveDirection.Z) + Vector3.new(lookDir.X, 0, lookDir.Z)
+            -- Nếu có di chuyển, mới tính toán hướng bay
+            if moveDirection.Magnitude > 0 then
+                -- Di chuyển theo hướng nhìn cộng với hướng di chuyển (MoveDirection)
+                moveDirection = Vector3.new(moveDirection.X, 0, moveDirection.Z) + Vector3.new(lookDir.X, 0, lookDir.Z)
+            else
+                -- Nếu không di chuyển, chỉ tính độ cao
+                moveDirection = Vector3.zero
+            end
 
+            -- Cập nhật bay lên/xuống theo hướng nhìn camera
             if lookDir.Y > 0.1 then
-                addY = getgenv().matcha.FlySpeed / 8 -- Bay lên
+                addY = getgenv().matcha.FlySpeed / 8  -- Bay lên
             elseif lookDir.Y < -0.1 then
-                addY = -getgenv().matcha.FlySpeed / 8 -- Bay xuống
+                addY = -getgenv().matcha.FlySpeed / 8  -- Bay xuống
             end
         end
 
+        -- Cập nhật vị trí bay
         hrp.CFrame = hrp.CFrame + (moveDirection * dt) * getgenv().matcha.FlySpeed * 10
         hrp.CFrame = hrp.CFrame + Vector3.new(0, addY, 0)
         hrp.Velocity = Vector3.new(0, 1.9, 0)
@@ -2062,7 +2071,7 @@ ESPGroup:AddToggle('ESPBoxes', {
         matcha.ESPBoxesColor = Color
     end
 }):AddColorPicker('ESPBoxesOutlineColor', {
-    Default = Color3.fromRGB(255, 255, 255),
+    Default = Color3.fromRGB(0, 0, 0),
     Title = 'Outline Color',
     Callback = function(Color)
         matcha.ESPBoxesOutlineColor = Color
@@ -2084,7 +2093,7 @@ ESPGroup:AddDropdown('ESPBoxesType', {
 })
 
 -- Dropdown multi cho checks
-ESPGroup:AddDropdown('ESPChecks', {
+ESPGroup:AddDropdown('', {
     Values = {'Team Check', 'Only Target', 'Self ESP'},
     Multi = true,
     Text = 'ESP Checks',
