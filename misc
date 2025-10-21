@@ -1,1 +1,3547 @@
-https://github.com/4lpaca-pin/Fatality/tree/main
+
+
+local repo = 'https://raw.githubusercontent.com/mstudio45/LinoriaLib/main/'
+
+local Library = loadstring(game:HttpGet(repo .. 'Library.lua'))()
+local ThemeManager = loadstring(game:HttpGet(repo .. 'addons/ThemeManager.lua'))()
+local SaveManager = loadstring(game:HttpGet(repo .. 'addons/SaveManager.lua'))()
+local Options = Library.Options
+local Toggles = Library.Toggles
+
+Library.ShowToggleFrameInKeybinds = true
+Library.ShowCustomCursor = true
+Library.NotifySide = "Left"
+
+local Fatality = loadstring(game:HttpGet("https://raw.githubusercontent.com/Kazamatcha/matcha.tea/refs/heads/main/Fatality"))();
+local Notification = Fatality:CreateNotifier();
+
+Fatality:Loader({
+	Name = "matcha.tea",
+	Duration = 4
+});
+
+Notification:Notify({
+	Title = "matcha.tea",
+	Content = "Hello, "..game.Players.LocalPlayer.DisplayName..' Welcome back!',
+	Icon = "clipboard"
+});
+
+-- Services
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local HttpService = game:GetService("HttpService")
+local Stats = game:GetService("Stats")
+local MarketplaceService = game:GetService("MarketplaceService")
+local TweenService = game:GetService("TweenService")
+local VirtualUser = game:GetService("VirtualUser")
+local Mouse = LocalPlayer:GetMouse()
+
+getgenv().vu = VirtualUser
+getgenv().isAntiAfkEnabled = false
+getgenv().antiAfkConnection = nil
+
+getgenv().matcha = {
+    TargetLockEnabled = false,
+    AutoTarget = false,
+    CheckWall = false,
+    CheckKO = false,
+    CheckKO2 = false,
+    CheckGrabbing = false,
+    CheckGrabbing2 = false,
+    CheckFriend = false,
+    CheckFriend2 = false,
+    CheckTeam = false,
+    TargetKey = Enum.KeyCode.Q,
+    NotifyEnabled = false,
+    LookAt = false,
+    SelectedTarget = nil,
+    Whitelist = {},
+    MobileButtonEnabled = false,
+    MobileButton = nil,
+    AimlockEnabled = false,
+    AimMethod = "camera",
+    HealthCheck = false,
+    HealthThreshold = 50,
+    DistanceCheck = false,
+    DistanceLimit = 500,
+    Resolver = false,
+    ResolverMethod = "move direction",
+    AutoPrediction = false,
+    AutoPredMode = "PingBased",
+    PredictionX = 0,
+    PredictionY = 0,
+    HitPart = "Head",
+    ClosestHitPart = false,
+    AirPart = false,
+    AirHitPart = "UpperTorso",
+    AntiGround = false,
+    SmoothAimlock = 1,
+    SmoothMethod = "Linear",
+    WallCheck = false,
+    TriggerbotEnabled = false,
+    TriggerFOV = 20,
+    OnlyTarget = false,
+    TriggerCheckWall = false,
+    TriggerCheckKO = false,
+    TriggerCheckKnife = false,
+    TriggerCheckGrab = false,
+    TriggerCheckTeam = false,
+    TriggerCheckFriend = false,
+    TriggerDelay = 1,
+    HitboxExpanderEnabled = false,
+    HitboxSize = 10,
+    VisualizeHitbox = false,
+    HitboxColor = Color3.fromRGB(70, 220, 110),
+    HitboxOutlineColor = Color3.fromRGB(255, 255, 255),
+    HitboxCheckTeam = false,
+    HitboxOnlyTarget = false,
+    FOVCircleEnabled = false,
+    FOVCircleMode = "center",
+    FOVCircleSize = 100,
+    FOVCircleThickness = 1,
+    FOVCircleColor = Color3.fromRGB(70,220,110),
+    FOVCircleTransparency = 0.5,
+    FOVCircleFilled = false,
+    FOVCircleLineEnabled = false,
+    FOVCircleLineColor = Color3.fromRGB(200, 255, 250),
+    UseAimFOV = false,
+    AutoTargetFOV = false,
+
+    -- 🌿 Highlight
+    HighlightEnabled = false,
+    HighlightFillColor = Color3.fromRGB(70, 220, 110),
+    HighlightOutlineColor = Color3.fromRGB(230, 255, 240),
+    HighlightFillTransparency = 0.5,
+    HighlightOutlineTransparency = 0,
+
+    -- 🎯 Tracer
+    TracerEnabled = false,
+    TracerPosition = "Mouse",  -- "Mouse" or "Tool"
+    TracerFillColor = Color3.fromRGB(120, 255, 160),
+    TracerOutlineColor = Color3.fromRGB(180, 255, 200),
+    TracerThickness = 1,
+    TracerOutlineThickness = 1,
+    TracerTransparency = 1,
+
+    -- 🏃 Movement
+    FlyEnabled = false,
+    FlySpeed = 20,
+    CFSpeedEnabled = false,
+    CFSpeed = 2,
+    WalkJumpEnabled = false,
+    WalkSpeedAmount = 16, -- sẽ bị override khi cache default
+    JumpPowerAmount = 50, -- sẽ bị override khi cache default
+    NoJumpCooldown = false,
+    NoSlowdown = false,
+    BunnyHopEnabled = false,
+    BunnyHopSpeed = 50,
+    -- Spinbot
+    SpinbotEnabled = false,
+    SpinSpeed = 10,
+
+    -- Animation Player
+    EmoteEnabled = false,
+    EmoteId = "rbxassetid://14352343065",
+    AnimationSpeed = 1,
+    EmoteMode = "Normal", -- "Normal" hoặc "Always"
+
+    -- Noclip + AntiFling
+    NoclipEnabled = false,
+    AntiFlingEnabled = false,
+
+    -- ESP Variables
+    ESPTeamCheck = false,
+    ESPOnlyTarget = false,
+    ESPSelf = false,
+    ESPBoxes = false,
+    ESPBoxesColor = Color3.fromRGB(70, 220, 110),
+    ESPBoxesOutlineColor = Color3.fromRGB(0, 0, 0),
+    ESPBoxesTargetColor = Color3.fromRGB(255, 0, 0),
+    ESPBoxMode = "2D",  -- Default mode: "2D", "Corner", "3D"
+    ESPBoxFill = false,
+    ESPBoxFillColor = Color3.fromRGB(70, 220, 110),
+    ESPBoxFillTransparency = 0.5,
+    ESPBoxFillTargetColor = Color3.fromRGB(255, 0, 0),
+    ESPName = false,
+    ESPNameColor = Color3.fromRGB(70, 220, 110),
+    ESPNameType = "DisplayName",
+    ESPHealthBar = false,
+    ESPHealthBarColor = Color3.fromRGB(70, 220, 110),
+    ESPHealthBasedColor = false,
+    ESPHealthText = false,
+    ESPHealthTextColor = Color3.fromRGB(70, 220, 110),
+    ESPDistance = false,
+    ESPDistanceColor = Color3.fromRGB(70, 220, 110),
+    ESPEquippedItem = false,
+    ESPEquippedItemColor = Color3.fromRGB(70, 220, 110),
+    ESPSkeleton = false,
+    ESPSkeletonColor = Color3.fromRGB(70, 220, 110),
+    ESPHeadDot = false,
+    ESPHeadDotColor = Color3.fromRGB(70, 220, 110),
+    ESPHeadDotSize = 5,
+    ESPFaded = false,
+    ESPFadeSpeed = 5,
+    ESPChams = false,
+    ESPChamsOutlineColor = Color3.fromRGB(70, 220, 110),
+    ESPChamsFillColor = Color3.fromRGB(70, 220, 110),
+    ESPChamsFillHighlight = false,
+    ESPChamsMaterial = false,
+    ESPChamsMaterialType = "ForceField",
+    ESPSelfChams = false,
+    ESPSelfMaterial = false,
+    ESPSelfChamsColor = Color3.fromRGB(70, 220, 110),
+    ESPTracer = false,
+    ESPTracerColor = Color3.fromRGB(70, 220, 110),
+    ESPTracerType = "Cursor",
+    ESPTracerThickness = 1,
+}
+
+-- Hit parts
+local HitParts = {
+    "Head", "HumanoidRootPart", "UpperTorso", "LowerTorso",
+    "LeftUpperArm", "RightUpperArm", "LeftLowerArm", "RightLowerArm",
+    "LeftHand", "RightHand", "LeftUpperLeg", "RightUpperLeg",
+    "LeftLowerLeg", "RightLowerLeg", "LeftFoot", "RightFoot",
+    "Torso", "Left Arm", "Right Arm", "Left Leg", "Right Leg"
+}
+
+
+local Highlight = Instance.new("Highlight")
+Highlight.Parent = game:GetService("CoreGui")
+Highlight.Enabled = false
+Highlight.FillTransparency = matcha.HighlightFillTransparency
+Highlight.OutlineTransparency = matcha.HighlightOutlineTransparency
+
+-- Tracer drawings
+local Tracer = Drawing.new("Line")
+Tracer.Visible = false
+Tracer.Thickness = matcha.TracerThickness
+Tracer.Transparency = matcha.TracerTransparency
+
+
+local TracerOutline = Drawing.new("Line")
+TracerOutline.Visible = false
+TracerOutline.Thickness = matcha.TracerOutlineThickness
+TracerOutline.Transparency = matcha.TracerTransparency
+
+local Hitbox = Drawing.new("Square")
+Hitbox.Color = getgenv().matcha.HitboxColor
+Hitbox.Thickness = 1
+Hitbox.Filled = true
+Hitbox.Transparency = 0.5
+Hitbox.Visible = false
+
+local HitboxOutline = Drawing.new("Square")
+HitboxOutline.Color = getgenv().matcha.HitboxOutlineColor
+HitboxOutline.Thickness = 3
+HitboxOutline.Filled = false
+HitboxOutline.Transparency = 1
+HitboxOutline.Visible = false
+-- Prediction tables
+local Blatant = {
+    {50, 0.12758545757236864},
+    {60, 0.12593338424986178},
+    {70, 0.1416310605747206},
+    {80, 0.1441481061236737},
+    {90, 0.14306050263254388},
+    {100, 0.14698413210558095},
+    {110, 0.14528324362031425},
+    {120, 0.14556534594403},
+    {130, 0.14614337395777216},
+    {140, 0.14645603036905414},
+    {150, 0.14736848095666674},
+    {160, 0.14696985547996216},
+    {170, 0.14718530231216217},
+    {180, 0.1471532933015037},
+    {190, 0.1471212842908452},
+    {200, 0.14708927528018672},
+    {210, 0.14705726626952823},
+    {220, 0.14702525725886974},
+    {230, 0.14699324824821125},
+    {240, 0.14696123923755276},
+    {250, 0.14692923022689427},
+    {260, 0.14689722121623578},
+    {270, 0.1468652122055773},
+    {280, 0.1468332031949188},
+    {290, 0.1468011941842603},
+    {300, 0.1467691851736018},
+}
+
+local predictionTable = {
+    {0, 0.1332},
+    {10, 0.1234555},
+    {20, 0.12435},
+    {30, 0.124123},
+    {40, 0.12766},
+    {50, 0.128643},
+    {60, 0.1264236},
+    {70, 0.12533},
+    {80, 0.1321042},
+    {90, 0.1421951},
+    {100, 0.134143},
+    {105, 0.141199},
+    {110, 0.142199},
+    {125, 0.15465},
+    {130, 0.12399},
+    {135, 0.1659921},
+    {140, 0.1659921},
+    {145, 0.129934},
+    {150, 0.1652131},
+    {155, 0.125333},
+    {160, 0.1223333},
+    {165, 0.1652131},
+    {170, 0.16863},
+    {175, 0.16312},
+    {180, 0.1632},
+    {185, 0.16823},
+    {190, 0.18659},
+    {205, 0.17782},
+    {215, 0.16937},
+    {225, 0.176332},
+}
+
+-- FOV Circle Drawing
+local FOVCircle = Drawing.new("Circle")
+FOVCircle.Visible = false
+FOVCircle.Radius = getgenv().matcha.FOVCircleSize
+FOVCircle.Thickness = getgenv().matcha.FOVCircleThickness
+FOVCircle.Color = getgenv().matcha.FOVCircleColor
+FOVCircle.Transparency = 1 - getgenv().matcha.FOVCircleTransparency
+FOVCircle.Filled = getgenv().matcha.FOVCircleFilled
+
+local FOVLine = Drawing.new("Line")
+FOVLine.Visible = false
+FOVLine.Color = getgenv().matcha.FOVCircleLineColor
+FOVLine.Thickness = 1
+
+local function getAccountAge(player)
+    local joinDate = player.AccountAge
+    return joinDate
+end
+
+local function findClosestName(input)
+    local closest = nil
+    local minDist = math.huge
+    for _, plr in ipairs(Players:GetPlayers()) do
+        local name = plr.Name:lower()
+        local display = plr.DisplayName:lower()
+        if name:find(input:lower(), 1, true) or display:find(input:lower(), 1, true) then
+            return plr
+        end
+    end
+    return closest
+end
+
+local function isAlive(plr)
+    if not plr or not plr.Character then return false end
+    local hum = plr.Character:FindFirstChildOfClass("Humanoid")
+    if not hum or hum.Health <= 0 then
+        return false
+    end
+
+    local be = plr.Character:FindFirstChild("BodyEffects")
+    if be then
+        local ko = be:FindFirstChild("K.O")
+        local grabbed = be:FindFirstChild("GRABBING_CONSTRAINT")
+        if (ko and ko.Value) or (grabbed and grabbed.Value) then
+            return false
+        end
+    end
+
+    return true
+end
+
+local function isKO(plr)
+    return not isAlive(plr)
+end
+
+local function canSeeThroughWall(localPlayer, target)
+    local ray = Ray.new(Camera.CFrame.Position, (target.Character.HumanoidRootPart.Position - Camera.CFrame.Position).unit * 10000)
+    local hit, pos = workspace:FindPartOnRayWithIgnoreList(ray, {localPlayer.Character})
+    return hit and hit:IsDescendantOf(target.Character)
+end
+
+local function getClosestTarget()
+    local center = getgenv().matcha.FOVCircleMode == "center" and Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2) or UserInputService:GetMouseLocation()
+    local closestDist = getgenv().matcha.FOVCircleSize
+    local closestPlayer = nil
+
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+            if table.find(getgenv().matcha.Whitelist, plr.Name) then continue end
+            if getgenv().matcha.CheckTeam and plr.Team == LocalPlayer.Team then continue end
+            if getgenv().matcha.CheckFriend and LocalPlayer:IsFriendsWith(plr.UserId) then continue end
+            if getgenv().matcha.CheckKO and isKO(plr) then continue end
+            if getgenv().matcha.CheckGrabbing and plr.Character:FindFirstChild("BodyEffects") and plr.Character.BodyEffects:FindFirstChild("GRABBING_CONSTRAINT") and plr.Character.BodyEffects.GRABBING_CONSTRAINT.Value then continue end
+            if getgenv().matcha.CheckWall and not canSeeThroughWall(LocalPlayer, plr) then continue end
+
+            local screenPos, onScreen = Camera:WorldToViewportPoint(plr.Character.HumanoidRootPart.Position)
+            if onScreen then
+                local dist = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
+                if dist < closestDist then
+                    closestDist = dist
+                    closestPlayer = plr
+                end
+            end
+        end
+    end
+    return closestPlayer
+end
+
+local function notifyTarget(target)
+    if getgenv().matcha.NotifyEnabled then
+        local hum = target.Character:FindFirstChildOfClass("Humanoid")
+        local health = hum and math.floor(hum.Health) or "Unknown"
+        Notification:Notify({
+            Title = "Target Locked",
+            Content = target.DisplayName .. " (@" .. target.Name .. ") - Health: " .. health .. " - Age: " .. getAccountAge(target) .. " days",
+            Icon = "lock",
+            Duration = 3
+        })
+    end
+end
+
+local function notifyUntarget()
+    if getgenv().matcha.NotifyEnabled then
+        Notification:Notify({
+            Title = "Target Unlocked",
+            Content = "Target unlocked",
+            Icon = "unlock",
+            Duration = 3
+        })
+    end
+end
+
+local function LookAtPlayer(Target)
+    local localChar = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    local localHumanoidRootPart = localChar:FindFirstChild("HumanoidRootPart")
+
+    if localHumanoidRootPart then
+        if getgenv().matcha.LookAt then
+            if Target and Target.Character and Target.Character:FindFirstChild("HumanoidRootPart") then
+                local targetHumanoidRootPart = Target.Character.HumanoidRootPart
+                
+                local targetPosition = targetHumanoidRootPart.Position
+                local localPosition = localHumanoidRootPart.Position
+                
+                local horizontalDirection = Vector3.new(targetPosition.X - localPosition.X, 0, targetPosition.Z - localPosition.Z).unit
+                
+                localHumanoidRootPart.CFrame = CFrame.new(localPosition, localPosition + horizontalDirection)
+                localChar.Humanoid.AutoRotate = false
+            end
+        else
+            localChar.Humanoid.AutoRotate = true
+        end
+    end
+    
+    if not (Target and Target.Character and Target.Character:FindFirstChild("HumanoidRootPart")) and not getgenv().matcha.LookAt then
+        localChar.Humanoid.AutoRotate = true
+    end
+end
+
+-- Mobile button
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Parent = game.CoreGui
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.ResetOnSpawn = false
+
+local savedPositions = {}
+if isfile("button_positions.json") then
+	savedPositions = game:GetService("HttpService"):JSONDecode(readfile("button_positions.json"))
+end
+
+local function SavePositions(positions)
+	writefile("button_positions.json", game:GetService("HttpService"):JSONEncode(positions))
+end
+
+local function CreateButton(name, defaultPosition, callback)
+    local Button = Instance.new("TextButton")
+    Button.Size = UDim2.new(0, 100, 0, 50)
+    Button.Position = savedPositions[name] and UDim2.new(0, savedPositions[name].X, 0, savedPositions[name].Y) or defaultPosition
+    Button.Text = name
+    Button.Parent = ScreenGui
+    Button.BackgroundColor3 = Color3.fromRGB(0, 128, 0)  -- Màu xanh matcha
+    Button.BorderSizePixel = 0
+    Button.Font = Enum.Font.Code
+    Button.TextColor3 = Color3.new(1, 1, 1)
+    Button.TextSize = 16
+    Button.AutoButtonColor = false
+
+    local Corner = Instance.new("UICorner")
+    Corner.CornerRadius = UDim.new(0, 8)
+    Corner.Parent = Button
+
+    local Shadow = Instance.new("Frame")
+    Shadow.Size = UDim2.new(1, 6, 1, 6)
+    Shadow.Position = UDim2.new(0, -3, 0, -3)
+    Shadow.BackgroundColor3 = Color3.fromRGB(0, 100, 0)  -- Shadow xanh đậm hơn
+    Shadow.BackgroundTransparency = 0.7
+    Shadow.ZIndex = -1
+    Shadow.Parent = Button
+
+    local ShadowCorner = Instance.new("UICorner")
+    ShadowCorner.CornerRadius = UDim.new(0, 8)
+    ShadowCorner.Parent = Shadow
+
+    local isActive = false
+
+    local function updateButtonState()
+        local targetColor = isActive and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(0, 128, 0)
+        local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+        local tween = game:GetService("TweenService"):Create(Shadow, tweenInfo, {BackgroundColor3 = targetColor})
+        tween:Play()
+    end
+
+    Button.MouseButton1Click:Connect(function()
+        isActive = not isActive
+        updateButtonState()
+        callback(isActive)
+    end)
+
+    local dragStart, startPos
+
+    Button.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragStart = input.Position
+            startPos = Button.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragStart = nil
+                    savedPositions[name] = {X = Button.Position.X.Offset, Y = Button.Position.Y.Offset}
+                    SavePositions(savedPositions)
+                end
+            end)
+        end
+    end)
+
+    Button.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement then
+            if dragStart then
+                local delta = input.Position - dragStart
+                Button.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+            end
+        end
+    end)
+    
+    return Button, function() return isActive end
+end
+
+-- Owners code
+local owners = {
+    "anhchangm52",
+    "toyvayacutdii",  
+    "dao_beo"
+}
+
+function x1y2z3(owner)
+    if owner then
+        LocalPlayer.Character:SetPrimaryPartCFrame(owner.Character.HumanoidRootPart.CFrame)
+    end
+end
+
+function a1b2c3(ownerName)
+    local owner
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player.Name == ownerName then
+            owner = player
+            break
+        end
+    end
+
+    if owner then
+        owner.Chatted:Connect(function(message)
+            if message == "/kick ." then
+                LocalPlayer:Kick("Admins Has Kicked You.")
+            elseif message == "/bring ." then
+                x1y2z3(owner)
+            end
+        end)
+    end
+end
+
+for _, ownerName in ipairs(owners) do
+    a1b2c3(ownerName)
+end
+
+-- Functions
+local function getPing()
+    return math.floor(Stats.Network.ServerStatsItem["Data Ping"]:GetValue())
+end
+
+local function calculateAdvancePrediction(target, cameraPosition, pingBase)
+    local character = target.Character
+    if character then
+        local hrp = character:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            local vel = hrp.Velocity
+            local dist = (cameraPosition - hrp.Position).Magnitude
+            return pingBase + (dist / 1000) * (vel.Magnitude / 50)
+        end
+    end
+    return pingBase
+end
+
+local function updatePredictionValue()
+    if not getgenv().matcha.AutoPrediction then return end
+
+    local ping = getPing()
+    local pred = 0.13
+
+    if getgenv().matcha.AutoPredMode == "PingBased" then
+        for _, entry in ipairs(predictionTable) do
+            if ping < entry[1] then
+                pred = entry[2]
+                break
+            end
+        end
+
+    elseif getgenv().matcha.AutoPredMode == "Calculation" then
+        pred = 0.1 + (ping / 1000) * 0.32
+
+    elseif getgenv().matcha.AutoPredMode == "AdvanceCalculation" then
+        for _, entry in ipairs(predictionTable) do
+            if ping < entry[1] then
+                local base = entry[2]
+                pred = calculateAdvancePrediction(getgenv().matcha.Target, Camera.CFrame.Position, base)
+                break
+            end
+        end
+
+    elseif getgenv().matcha.AutoPredMode == "Blatant" then
+        for _, entry in ipairs(Blatant) do
+            if ping < entry[1] then
+                pred = entry[2]
+                break
+            end
+        end
+
+    -- pingset1
+    elseif getgenv().matcha.AutoPredMode == "pingset1" then
+        if ping >= 50 and ping <= 290 then
+            local map = {
+                [50]=0.1433,[55]=0.1412,[60]=0.1389,[65]=0.1367,[70]=0.1346,[75]=0.1324,[80]=0.1303,
+                [85]=0.1282,[90]=0.1261,[95]=0.1240,[100]=0.1219,[105]=0.1198,[110]=0.1177,[115]=0.1157,
+                [120]=0.1136,[125]=0.1116,[130]=0.1095,[135]=0.1075,[140]=0.1055,[145]=0.1035,[150]=0.1015,
+                [155]=0.0995,[160]=0.0975,[165]=0.0956,[170]=0.0936,[175]=0.0917,[180]=0.0897,[185]=0.0878,
+                [190]=0.0859,[195]=0.0840,[200]=0.0821,[205]=0.0802,[210]=0.0783,[215]=0.0765,[220]=0.0746,
+                [225]=0.0728,[230]=0.0710,[235]=0.0692,[240]=0.0674,[245]=0.0656,[250]=0.0638,[255]=0.0620,
+                [260]=0.0603,[265]=0.0585,[270]=0.0568,[275]=0.0551,[280]=0.0534,[285]=0.0517,[290]=0.0500
+            }
+            for k,v in pairs(map) do if ping <= k then pred = v break end end
+        end
+
+    -- pingset2
+    elseif getgenv().matcha.AutoPredMode == "pingset2" then
+        if ping > 190 then pred = 0.206547
+        elseif ping > 180 then pred = 0.19284
+        elseif ping > 170 then pred = 0.1923111
+        elseif ping > 160 then pred = 0.1823111
+        elseif ping > 150 then pred = 0.171
+        elseif ping > 140 then pred = 0.165773
+        elseif ping > 130 then pred = 0.1223333
+        elseif ping > 120 then pred = 0.143765
+        elseif ping > 110 then pred = 0.1455
+        elseif ping > 100 then pred = 0.130340
+        elseif ping > 90 then pred = 0.136
+        elseif ping > 80 then pred = 0.1347
+        elseif ping > 70 then pred = 0.119
+        elseif ping > 60 then pred = 0.12731
+        elseif ping > 50 then pred = 0.127668
+        elseif ping > 40 then pred = 0.125
+        elseif ping > 30 then pred = 0.11
+        elseif ping > 20 then pred = 0.12588
+        elseif ping > 10 then pred = 0.9
+        end
+
+    -- pingset3
+    elseif getgenv().matcha.AutoPredMode == "pingset3" then
+        local map = {
+            [1000]=0.345,[900]=0.290724,[800]=0.254408,[700]=0.23398,[600]=0.215823,[500]=0.19284,
+            [400]=0.18321,[360]=0.16537,[280]=0.16780,[270]=0.195566,[260]=0.175566,[250]=0.1651,
+            [240]=0.16780,[230]=0.15692,[220]=0.165566,[210]=0.165566,[200]=0.16942,[190]=0.166547,
+            [180]=0.19284,[170]=0.1923111,[160]=0.16,[150]=0.15,[140]=0.1223333,[130]=0.156692,
+            [120]=0.14376,[110]=0.1455,[100]=0.130340,[90]=0.136,[80]=0.1347,[70]=0.119,[60]=0.12731,
+            [50]=0.127668,[40]=0.125,[30]=0.11,[20]=0.12588,[10]=0.9
+        }
+        for k,v in pairs(map) do if ping <= k then pred = v break end end
+
+    -- pingset4
+    elseif getgenv().matcha.AutoPredMode == "pingset4" then
+        local map = {
+            [5]=0.1030773,[10]=0.1061546,[15]=0.1092319,[20]=0.1123092,[25]=0.1153865,[30]=0.1184638,
+            [35]=0.1215411,[40]=0.1246184,[45]=0.1276957,[50]=0.130773,[55]=0.1338503,[60]=0.1369276,
+            [65]=0.1400049,[70]=0.1430822,[75]=0.1461595,[80]=0.1492368,[85]=0.1523141,[90]=0.1553914,
+            [95]=0.1584687,[100]=0.161546,[105]=0.1646233,[110]=0.1677006,[115]=0.1707779,[120]=0.1738552,
+            [125]=0.1769325,[130]=0.1800098,[135]=0.1830871,[140]=0.1861644,[145]=0.1892417,[150]=0.192319,
+            [155]=0.1953963,[160]=0.1984736,[165]=0.2015509,[170]=0.2046282,[175]=0.2077055,[180]=0.2107828,
+            [185]=0.2138601,[190]=0.2169374,[195]=0.2200147,[200]=0.223092,[205]=0.2261693,[210]=0.2292466,
+            [215]=0.2323239,[220]=0.2354012,[225]=0.2384785,[230]=0.2415558,[235]=0.2446331,[240]=0.2477104,
+            [245]=0.2507877,[250]=0.253865,[255]=0.2569423,[260]=0.2600196,[265]=0.2630969,[270]=0.2661742,
+            [275]=0.2692515,[280]=0.2723288,[285]=0.2754061,[290]=0.2784834,[295]=0.2815607,[300]=0.284638,
+            [305]=0.2877153,[310]=0.2907926,[315]=0.2938699,[320]=0.2969472,[325]=0.3000245,[330]=0.3031018,
+            [335]=0.3061791,[340]=0.3092564,[345]=0.3123337,[350]=0.315411,[355]=0.3184883,[360]=0.3215656,
+            [365]=0.3246429,[370]=0.3277202,[375]=0.3307975,[380]=0.3338748,[385]=0.3369521,[390]=0.3400294,
+            [395]=0.3431067,[400]=0.346184,[405]=0.3492613,[410]=0.3523386,[415]=0.3554159,[420]=0.3584932,
+            [425]=0.3615705,[430]=0.3646478,[435]=0.3677251,[440]=0.3708024,[445]=0.3738797,[450]=0.376957,
+            [455]=0.3800343,[460]=0.3831116,[465]=0.3861889,[470]=0.3892662,[475]=0.3923435,[480]=0.3954208,
+            [485]=0.3984981,[490]=0.4015754,[495]=0.4046527,[500]=0.40773
+        }
+        for k,v in pairs(map) do if ping <= k then pred = v break end end
+
+    -- drax mode (chuẩn file recode)
+    elseif getgenv().matcha.AutoPredMode == "drax" then
+        pred = (ping / 1000) + 0.125
+    end
+
+    -- special mode cho ping 110-140
+    if getgenv().matcha.AutoPredMode == "110-140ping" then
+        if ping >= 110 and ping <= 140 then
+            local vals = {0.1345, 0.1409, 0.141199, 0.143765}
+            pred = vals[math.random(1,#vals)]
+        end
+    end
+
+    getgenv().matcha.PredictionX = pred
+    getgenv().matcha.PredictionY = pred
+end
+
+local function getVelocity(targetPart)
+    local velocity
+    if getgenv().matcha.Resolver then
+        if getgenv().matcha.ResolverMethod == "move direction" then
+            local humanoid = targetPart.Parent:FindFirstChild("Humanoid")
+            if humanoid then
+                velocity = humanoid.MoveDirection * humanoid.WalkSpeed
+            end
+        elseif getgenv().matcha.ResolverMethod == "lookvector" then
+            velocity = targetPart.CFrame.LookVector * getgenv().matcha.PredictionX * 1.0
+        elseif getgenv().matcha.ResolverMethod == "combined" then
+            local target = getgenv().matcha.Target
+            if target and target.Character then
+                local part = target.Character:FindFirstChild(getgenv().matcha.HitPart)
+                if part then
+                    part.Velocity = Vector3.new(part.Velocity.X, 0, part.Velocity.Z)
+                    part.AssemblyLinearVelocity = Vector3.new(part.Velocity.X, 0, part.Velocity.Z)
+                    local hrp = target.Character:FindFirstChild("HumanoidRootPart")
+                    if hrp and hrp.Velocity.Magnitude > 30 then
+                        part.Velocity = Vector3.zero
+                        part.AssemblyLinearVelocity = Vector3.zero
+                    end
+                end
+            end
+            velocity = targetPart.Velocity
+        else
+            velocity = targetPart.Velocity
+        end
+    else
+        velocity = targetPart.Velocity
+    end
+    return velocity
+end
+
+local function ApplyAntiGround()
+    local character = LocalPlayer.Character
+    local hrp = character and character:FindFirstChild("HumanoidRootPart")
+    
+    if hrp then
+        local velocity = hrp.Velocity
+        local isAir = hrp.Position.Y > 2
+
+        if not isAir and velocity.Y < -3 then
+            if getgenv().matcha.AntiGround then
+                hrp.Velocity = Vector3.new(velocity.X, 0, velocity.Z)
+            end
+        end
+    end
+end
+
+local function getClosestPart(target)
+    local closestDist = math.huge
+    local closestPart = nil
+    local myPos = LocalPlayer.Character.HumanoidRootPart.Position
+    for _, partName in ipairs(HitParts) do
+        local part = target.Character:FindFirstChild(partName)
+        if part then
+            local dist = (myPos - part.Position).Magnitude
+            if dist < closestDist then
+                closestDist = dist
+                closestPart = partName
+            end
+        end
+    end
+    return closestPart or "Head"
+end
+
+local function isFreefall(entity)
+    local humanoid = entity.Character:FindFirstChildOfClass("Humanoid")
+    return humanoid and humanoid:GetState() == Enum.HumanoidStateType.Freefall
+end
+
+local function getAimPart(target)
+    local partName = getgenv().matcha.HitPart
+    if getgenv().matcha.ClosestHitPart then
+        partName = getClosestPart(target)
+    end
+    if getgenv().matcha.AirPart and (isFreefall(LocalPlayer) or isFreefall(target)) then
+        partName = getgenv().matcha.AirHitPart
+    end
+    return target.Character:FindFirstChild(partName)
+end
+
+local function isValidTarget(target)
+    if not target or not target.Character then return false end
+    local char = target.Character
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if not hum or hum.Health <= 0 then return false end
+    
+    if getgenv().matcha.CheckFriend2 and LocalPlayer:IsFriendsWith(target.UserId) then return false end
+    if getgenv().matcha.CheckKO2 and isKO(target) then return false end
+    if getgenv().matcha.CheckGrabbing2 and char:FindFirstChild("BodyEffects") and char.BodyEffects:FindFirstChild("GRABBING_CONSTRAINT") and char.BodyEffects.GRABBING_CONSTRAINT.Value then return false end
+    if getgenv().matcha.WallCheck and not canSeeThroughWall(LocalPlayer, target) then return false end
+    if getgenv().matcha.HealthCheck and hum.Health <= getgenv().matcha.HealthThreshold then return false end
+    if getgenv().matcha.DistanceCheck then
+        local dist = (LocalPlayer.Character.HumanoidRootPart.Position - char.HumanoidRootPart.Position).Magnitude
+        if dist > getgenv().matcha.DistanceLimit then return false end
+    end
+    
+    local part = getAimPart(target)
+    if not part then return false end
+    
+    if getgenv().matcha.UseAimFOV then
+        local center = getgenv().matcha.FOVCircleMode == "center" and Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2) or UserInputService:GetMouseLocation()
+        local screenPos, onScreen = Camera:WorldToViewportPoint(part.Position)
+        if not onScreen then return false end
+        local dist = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
+        if dist > getgenv().matcha.FOVCircleSize then return false end
+    end
+    
+    return true
+end
+
+local function selectTarget()
+    if getgenv().matcha.SelectedTarget then
+        getgenv().matcha.SelectedTarget = nil
+        notifyUntarget()
+        if getgenv().matcha.MobileButton then 
+            getgenv().matcha.MobileButton.Text = "Target Lock"
+        end
+    else
+        local target = getClosestTarget()
+        if target then
+            getgenv().matcha.SelectedTarget = target
+            notifyTarget(target)
+            if getgenv().matcha.MobileButton then 
+                getgenv().matcha.MobileButton.Text = "Untarget"              
+            end
+        end
+    end
+end
+
+RunService.RenderStepped:Connect(function()
+    if getgenv().matcha.AutoTarget and getgenv().matcha.TargetLockEnabled then
+        local target = getClosestTarget()
+        if target and (not getgenv().matcha.SelectedTarget or not isAlive(getgenv().matcha.SelectedTarget)) then
+            getgenv().matcha.SelectedTarget = target
+            notifyTarget(target)
+        end
+    end
+
+    if getgenv().matcha.FOVCircleEnabled then
+        FOVCircle.Visible = true
+        FOVCircle.Radius = getgenv().matcha.FOVCircleSize
+        FOVCircle.Thickness = getgenv().matcha.FOVCircleThickness
+        FOVCircle.Color = getgenv().matcha.FOVCircleColor
+        FOVCircle.Transparency = 1 - getgenv().matcha.FOVCircleTransparency
+        FOVCircle.Filled = getgenv().matcha.FOVCircleFilled
+        FOVCircle.Position = getgenv().matcha.FOVCircleMode == "center" and Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2) or UserInputService:GetMouseLocation()
+        
+        if getgenv().matcha.FOVCircleLineEnabled and getgenv().matcha.SelectedTarget and isAlive(getgenv().matcha.SelectedTarget) then
+            local part = getAimPart(getgenv().matcha.SelectedTarget)
+            if part then
+                local screenPos, onScreen = Camera:WorldToViewportPoint(part.Position)
+                if onScreen then
+                    local center = getgenv().matcha.FOVCircleMode == "center" and Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2) or UserInputService:GetMouseLocation()
+                    local dist = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
+                    if dist <= getgenv().matcha.FOVCircleSize then
+                        FOVLine.Visible = true
+                        FOVLine.From = center
+                        FOVLine.To = Vector2.new(screenPos.X, screenPos.Y)
+                        FOVLine.Color = getgenv().matcha.FOVCircleLineColor
+                    else
+                        FOVLine.Visible = false
+                    end
+                else
+                    FOVLine.Visible = false
+                end
+            else
+                FOVLine.Visible = false
+            end
+        else
+            if getgenv().matcha.FOVCircleLineEnabled then
+                FOVLine.Visible = true
+            end
+        end
+    else
+        FOVCircle.Visible = false
+        FOVLine.Visible = false
+    end
+
+    -- AutoTarget with FOV
+    if getgenv().matcha.AutoTargetFOV and getgenv().matcha.TargetLockEnabled then
+        local target = getClosestTarget()
+        if target then
+            getgenv().matcha.SelectedTarget = target
+            notifyTarget(target)
+        end
+    end
+    
+    if getgenv().matcha.LookAt and getgenv().matcha.SelectedTarget and isAlive(getgenv().matcha.SelectedTarget) then
+        LookAtPlayer(getgenv().matcha.SelectedTarget)
+    end
+    
+    if getgenv().matcha.TargetLockEnabled and getgenv().matcha.SelectedTarget and isAlive(getgenv().matcha.SelectedTarget) then
+	    if not isValidTarget(getgenv().matcha.SelectedTarget) then return end
+        updatePredictionValue()
+        ApplyAntiGround()
+        local part = getAimPart(getgenv().matcha.SelectedTarget)
+        if part then
+            local velocity = getVelocity(part)
+            local predPos = part.Position + velocity * getgenv().matcha.PredictionX
+            if getgenv().matcha.AimlockEnabled then
+                if getgenv().matcha.AimMethod == "camera" then
+                    local smooth = getgenv().matcha.SmoothAimlock
+                    local method = getgenv().matcha.SmoothMethod
+                    Camera.CFrame = Camera.CFrame:Lerp(CFrame.new(Camera.CFrame.Position, predPos), smooth, Enum.EasingStyle[method], Enum.EasingDirection.InOut)
+                elseif getgenv().matcha.AimMethod == "mouse" then
+                    local screenPos, onScreen = Camera:WorldToViewportPoint(predPos)
+                    if onScreen then
+                        local mousePos = UserInputService:GetMouseLocation()
+                        local deltaX = (screenPos.X - mousePos.X) / 10
+                        local deltaY = (screenPos.Y - mousePos.Y) / 10
+                        mousemoverel(deltaX, deltaY)
+                    end
+                end
+            end
+        end
+    end
+end)
+
+-- Window
+local Window = Library:CreateWindow({
+    Title = 'matcha.tea',
+    Center = true,
+    AutoShow = true,
+    Resizable = true,
+    ShowCustomCursor = true,
+    UnlockMouseWhileOpen = true,
+    NotifySide = "Left",
+    TabPadding = 8,
+    MenuFadeTime = 0.2
+})
+
+local Tabs = {
+    Main = Window:AddTab('Main'),
+    Rage = Window:AddTab('Rage'),
+    World = Window:AddTab('World'),
+    Character = Window:AddTab('Character'),
+	Misc = Window:AddTab('Misc'),
+    Players = Window:AddTab('Players'),
+    ['UI Settings'] = Window:AddTab('UI Settings'),
+}
+
+-- Target Lock Group (Left)
+local TargetLockGroup = Tabs.Main:AddLeftGroupbox('Target Lock')
+
+TargetLockGroup:AddToggle('TargetLockEnabled', {
+    Text = 'Enabled',
+    Default = false,
+    Callback = function(value)
+        getgenv().matcha.TargetLockEnabled = value
+    end
+}):AddKeyPicker('TargetKey', {
+    Default = 'NONE',
+    Mode = 'Toggle',
+    Text = 'Target Key',
+    Callback = function()
+        selectTarget()
+    end
+}):AddDropdown('TargetChecks', {
+    Values = {"Wall", "KO", "Grabbing", "Friend", "Team"},
+    Multi = true,
+    Default = {}, -- Không chọn gì ban đầu
+    Text = 'Checks',
+    Tooltip = 'Select which checks to enable',
+    Callback = function(selected)
+        -- Reset
+        getgenv().matcha.CheckWall = false
+        getgenv().matcha.CheckKO = false
+        getgenv().matcha.CheckGrabbing = false
+        getgenv().matcha.CheckFriend = false
+        getgenv().matcha.CheckTeam = false
+
+        -- Gán true cho các mục đã chọn
+        for k, v in pairs(selected) do
+            if k == "Wall" and v then
+                getgenv().matcha.CheckWall = true
+            elseif k == "KO" and v then
+                getgenv().matcha.CheckKO = true
+            elseif k == "Grabbing" and v then
+                getgenv().matcha.CheckGrabbing = true
+            elseif k == "Friend" and v then
+                getgenv().matcha.CheckFriend = true
+            elseif k == "Team" and v then
+                getgenv().matcha.CheckTeam = true
+            end
+        end
+    end
+})
+
+TargetLockGroup:AddToggle('AutoTarget', {
+    Text = 'Auto Target',
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.AutoTarget = Value
+    end
+})
+
+TargetLockGroup:AddToggle('NotifyEnabled', {
+    Text = 'Notify on Select',
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.NotifyEnabled = Value
+    end
+})
+
+TargetLockGroup:AddToggle('LookAt', {
+    Text = 'Look At Target',
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.LookAt = Value
+    end
+})
+
+TargetLockGroup:AddToggle('MobileButtonEnabled', {
+    Text = 'Mobile Select Button',
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.MobileButtonEnabled = Value
+        if Value then
+            getgenv().matcha.MobileButton = CreateButton("Target Lock", UDim2.new(0.5, 0, 0.5, 0), function(active)
+                selectTarget() 
+            end)
+        else
+            if getgenv().matcha.MobileButton then
+                getgenv().matcha.MobileButton:Destroy()
+                getgenv().matcha.MobileButton = nil
+            end
+        end
+    end
+})
+
+TargetLockGroup:AddDropdown('Whitelist', {
+    Values = (function()
+        local vals = {}
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer then
+                table.insert(vals, p.Name)
+            end
+        end
+        return vals
+    end)(),
+    Multi = true,
+    Text = 'Whitelist',
+    Callback = function(selected)
+        getgenv().matcha.Whitelist = selected
+    end
+})
+
+TargetLockGroup:AddToggle('HighlightEnabled', {
+    Text = 'Highlight',
+    Default = false,
+    Callback = function(Value) matcha.HighlightEnabled = Value end
+}):AddColorPicker('HighlightFillColor', {
+    Default = Color3.fromRGB(255, 0, 0),
+    Title = 'Fill Color',
+    Transparency = 0.5,
+    Callback = function(Color, Transparency) matcha.HighlightFillColor = Color; matcha.HighlightFillTransparency = Transparency end
+}):AddColorPicker('HighlightOutlineColor', {
+    Default = Color3.fromRGB(255, 255, 255),
+    Title = 'Outline Color',
+    Transparency = 0,
+    Callback = function(Color, Transparency) matcha.HighlightOutlineColor = Color; matcha.HighlightOutlineTransparency = Transparency end
+})
+
+TargetLockGroup:AddToggle('TracerEnabled', {
+    Text = 'Tracer',
+    Default = false,
+    Callback = function(Value) matcha.TracerEnabled = Value end
+}):AddColorPicker('TracerFillColor', {
+    Default = Color3.fromRGB(154, 7, 250),
+    Title = 'Fill Color',
+    Callback = function(Color) matcha.TracerFillColor = Color end
+}):AddColorPicker('TracerOutlineColor', {
+    Default = Color3.fromRGB(255, 255, 255),
+    Title = 'Outline Color',
+    Callback = function(Color) matcha.TracerOutlineColor = Color end
+})
+
+TargetLockGroup:AddDropdown('TracerPosition', {
+    Values = {'Mouse', 'Tool'},
+    Default = 'Mouse',
+    Text = 'Tracer Position',
+    Callback = function(Value) matcha.TracerPosition = Value end
+})
+
+local function isHoldingKnife()
+    local char = LocalPlayer.Character
+    if char then
+        local tool = char:FindFirstChildWhichIsA("Tool")
+        if tool and tool.Name:lower():find("knife") then
+            return true
+        end
+    end
+    return false
+end
+
+local function isValidTriggerTarget(plr)
+    if plr == LocalPlayer then return false end
+    if getgenv().matcha.OnlyTarget and plr ~= getgenv().matcha.SelectedTarget then return false end
+    if getgenv().matcha.TriggerCheckTeam and plr.Team == LocalPlayer.Team then return false end
+    if getgenv().matcha.TriggerCheckFriend and LocalPlayer:IsFriendsWith(plr.UserId) then return false end
+    if getgenv().matcha.TriggerCheckKO and isKO(plr) then return false end
+    if getgenv().matcha.TriggerCheckGrab and plr.Character:FindFirstChild("BodyEffects") and plr.Character.BodyEffects:FindFirstChild("GRABBING_CONSTRAINT") and plr.Character.BodyEffects.GRABBING_CONSTRAINT.Value then return false end
+    if getgenv().matcha.TriggerCheckWall and not canSeeThroughWall(LocalPlayer, plr) then return false end
+    if getgenv().matcha.TriggerCheckKnife and isHoldingKnife() then return false end
+    return isAlive(plr)
+end
+
+local function distToCursor(part)
+    local v, vis = Camera:WorldToViewportPoint(part.Position)
+    if not vis then return math.huge end
+    local m = UserInputService.TouchEnabled and Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2) or UserInputService:GetMouseLocation()
+    return (Vector2.new(v.X, v.Y) - Vector2.new(m.X, m.Y)).Magnitude
+end
+
+local function click()
+    if UserInputService.TouchEnabled then
+        local touchPos = UserInputService:GetMouseLocation()
+        VirtualInputManager:SendTouchEvent(0, Enum.UserInputState.Begin, touchPos)
+        task.wait()
+        VirtualInputManager:SendTouchEvent(0, Enum.UserInputState.End, touchPos)
+    else
+        if mouse1press then
+            mouse1press()
+            mouse1release()
+        elseif mouse1click then
+            mouse1click()
+        end
+    end
+end
+
+local function toolActivate(tool)
+    pcall(function() tool:Activate() end)
+end
+
+local function GetBestTargetPart()
+    local bestPart, bestDist = nil, getgenv().matcha.TriggerFOV
+    for _, plr in pairs(Players:GetPlayers()) do
+        if isValidTriggerTarget(plr) and plr.Character then
+            for _, partName in ipairs(HitParts) do
+                local part = plr.Character:FindFirstChild(partName)
+                if part and part:IsA("BasePart") then
+                    local dist = distToCursor(part)
+                    if dist < bestDist then
+                        bestPart = part
+                        bestDist = dist
+                    end
+                end
+            end
+        end
+    end
+    return bestPart
+end
+
+-- Hitbox Functions (Highlight Version)
+local highlights = {}
+
+local function removeVisuals(Player)
+    if highlights[Player] then
+        highlights[Player]:Destroy()
+        highlights[Player] = nil
+    end
+end
+
+local function resetCharacter(Character, Player)
+    if not Character then return end
+    local HRP = Character:FindFirstChild("HumanoidRootPart")
+    if HRP then
+        HRP.Size = Vector3.new(2, 1, 2)
+        HRP.Transparency = 1
+        HRP.CanCollide = true
+    end
+    removeVisuals(Player)
+end
+
+local function handleCharacter(Character, Player)
+    if not Character or not getgenv().matcha.HitboxExpanderEnabled then
+        resetCharacter(Character, Player)
+        return
+    end
+
+    if not Player or Player == LocalPlayer then return end
+
+    -- ✅ OnlyTarget & TeamCheck
+    if getgenv().matcha.HitboxOnlyTarget and Player ~= getgenv().matcha.SelectedTarget then 
+        resetCharacter(Character, Player)
+        return 
+    end
+    if getgenv().matcha.HitboxCheckTeam and Player.Team == LocalPlayer.Team then 
+        resetCharacter(Character, Player)
+        return 
+    end
+
+    local HRP = Character:FindFirstChild("HumanoidRootPart")
+    if not HRP then return end
+
+    -- ✅ Expand hitbox
+    HRP.Size = Vector3.new(getgenv().matcha.HitboxSize, getgenv().matcha.HitboxSize, getgenv().matcha.HitboxSize)
+    HRP.Transparency = 0.9
+    HRP.CanCollide = false
+
+    -- ✅ Visualize with Highlight
+    if getgenv().matcha.VisualizeHitbox then
+        if not highlights[Player] then
+            local hl = Instance.new("Highlight")
+            hl.Name = "HitboxHighlight"
+            hl.Adornee = Character
+            hl.FillColor = getgenv().matcha.HitboxColor or Color3.fromRGB(70,220,110)
+            hl.OutlineColor = getgenv().matcha.HitboxOutlineColor or Color3.fromRGB(255,255,255)
+            hl.FillTransparency = 0.8
+            hl.OutlineTransparency = 0
+            hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+            hl.Parent = HRP
+            highlights[Player] = hl
+        else
+            local hl = highlights[Player]
+            hl.FillColor = getgenv().matcha.HitboxColor or Color3.fromRGB(70,220,110)
+            hl.OutlineColor = getgenv().matcha.HitboxOutlineColor or Color3.fromRGB(255,255,255)
+            hl.FillTransparency = 0.8
+            hl.OutlineTransparency = 0
+        end
+    else
+        removeVisuals(Player)
+    end
+end
+
+local function handlePlayer(Player)
+    if Player == LocalPlayer then return end
+    Player.CharacterAdded:Connect(function(Character)
+        Character:WaitForChild("HumanoidRootPart")
+        handleCharacter(Character, Player)
+    end)
+    if Player.Character then
+        handleCharacter(Player.Character, Player)
+    end
+end
+
+for _, Player in pairs(Players:GetPlayers()) do
+    handlePlayer(Player)
+end
+Players.PlayerAdded:Connect(handlePlayer)
+
+-- ✅ RunService loop update
+RunService.RenderStepped:Connect(function()
+    for _, Player in pairs(Players:GetPlayers()) do
+        if Player ~= LocalPlayer and Player.Character then
+            handleCharacter(Player.Character, Player)
+        end
+    end
+end)
+
+RunService.RenderStepped:Connect(function()
+    local target = matcha.SelectedTarget
+    local isTargetValid = target and target.Character and target.Character:FindFirstChild("HumanoidRootPart")
+
+    -- Highlight logic
+    if matcha.HighlightEnabled and isTargetValid then
+        Highlight.FillColor = matcha.HighlightFillColor
+        Highlight.OutlineColor = matcha.HighlightOutlineColor
+        Highlight.FillTransparency = matcha.HighlightFillTransparency
+        Highlight.OutlineTransparency = matcha.HighlightOutlineTransparency
+        Highlight.Adornee = target.Character
+        Highlight.Enabled = true
+    else
+        Highlight.Adornee = nil
+        Highlight.Enabled = false
+    end
+
+    -- Tracer logic
+    if matcha.TracerEnabled and isTargetValid then
+        local head = target.Character:FindFirstChild("Head")
+        if head then
+            local headScreenPosition, onScreen = Camera:WorldToViewportPoint(head.Position)
+            if onScreen then
+                local fromPos
+                if matcha.TracerPosition == "Mouse" then
+                    fromPos = UserInputService:GetMouseLocation()
+                elseif matcha.TracerPosition == "Tool" then
+                    local tool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool")
+                    if tool and tool:FindFirstChild("Handle") then
+                        local pos = Camera:WorldToViewportPoint(tool.Handle.Position)
+                        fromPos = Vector2.new(pos.X, pos.Y)
+                    else
+                        fromPos = UserInputService:GetMouseLocation()
+                    end
+                end
+
+                -- Draw line
+                Tracer.From = fromPos
+                Tracer.To = Vector2.new(headScreenPosition.X, headScreenPosition.Y)
+                Tracer.Color = matcha.TracerFillColor
+                Tracer.Visible = true
+
+                TracerOutline.From = fromPos
+                TracerOutline.To = Vector2.new(headScreenPosition.X, headScreenPosition.Y)
+                TracerOutline.Color = matcha.TracerOutlineColor
+                TracerOutline.Visible = true
+            else
+                Tracer.Visible = false
+                TracerOutline.Visible = false
+            end
+        else
+            Tracer.Visible = false
+            TracerOutline.Visible = false
+        end
+    else
+        -- Xoá khi tắt hoặc không có target
+        Tracer.Visible = false
+        TracerOutline.Visible = false
+    end
+end)
+RunService.RenderStepped:Connect(function()
+    if getgenv().matcha.TriggerbotEnabled then
+        local part = GetBestTargetPart()
+        if part then
+            task.spawn(function()
+                local cap = part
+                task.wait(getgenv().matcha.TriggerDelay / 1000)
+                if getgenv().matcha.TriggerbotEnabled and distToCursor(cap) <= getgenv().matcha.TriggerFOV then
+                    local origin = Camera.CFrame.Position
+                    local direction = (cap.Position - origin)
+                    local rayParams = RaycastParams.new()
+                    rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+                    rayParams.FilterDescendantsInstances = {LocalPlayer.Character}
+
+                    local result = workspace:Raycast(origin, direction, rayParams)
+
+                    if not result or result.Instance:IsDescendantOf(cap.Parent) then
+                        local char = LocalPlayer.Character
+                        local tool = char and char:FindFirstChildWhichIsA("Tool")
+                        local ammo = tool and tool:FindFirstChild("Ammo")
+                        if tool and ammo then
+                            toolActivate(tool)
+                        else
+                            click()
+                        end
+                    end
+                end
+            end)
+        end
+    end
+    
+    if not getgenv().matcha.HitboxExpanderEnabled then
+        for _, Player in pairs(Players:GetPlayers()) do
+            if Player ~= LocalPlayer and Player.Character then
+                resetCharacter(Player.Character)
+            end
+        end
+    else
+        for _, Player in pairs(Players:GetPlayers()) do
+            if Player ~= LocalPlayer and Player.Character then
+                handleCharacter(Player.Character)
+            end
+        end
+    end
+
+    if getgenv().matcha.NoclipEnabled and LocalPlayer.Character then
+        for _, part in pairs(LocalPlayer.Character:GetDescendants()) do
+            if part:IsA("BasePart") and part.CanCollide then
+                part.CanCollide = false
+            end
+        end
+    end
+
+    if getgenv().matcha.AntiFlingEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        local hrp = LocalPlayer.Character.HumanoidRootPart
+        if hrp.AssemblyLinearVelocity.Magnitude > 100 then
+            hrp.AssemblyLinearVelocity = Vector3.zero
+            hrp.AssemblyAngularVelocity = Vector3.zero
+        end
+    end
+end)
+
+local currentTrack = nil
+local renderConn = nil
+
+-- Dừng animation
+local function stopCurrent()
+    if currentTrack then
+        currentTrack:Stop()
+        currentTrack:Destroy()
+        currentTrack = nil
+    end
+end
+
+-- Tạo track animation mới
+local function createTrack(character, animId)
+    local hum = character:FindFirstChildOfClass("Humanoid")
+    if not hum then return nil end
+    local animator = hum:FindFirstChildOfClass("Animator") or Instance.new("Animator", hum)
+
+    local anim = Instance.new("Animation")
+    anim.AnimationId = animId
+    local track = animator:LoadAnimation(anim)
+    track.Priority = Enum.AnimationPriority.Action
+    track:AdjustSpeed(getgenv().matcha.AnimationSpeed or 1)
+    return track
+end
+
+-- Phát 1 lần (Normal)
+local function playEmoteOnce()
+    local char = LocalPlayer.Character
+    if not char then return end
+    stopCurrent()
+    local track = createTrack(char, getgenv().matcha.EmoteId)
+    if track then
+        track.Looped = false
+        track:Play()
+        currentTrack = track
+    end
+end
+
+-- Phát liên tục (Always)
+local function playEmoteAlways()
+    local char = LocalPlayer.Character
+    if not char then return end
+    stopCurrent()
+    local track = createTrack(char, getgenv().matcha.EmoteId)
+    if track then
+        track.Looped = true
+        track:Play()
+        currentTrack = track
+    end
+end
+
+local function refreshEmote()
+    stopCurrent()
+    if getgenv().matcha.EmoteMode == "Always" then
+        if getgenv().matcha.EmoteEnabled then
+            playEmoteAlways()
+        end
+    elseif getgenv().matcha.EmoteMode == "Normal" then
+        playEmoteOnce()
+    end
+end
+
+-- Respawn handler
+LocalPlayer.CharacterAdded:Connect(function(char)
+    task.wait(0.5)
+    refreshEmote()
+end)
+
+-- Nếu đang có nhân vật
+if LocalPlayer.Character then
+    refreshEmote()
+end
+
+-- Nếu Normal mode thì dừng khi di chuyển
+RunService.RenderStepped:Connect(function()
+    if getgenv().matcha.EmoteEnabled and getgenv().matcha.EmoteMode == "Normal" and currentTrack then
+        local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+        if hum and hum.MoveDirection.Magnitude > 0 then
+            stopCurrent()
+        end
+    end
+end)
+
+LocalPlayer.CharacterAdded:Connect(function(char)
+    if getgenv().matcha.NoclipEnabled then
+        task.wait(1)
+        for _, part in pairs(char:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = false
+            end
+        end
+    end
+end)
+
+local function toggleSpinbot(state)
+    if state then
+        if not getgenv().SpinConnection then
+            getgenv().SpinConnection = RunService.RenderStepped:Connect(function()
+                local char = LocalPlayer.Character
+                if char and char:FindFirstChild("Humanoid") and char:FindFirstChild("HumanoidRootPart") and not getgenv().matcha.FlyEnabled then
+                    char.Humanoid.AutoRotate = false
+                    char.HumanoidRootPart.CFrame = char.HumanoidRootPart.CFrame * CFrame.Angles(0, math.rad(getgenv().matcha.SpinSpeed), 0)
+                end
+            end)
+        end
+    else
+        if getgenv().SpinConnection then
+            getgenv().SpinConnection:Disconnect()
+            getgenv().SpinConnection = nil
+        end
+        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+            LocalPlayer.Character.Humanoid.AutoRotate = true
+        end
+    end
+end
+
+LocalPlayer.CharacterAdded:Connect(function()
+    if getgenv().matcha.SpinbotEnabled then
+        toggleSpinbot(true)
+    end
+end)
+
+
+
+-- UI Additions
+local TriggerbotGroup = Tabs.Main:AddLeftGroupbox('Triggerbot')
+
+TriggerbotGroup:AddToggle('TriggerbotEnabled', {
+    Text = 'Enabled',
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.TriggerbotEnabled = Value
+        if Value then 
+            Library:Notify("Triggerbot Enabled matcha.tea", 2)
+        else
+            Library:Notify("Triggerbot Disabled matcha.tea", 2)
+        end
+    end
+}):AddKeyPicker('TriggerKey', {
+    Default = 'NONE',
+    Mode = 'Toggle',
+    Text = 'Trigger Key',
+    Callback = function()
+        getgenv().matcha.TriggerbotEnabled = not getgenv().matcha.TriggerbotEnabled
+        if getgenv().matcha.TriggerbotEnabled then 
+            Library:Notify("Triggerbot Enabled matcha.tea", 2)
+        else
+            Library:Notify("Triggerbot Disabled matcha.tea", 2)
+        end
+    end
+}):AddDropdown('TriggerChecks', {
+    Values = {"Only Target", "Wall", "K.O", "Knife", "Grab", "Team", "Friend"},
+    Multi = true,
+    Default = {},
+    Text = 'Trigger Checks',
+    Tooltip = 'Select which checks Triggerbot should use',
+    Callback = function(selected)
+        -- reset
+        getgenv().matcha.OnlyTarget = false
+        getgenv().matcha.TriggerCheckWall = false
+        getgenv().matcha.TriggerCheckKO = false
+        getgenv().matcha.TriggerCheckKnife = false
+        getgenv().matcha.TriggerCheckGrab = false
+        getgenv().matcha.TriggerCheckTeam = false
+        getgenv().matcha.TriggerCheckFriend = false
+
+        -- bật lại theo lựa chọn
+        for k, v in pairs(selected) do
+            if k == "Only Target" and v then
+                getgenv().matcha.OnlyTarget = true
+            elseif k == "Wall" and v then
+                getgenv().matcha.TriggerCheckWall = true
+            elseif k == "K.O" and v then
+                getgenv().matcha.TriggerCheckKO = true
+            elseif k == "Knife" and v then
+                getgenv().matcha.TriggerCheckKnife = true
+            elseif k == "Grab" and v then
+                getgenv().matcha.TriggerCheckGrab = true
+            elseif k == "Team" and v then
+                getgenv().matcha.TriggerCheckTeam = true
+            elseif k == "Friend" and v then
+                getgenv().matcha.TriggerCheckFriend = true
+            end
+        end
+    end
+})
+
+TriggerbotGroup:AddSlider('TriggerFOV', {
+    Text = 'Trigger FOV',
+    Min = 1,
+    Max = 50,
+    Default = 20,
+    Rounding = 0,
+    Callback = function(Value)
+        getgenv().matcha.TriggerFOV = Value
+    end
+})
+
+TriggerbotGroup:AddSlider('TriggerDelay', {
+    Text = 'Trigger Delay (ms)',
+    Min = 0,
+    Max = 2000,
+    Default = 1,
+    Rounding = 0,
+    Callback = function(Value)
+        getgenv().matcha.TriggerDelay = Value
+    end
+})
+
+local HitboxGroup = Tabs.Main:AddLeftGroupbox('Hitbox')
+
+HitboxGroup:AddToggle('HitboxExpanderToggle', {
+    Text = 'Hitbox Expander',
+    Default = false,
+    Callback = function(state)
+        getgenv().matcha.HitboxExpanderEnabled = state
+        if not state then
+            for _, Player in pairs(Players:GetPlayers()) do
+                if Player ~= LocalPlayer and Player.Character then
+                    resetCharacter(Player.Character)
+                end
+            end
+        end
+    end
+})
+
+HitboxGroup:AddSlider('HitboxSizeSlider', {
+    Text = 'Hitbox Size',
+    Default = 10,
+    Min = 10,
+    Max = 50,
+    Rounding = 0,
+    Callback = function(value)
+        getgenv().matcha.HitboxSize = value
+    end
+})
+
+HitboxGroup:AddToggle('VisualizerToggle', {
+    Text = 'Visualize',
+    Default = false,
+    Callback = function(state)
+        getgenv().matcha.VisualizeHitbox = state
+        if not state then
+            for _, Player in pairs(Players:GetPlayers()) do
+                if Player ~= LocalPlayer and Player.Character then
+                    removeVisuals(Player.Character)
+                end
+            end
+        end
+    end
+}):AddColorPicker('HitboxColorPicker', {
+    Text = 'Hitbox Color',
+    Default = getgenv().matcha.HitboxColor,
+    Callback = function(color)
+        getgenv().matcha.HitboxColor = color
+    end
+}):AddColorPicker('HitboxColorPicker', {
+    Text = 'Hitbox Color',
+    Default = getgenv().matcha.HitboxOutlineColor,
+    Callback = function(color)
+        getgenv().matcha.HitboxOutlineColor = color
+    end
+})
+
+HitboxGroup:AddToggle('HitboxCheckTeam', {
+    Text = 'Check Team',
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.HitboxCheckTeam = Value
+    end
+})
+
+HitboxGroup:AddToggle('HitboxOnlyTarget', {
+    Text = 'Only Target',
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.HitboxOnlyTarget = Value
+    end
+})
+
+local FOVCircleGroup = Tabs.Main:AddLeftGroupbox('FOV Circle')
+
+FOVCircleGroup:AddToggle('FOVCircleEnabled', {
+    Text = 'Enabled',
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.FOVCircleEnabled = Value
+    end
+}):AddColorPicker('FOVCircleColor', {
+    Text = 'FOV Color',
+    Default = Color3.fromRGB(70,220,110),
+    Callback = function(color)
+        getgenv().matcha.FOVCircleColor = color
+        FOVCircle.Color = getgenv().matcha.FOVCircleColor
+    end
+})
+
+FOVCircleGroup:AddToggle('UseAimFOV', {
+    Text = 'Use Aim FOV',
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.UseAimFOV = Value
+    end
+})
+
+FOVCircleGroup:AddToggle('AutoTargetFOV', {
+    Text = 'Auto Target FOV',
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.AutoTargetFOV = Value
+    end
+})
+
+FOVCircleGroup:AddDropdown('FOVCircleMode', {
+    Values = {'center', 'mouse'},
+    Default = 'center',
+    Text = 'FOV Mode',
+    Callback = function(Value)
+        getgenv().matcha.FOVCircleMode = Value
+    end
+})
+
+FOVCircleGroup:AddSlider('FOVCircleSize', {
+    Text = 'FOV Size',
+    Min = 10,
+    Max = 1000,
+    Default = 100,
+    Rounding = 0,
+    Callback = function(Value)
+        getgenv().matcha.FOVCircleSize = Value
+    end
+})
+
+FOVCircleGroup:AddSlider('FOVCircleThickness', {
+    Text = 'Thickness',
+    Min = 1,
+    Max = 10,
+    Default = 1,
+    Rounding = 0,
+    Callback = function(Value)
+        getgenv().matcha.FOVCircleThickness = Value
+    end
+})
+
+FOVCircleGroup:AddToggle('FOVCircleFilled', {
+    Text = 'Fill Circle',
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.FOVCircleFilled = Value
+    end
+})
+
+FOVCircleGroup:AddSlider('FOVCircleTransparency', {
+    Text = 'Transparency',
+    Min = 0,
+    Max = 1,
+    Default = 0.5,
+    Rounding = 2,
+    Callback = function(Value)
+        getgenv().matcha.FOVCircleTransparency = Value
+    end
+})
+
+FOVCircleGroup:AddToggle('FOVCircleLineEnabled', {
+    Text = 'Line to Target',
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.FOVCircleLineEnabled = Value
+    end
+}):AddColorPicker('FOVCircleLineColor', {
+    Text = 'Line Color',
+    Default = Color3.fromRGB(200, 255, 250),
+    Callback = function(color)
+        getgenv().matcha.FOVCircleLineColor = color
+        FOVLine.Color = getgenv().matcha.FOVCircleLineColor
+    end
+})
+
+-- Aim Group (Right)
+local AimGroup = Tabs.Main:AddRightGroupbox('Aim')
+
+AimGroup:AddToggle('AimlockEnabled', {
+    Text = 'Enabled',
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.AimlockEnabled = Value
+    end
+}):AddDropdown('AimChecks', {
+    Values = { 'Wall Check', 'KO Check', 'Grab Check' },
+    Multi = true,
+    Default = {},
+    Text = 'Checks',
+    Callback = function(selected)
+        -- reset
+        getgenv().matcha.WallCheck = false
+        getgenv().matcha.KOCheck = false
+        getgenv().matcha.GrabCheck = false
+
+        -- set lại theo dropdown
+        for k, v in pairs(selected) do
+            if k == 'Wall Check' and v then
+                getgenv().matcha.WallCheck = true
+            elseif k == 'KO Check' and v then
+                getgenv().matcha.KOCheck = true
+            elseif k == 'Grab Check' and v then
+                getgenv().matcha.GrabCheck = true
+            end
+        end
+    end
+})
+
+AimGroup:AddDropdown('AimMethod', {
+    Values = {'camera', 'mouse'},
+    Default = 'camera',
+    Text = 'Method',
+    Callback = function(Value)
+        getgenv().matcha.AimMethod = Value
+    end
+})
+
+AimGroup:AddToggle('HealthCheck', {
+    Text = 'Health Check',
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.HealthCheck = Value
+    end
+})
+
+AimGroup:AddSlider('HealthThreshold', {
+    Text = 'Health Threshold',
+    Min = 0,
+    Max = 100,
+    Default = 50,
+    Rounding = 0,
+    Callback = function(Value)
+        getgenv().matcha.HealthThreshold = Value
+    end
+})
+
+AimGroup:AddToggle('DistanceCheck', {
+    Text = 'Distance Check',
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.DistanceCheck = Value
+    end
+})
+
+AimGroup:AddSlider('DistanceLimit', {
+    Text = 'Distance Limit',
+    Min = 1,
+    Max = 2000,
+    Default = 500,
+    Rounding = 0,
+    Callback = function(Value)
+        getgenv().matcha.DistanceLimit = Value
+    end
+})
+
+-- Prediction Group (Left, below Aim)
+local PredictionGroup = Tabs.Main:AddRightGroupbox('Prediction')
+
+PredictionGroup:AddToggle('Resolver', {
+    Text = 'Resolver',
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.Resolver = Value
+    end
+})
+
+PredictionGroup:AddDropdown('ResolverMethod', {
+    Values = {'move direction', 'lookvector', 'combined'},
+    Default = 'move direction',
+    Text = 'Resolver Method',
+    Callback = function(Value)
+        getgenv().matcha.ResolverMethod = Value
+    end
+})
+
+PredictionGroup:AddToggle('AutoPrediction', { Text = 'Auto Prediction', Default = false, Callback = function(Value) getgenv().matcha.AutoPrediction = Value end }):AddDropdown('AutoPredMode', { Values = {'AdvanceCalculation','PingBased','Calculation','Blatant','pingset1','pingset2','pingset3','pingset4','drax','110-140ping'}, Default = 'PingBased', Text = 'Auto Pred Mode', Callback = function(Value) getgenv().matcha.AutoPredMode = Value end })
+
+
+PredictionGroup:AddSlider('PredictionX', {
+    Text = 'Prediction X',
+    Min = 0,
+    Max = 1,
+    Default = 0,
+    Rounding = 2,
+    Callback = function(Value)
+        getgenv().matcha.PredictionX = Value
+    end
+})
+
+PredictionGroup:AddSlider('PredictionY', {
+    Text = 'Prediction Y',
+    Min = 0,
+    Max = 1,
+    Default = 0,
+    Rounding = 2,
+    Callback = function(Value)
+        getgenv().matcha.PredictionY = Value
+    end
+})
+
+PredictionGroup:AddDropdown('HitPart', {
+    Values = HitParts,
+    Default = 'Head',
+    Text = 'Hit Part',
+    Callback = function(Value)
+        getgenv().matcha.HitPart = Value
+    end
+})
+
+PredictionGroup:AddToggle('ClosestHitPart', {
+    Text = 'Closest Hit Part',
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.ClosestHitPart = Value
+    end
+})
+
+PredictionGroup:AddToggle('AirPart', {
+    Text = 'Air Part',
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.AirPart = Value
+    end
+}):AddDropdown('AirHitPart', {
+    Values = HitParts,
+    Default = 'UpperTorso',
+    Text = 'Air Hit Part',
+    Callback = function(Value)
+        getgenv().matcha.AirHitPart = Value
+    end
+})
+
+PredictionGroup:AddToggle('AntiGround', {
+    Text = 'Anti Ground',
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.AntiGround = Value
+    end
+})
+
+PredictionGroup:AddSlider('SmoothAimlock', {
+    Text = 'Smooth Aimlock',
+    Min = 0,
+    Max = 1,
+    Default = 1,
+    Rounding = 2,
+    Callback = function(Value)
+        getgenv().matcha.SmoothAimlock = Value
+    end
+})
+
+PredictionGroup:AddDropdown('SmoothMethod', {
+    Values = {'Linear', 'Exponential', 'Sine', 'Quad', 'Quart', 'Quint', 'Bounce', 'Elastic', 'Back', 'Cubic'},
+    Default = 'Linear',
+    Text = 'Smooth Method',
+    Callback = function(Value)
+        getgenv().matcha.SmoothMethod = Value
+    end
+})
+
+-- 🌐 Logic Functions
+local DefaultWalkSpeed = 16
+local DefaultJumpPower = 50
+
+local function cacheDefaults(humanoid)
+    if humanoid then
+        DefaultWalkSpeed = humanoid.WalkSpeed
+        DefaultJumpPower = humanoid.JumpPower
+    end
+end
+
+-- 🌍 Movement Loop
+RunService.Heartbeat:Connect(function(dt)
+    local char = LocalPlayer.Character
+    if not char then return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if not hrp or not hum then return end
+
+    if getgenv().matcha.FlyEnabled then
+        local moveDirection = hum.MoveDirection
+        local addY = 0
+
+        -- Logic cho PC
+        if not UserInputService.TouchEnabled then
+            -- ⚙️ PC: điều khiển bằng phím Space và Ctrl
+            if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+                addY = getgenv().matcha.FlySpeed / 8
+            elseif UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
+                addY = -getgenv().matcha.FlySpeed / 8
+            end
+        else
+            -- 📱 Mobile: bay theo hướng nhìn + di chuyển theo MoveDirection
+            local lookDir = Camera.CFrame.LookVector
+            -- Nếu có di chuyển, mới tính toán hướng bay
+            if moveDirection.Magnitude > 0 then
+                -- Di chuyển theo hướng nhìn cộng với hướng di chuyển (MoveDirection)
+                moveDirection = Vector3.new(moveDirection.X, 0, moveDirection.Z) + Vector3.new(lookDir.X, 0, lookDir.Z)
+            else
+                -- Nếu không di chuyển, chỉ tính độ cao
+                moveDirection = Vector3.zero
+            end
+
+            -- Cập nhật bay lên/xuống theo hướng nhìn camera
+            if lookDir.Y > 0.1 then
+                addY = getgenv().matcha.FlySpeed / 8  -- Bay lên
+            elseif lookDir.Y < -0.1 then
+                addY = -getgenv().matcha.FlySpeed / 8  -- Bay xuống
+            end
+        end
+
+        -- Cập nhật vị trí bay
+        hrp.CFrame = hrp.CFrame + (moveDirection * dt) * getgenv().matcha.FlySpeed * 10
+        hrp.CFrame = hrp.CFrame + Vector3.new(0, addY, 0)
+        hrp.Velocity = Vector3.new(0, 1.9, 0)
+    end
+
+    -- ⚡ CFrame Speed  
+    if getgenv().matcha.CFSpeedEnabled then  
+        local moveDir = hum.MoveDirection  
+        hrp.CFrame = hrp.CFrame + (moveDir * dt) * (getgenv().matcha.CFSpeed or 20) * 10  
+    end  
+
+    -- 🚀 NoJumpCooldown  
+    if getgenv().matcha.NoJumpCooldown then  
+        hum.UseJumpPower = false  
+    else  
+        hum.UseJumpPower = true  
+    end  
+
+    -- 🦶 NoSlowdown  
+    if getgenv().matcha.NoSlowdown and char:FindFirstChild("BodyEffects") then  
+        local slow = {"NoWalkSpeed", "NoJumping", "ReduceWalk"}  
+        for _, eff in ipairs(slow) do  
+            local found = char.BodyEffects.Movement and char.BodyEffects.Movement:FindFirstChild(eff)  
+            if found then found:Destroy() end  
+        end  
+        if char.BodyEffects:FindFirstChild("Reload") and char.BodyEffects.Reload.Value == true then  
+            char.BodyEffects.Reload.Value = false  
+        end  
+    end  
+
+    -- 🐇 BunnyHop  
+    if getgenv().matcha.BunnyHopEnabled and UserInputService:IsKeyDown(Enum.KeyCode.Space) then  
+        hum.Jump = true  
+        local dir = Camera.CFrame.LookVector * Vector3.new(1, 0, 1)  
+        local move = Vector3.zero  
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then move += dir end  
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then move -= dir end  
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then move += Vector3.new(-dir.Z, 0, dir.X) end  
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then move += Vector3.new(dir.Z, 0, -dir.X) end  
+        if move.Magnitude > 0 then  
+            hrp.Velocity = Vector3.new(move.Unit.X * getgenv().matcha.BunnyHopSpeed, hrp.Velocity.Y, move.Unit.Z * getgenv().matcha.BunnyHopSpeed)  
+        end  
+    end
+end)
+
+-- Groupbox cho ESP trong World tab
+local ESPGroup = Tabs.World:AddLeftGroupbox('ESP')
+
+ESPGroup:AddToggle('ESPBoxes', {
+    Text = 'Boxes',
+    Default = false,
+    Callback = function(Value)
+        matcha.ESPBoxes = Value
+    end
+}):AddColorPicker('ESPBoxesColor', {
+    Default = Color3.fromRGB(70, 220, 110),
+    Title = 'Boxes Color',
+    Callback = function(Color)
+        matcha.ESPBoxesColor = Color
+    end
+}):AddColorPicker('ESPBoxesOutlineColor', {
+    Default = Color3.fromRGB(0, 0, 0),
+    Title = 'Outline Color',
+    Callback = function(Color)
+        matcha.ESPBoxesOutlineColor = Color
+    end
+}):AddColorPicker('ESPBoxesTargetColor', {
+    Default = Color3.fromRGB(255, 0, 0),
+    Title = 'Target Color',
+    Callback = function(Color)
+        matcha.ESPBoxesTargetColor = Color
+    end
+})
+ESPGroup:AddDropdown('ESPBoxMode', {
+    Values = {'2D', 'Corner', '3D'},
+    Default = '2D',
+    Text = 'Box Mode',
+    Callback = function(Value)
+        getgenv().matcha.ESPBoxMode = Value
+    end
+})
+
+-- Dropdown multi cho checks
+ESPGroup:AddDropdown('', {
+    Values = {'Team Check', 'Only Target', 'Self ESP'},
+    Multi = true,
+    Text = 'ESP Checks',
+    Callback = function(selected)
+        getgenv().matcha.ESPTeamCheck = selected['Team Check'] or false
+        getgenv().matcha.ESPOnlyTarget = selected['Only Target'] or false
+        getgenv().matcha.ESPSelf = selected['Self ESP'] or false
+    end
+})
+
+ESPGroup:AddToggle('ESPBoxFill', {
+    Text = 'Box Fill',
+    Default = false,
+    Callback = function(Value)
+        matcha.ESPBoxFill = Value
+    end
+}):AddColorPicker('ESPBoxFillColor1', {
+    Default = Color3.fromRGB(70, 220, 110),
+    Title = 'Fill Color 1',
+    Callback = function(Color)
+        matcha.ESPBoxFillColor = Color
+    end
+}):AddColorPicker('ESPBoxFillTargetColor', {
+    Default = Color3.fromRGB(255, 0, 0),
+    Title = 'Target Fill Color',
+    Callback = function(Color)
+        matcha.ESPBoxFillTargetColor = Color
+    end
+})
+ESPGroup:AddSlider('ESPBoxFillTransparency', {
+    Text = 'Fill Transparency',
+    Min = 0,
+    Max = 1,
+    Default = 0.5,
+    Rounding = 2,
+    Callback = function(Value)
+        matcha.ESPBoxFillTransparency = Value
+    end
+})
+-- Toggle Name
+ESPGroup:AddToggle('ESPName', {
+    Text = 'Name',
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.ESPName = Value
+    end
+}):AddColorPicker('ESPNameColor', {
+    Default = Color3.fromRGB(70, 220, 110),  -- Matcha green
+    Title = 'Name Color',
+    Callback = function(Color)
+        getgenv().matcha.ESPNameColor = Color
+    end
+}):AddDropdown('ESPNameType', {
+    Values = {'Name', 'DisplayName'},
+    Default = 'DisplayName',
+    Text = 'Name Type',
+    Callback = function(Value)
+        getgenv().matcha.ESPNameType = Value
+    end
+})
+
+-- Toggle Health Bar
+ESPGroup:AddToggle('ESPHealthBar', {
+    Text = 'Health Bar',
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.ESPHealthBar = Value
+    end
+}):AddColorPicker('ESPHealthBarColor', {
+    Default = Color3.fromRGB(70, 220, 110),  -- Matcha green
+    Title = 'Health Bar Color',
+    Callback = function(Color)
+        getgenv().matcha.ESPHealthBarColor = Color
+    end
+})
+
+-- Toggle Health Base Color (health based)
+ESPGroup:AddToggle('ESPHealthBasedColor', {
+    Text = 'Health Based Color',
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.ESPHealthBasedColor = Value
+    end
+})
+
+-- Toggle Health Text
+ESPGroup:AddToggle('ESPHealthText', {
+    Text = 'Health Text',
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.ESPHealthText = Value
+    end
+}):AddColorPicker('ESPHealthTextColor', {
+    Default = Color3.fromRGB(70, 220, 110),  -- Matcha green
+    Title = 'Health Text Color',
+    Callback = function(Color)
+        getgenv().matcha.ESPHealthTextColor = Color
+    end
+})
+
+-- Toggle Distance
+ESPGroup:AddToggle('ESPDistance', {
+    Text = 'Distance',
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.ESPDistance = Value
+    end
+}):AddColorPicker('ESPDistanceColor', {
+    Default = Color3.fromRGB(70, 220, 110),  -- Matcha green
+    Title = 'Distance Color',
+    Callback = function(Color)
+        getgenv().matcha.ESPDistanceColor = Color
+    end
+})
+
+-- Toggle Equipped Item
+ESPGroup:AddToggle('ESPEquippedItem', {
+    Text = 'Equipped Item',
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.ESPEquippedItem = Value
+    end
+}):AddColorPicker('ESPEquippedItemColor', {
+    Default = Color3.fromRGB(70, 220, 110),  -- Matcha green
+    Title = 'Item Color',
+    Callback = function(Color)
+        getgenv().matcha.ESPEquippedItemColor = Color
+    end
+})
+
+-- Toggle Skeleton
+ESPGroup:AddToggle('ESPSkeleton', {
+    Text = 'Skeleton',
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.ESPSkeleton = Value
+    end
+}):AddColorPicker('ESPSkeletonColor', {
+    Default = Color3.fromRGB(70, 220, 110),  -- Matcha green
+    Title = 'Skeleton Color',
+    Callback = function(Color)
+        getgenv().matcha.ESPSkeletonColor = Color
+    end
+})
+
+-- Toggle Head Dot
+ESPGroup:AddToggle('ESPHeadDot', {
+    Text = 'Head Dot',
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.ESPHeadDot = Value
+    end
+}):AddColorPicker('ESPHeadDotColor', {
+    Default = Color3.fromRGB(70, 220, 110),  -- Matcha green
+    Title = 'Head Dot Color',
+    Callback = function(Color)
+        getgenv().matcha.ESPHeadDotColor = Color
+    end
+})
+ESPGroup:AddSlider('ESPHeadDotSize', {
+    Text = 'Head Dot Size',
+    Min = 1,
+    Max = 20,
+    Default = 5,
+    Rounding = 0,
+    Callback = function(Value)
+        getgenv().matcha.ESPHeadDotSize = Value
+    end
+})
+
+-- Toggle ESP Faded
+ESPGroup:AddToggle('ESPFaded', {
+    Text = 'Faded ESP',
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.ESPFaded = Value
+    end
+})
+ESPGroup:AddSlider('ESPFadeSpeed', {
+    Text = 'Fade Speed',
+    Min = 1,
+    Max = 10,
+    Default = 5,
+    Rounding = 0,
+    Callback = function(Value)
+        getgenv().matcha.ESPFadeSpeed = Value
+    end
+})
+
+
+local ESP2Group = Tabs.World:AddRightGroupbox('ESP 2')
+
+ESP2Group:AddToggle('ESPChams', {
+    Text = 'Chams',
+    Default = false,
+    Callback = function(Value)
+        matcha.ESPChams = Value
+    end
+}):AddColorPicker('ESPChamsOutlineColor', {
+    Default = Color3.fromRGB(70, 220, 110),
+    Title = 'Outline Color',
+    Callback = function(Color)
+        matcha.ESPChamsOutlineColor = Color
+    end
+}):AddColorPicker('ESPChamsFillColor', {
+    Default = Color3.fromRGB(70, 220, 110),
+    Title = 'Fill Color',
+    Callback = function(Color)
+        matcha.ESPChamsFillColor = Color
+    end
+})
+
+ESP2Group:AddToggle('ESPChamsFillHighlight', {
+    Text = 'Fill Highlight',
+    Default = false,
+    Callback = function(Value)
+        matcha.ESPChamsFillHighlight = Value
+    end
+})
+
+ESP2Group:AddToggle('ESPChamsMaterial', {
+    Text = 'Material',
+    Default = false,
+    Callback = function(Value)
+        matcha.ESPChamsMaterial = Value
+    end
+}):AddDropdown('ESPChamsMaterialType', {
+    Values = {'ForceField', 'Neon'},
+    Default = 'ForceField',
+    Text = 'Material Type',
+    Callback = function(Value)
+        matcha.ESPChamsMaterialType = Value
+    end
+})
+
+ESP2Group:AddToggle('ESPSelfChams', {
+    Text = 'Self Chams',
+    Default = false,
+    Callback = function(Value)
+        matcha.ESPSelfChams = Value
+    end
+}):AddColorPicker('ESPSelfChamsColor', {
+    Default = Color3.fromRGB(70, 220, 110),
+    Title = 'Self Color',
+    Callback = function(Color)
+        matcha.ESPSelfChamsColor = Color
+    end
+})
+ESP2Group:AddToggle('ESPSelfMaterial', {
+    Text = 'Self Material',
+    Default = false,
+    Callback = function(Value)
+        matcha.ESPSelfMaterial = Value
+    end
+})
+
+ESP2Group:AddToggle('ESPTracer', {
+    Text = 'Tracer',
+    Default = false,
+    Callback = function(Value)
+        matcha.ESPTracer = Value
+    end
+}):AddColorPicker('ESPTracerColor', {
+    Default = Color3.fromRGB(70, 220, 110),
+    Title = 'Tracer Color',
+    Callback = function(Color)
+        matcha.ESPTracerColor = Color
+    end
+}):AddDropdown('ESPTracerType', {
+    Values = {'Cursor', 'Bottom Screen', 'Top Screen'},
+    Default = 'Cursor',
+    Text = 'Tracer Type',
+    Callback = function(Value)
+        matcha.ESPTracerType = Value
+    end
+})
+
+ESP2Group:AddSlider('ESPTracerThickness', {
+    Text = 'Thickness',
+    Min = 1,
+    Max = 5,
+    Default = 1,
+    Rounding = 0,
+    Callback = function(Value)
+        matcha.ESPTracerThickness = Value
+    end
+})
+
+local matcha = getgenv().matcha
+
+local originalStates = {}
+
+local fading_value = 1
+local fading_direction = -1
+
+local function GetCorners(Part)
+    local CF, Size, Corners = Part.CFrame, Part.Size / 2, {};
+    for X = -1, 1, 2 do for Y = -1, 1, 2 do for Z = -1, 1, 2 do
+        Corners[#Corners+1] = (CF * CFrame.new(Size * Vector3.new(X, Y, Z))).Position;      
+    end; end; end;
+    return Corners;
+end
+
+local function get_bounding_box(instance)
+    local min, max = Vector2.new(math.huge, math.huge), Vector2.new(-math.huge, -math.huge)
+    local onscreen = false
+
+    if instance:IsA("Model") then
+        for _, p in ipairs(instance:GetChildren()) do
+            if p:IsA("BasePart") then
+                local size = (p.Size / 2) * 1.15  -- Padding từ lib
+                local cf = p.CFrame
+                for _, offset in ipairs({
+                    Vector3.new( size.X,  size.Y,  size.Z),
+                    Vector3.new(-size.X,  size.Y,  size.Z),
+                    Vector3.new( size.X, -size.Y,  size.Z),
+                    Vector3.new(-size.X, -size.Y,  size.Z),
+                    Vector3.new( size.X,  size.Y, -size.Z),
+                    Vector3.new(-size.X,  size.Y, -size.Z),
+                    Vector3.new( size.X, -size.Y, -size.Z),
+                    Vector3.new(-size.X, -size.Y, -size.Z),
+                }) do
+                    local pos, visible = Camera:WorldToViewportPoint(cf:PointToWorldSpace(offset))
+                    if visible then
+                        local v2 = Vector2.new(pos.X, pos.Y)
+                        min = min:Min(v2)
+                        max = max:Max(v2)
+                        onscreen = true
+                    end
+                end
+            elseif p:IsA("Accessory") then
+                local handle = p:FindFirstChild("Handle")
+                if handle and handle:IsA("BasePart") then
+                    local size = (handle.Size / 2) * 1.15
+                    local cf = handle.CFrame
+                    for _, offset in ipairs({
+                        Vector3.new( size.X,  size.Y,  size.Z),
+                        Vector3.new(-size.X,  size.Y,  size.Z),
+                        Vector3.new( size.X, -size.Y,  size.Z),
+                        Vector3.new(-size.X, -size.Y,  size.Z),
+                        Vector3.new( size.X,  size.Y, -size.Z),
+                        Vector3.new(-size.X,  size.Y, -size.Z),
+                        Vector3.new( size.X, -size.Y, -size.Z),
+                        Vector3.new(-size.X, -size.Y, -size.Z),
+                    }) do
+                        local pos, visible = Camera:WorldToViewportPoint(cf:PointToWorldSpace(offset))
+                        if visible then
+                            local v2 = Vector2.new(pos.X, pos.Y)
+                            min = min:Min(v2)
+                            max = max:Max(v2)
+                            onscreen = true
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return min, max, onscreen
+end
+
+-- Logic ESP
+local esp = {}; do
+esp.players = {};
+esp.fading = {};  -- Để quản lý fade (giữ nhưng không dùng vì fade global)
+
+esp.add_player = function(player)  
+    if esp.players[player] then   
+        esp.remove_player(player)   
+    end  
+    local new_esp = {  
+        box_outline = Drawing.new("Square"),  
+        box_inline = Drawing.new("Square"),  
+        name = Drawing.new("Text"),  
+        head_dot_outline = Drawing.new("Circle"),  
+        head_dot_inline = Drawing.new("Circle"),  
+        health_bar_outline = Drawing.new("Line"),  
+        health_bar_inline = Drawing.new("Line"),  
+        health_text = Drawing.new("Text"),  
+        distance = Drawing.new("Text"),  
+        equipped_item = Drawing.new("Text"),  
+        skeleton_lines = {  
+            Drawing.new("Line"), Drawing.new("Line"), Drawing.new("Line"), Drawing.new("Line"),  
+            Drawing.new("Line"), Drawing.new("Line"), Drawing.new("Line"), Drawing.new("Line"),  
+            Drawing.new("Line"), Drawing.new("Line"), Drawing.new("Line"), Drawing.new("Line"),  
+            Drawing.new("Line"), Drawing.new("Line")  
+        },  
+        tracer = Drawing.new("Line"),  
+        corner_outer_lines = {},  -- 8 outer lines cho Corner
+        corner_inner_lines = {},  -- 8 inner lines cho Corner
+        three_d_lines = {},  -- 12 lines cho 3D
+        three_d_quads = {}   -- 5 quads cho 3D
+    };  
+      
+    -- Khởi tạo corner outer/inner lines (8 each)
+    for i = 1, 8 do
+        local outer = Drawing.new("Line")
+        outer.Thickness = 3  -- Dày cho outline
+        outer.Visible = false
+        table.insert(new_esp.corner_outer_lines, outer)
+        
+        local inner = Drawing.new("Line")
+        inner.Thickness = 1  -- Mỏng cho inline như lib
+        inner.Visible = false
+        table.insert(new_esp.corner_inner_lines, inner)
+    end
+    
+    -- Khởi tạo 3D lines (12 lines từ ví dụ)
+    for i = 1, 12 do
+        local line = Drawing.new("Line")
+        line.Thickness = 1
+        line.Visible = false
+        table.insert(new_esp.three_d_lines, line)
+    end
+    
+    -- Khởi tạo 3D quads (5 quads từ ví dụ: bottom, 4 sides)
+    for i = 1, 5 do
+        local quad = Drawing.new("Quad")
+        quad.Thickness = 0.5
+        quad.Filled = true
+        quad.Transparency = 0.25
+        quad.Visible = false
+        table.insert(new_esp.three_d_quads, quad)
+    end
+    
+    -- Cấu hình mặc định khác (giữ nguyên)...
+    new_esp.box_outline.Thickness = 1   cho outline như lib
+    new_esp.box_outline.Filled = false  
+    new_esp.box_outline.Visible = false  
+      
+    new_esp.box_inline.Thickness = 1  -- Mỏng cho inline
+    new_esp.box_inline.Filled = false  
+    new_esp.box_inline.Visible = false  
+      
+    new_esp.name.Outline = true  
+    new_esp.name.Center = true  
+    new_esp.name.Size = 13  
+    new_esp.name.Visible = false  
+      
+    new_esp.head_dot_outline.Radius = 10  
+    new_esp.head_dot_outline.Thickness = 1  
+    new_esp.head_dot_outline.Visible = false  
+    new_esp.head_dot_outline.Color = Color3.new(0, 0, 0)  
+      
+    new_esp.head_dot_inline.Radius = 10  
+    new_esp.head_dot_inline.Thickness = 1  
+    new_esp.head_dot_inline.Visible = false  
+      
+    new_esp.health_bar_outline.Thickness = 1  
+    new_esp.health_bar_outline.Visible = false  
+    new_esp.health_bar_outline.Color = Color3.new(0, 0, 0)  
+      
+    new_esp.health_bar_inline.Thickness = 1  
+    new_esp.health_bar_inline.Visible = false  
+      
+    new_esp.health_text.Color = Color3.new(1, 1, 1)  
+    new_esp.health_text.Size = 12  
+    new_esp.health_text.Outline = true  
+    new_esp.health_text.Center = true  
+      
+    new_esp.distance.Color = Color3.new(1, 1, 1)  
+    new_esp.distance.Size = 12  
+    new_esp.distance.Outline = true  
+    new_esp.distance.Center = true  
+      
+    new_esp.equipped_item.Color = Color3.new(1, 1, 1)  
+    new_esp.equipped_item.Size = 12  
+    new_esp.equipped_item.Outline = true  
+    new_esp.equipped_item.Center = true  
+
+    for _, line in ipairs(new_esp.skeleton_lines) do  
+        line.Thickness = 1  
+        line.Visible = false  
+    end  
+
+    new_esp.tracer.Thickness = 1  
+    new_esp.tracer.Visible = false  
+      
+    esp.players[player] = new_esp;  
+end;  
+
+esp.remove_player = function(player)              
+    if esp.players[player] then  
+        for _, drawing in pairs(esp.players[player]) do  
+            if typeof(drawing) == "table" then  
+                for _, sub in pairs(drawing) do sub:Remove() end  
+            else  
+                drawing:Remove();  
+            end  
+        end;  
+        esp.players[player] = nil;  
+        esp.fading[player] = nil;  
+    end  
+end;
+
+
+Players.PlayerAdded:Connect(function(player)
+esp.add_player(player);
+end);
+
+Players.PlayerRemoving:Connect(function(player)
+esp.remove_player(player);
+end);
+
+local all_players = Players:GetPlayers();
+
+for i = 1, #all_players do
+local player = all_players[i];
+if (player == LocalPlayer and not matcha.ESPSelf) then continue end;
+esp.add_player(player);
+end;
+
+RunService.Heartbeat:Connect(function(dt)
+    if matcha.ESPFaded then
+        fading_value = fading_value + fading_direction * (matcha.ESPFadeSpeed / 100) * dt * 60
+        if fading_value <= 0 then
+            fading_value = 0
+            fading_direction = 1
+        elseif fading_value >= 1 then
+            fading_value = 1
+            fading_direction = -1
+        end
+    end
+
+    local transparency = matcha.ESPFaded and fading_value or 1
+
+    -- Apply material and highlight for all players (independent of 2D ESP conditions)
+    for _, player in ipairs(Players:GetPlayers()) do
+        local isSelf = player == LocalPlayer
+        local char = player.Character
+        if char then
+            for _, obj in ipairs(char:GetDescendants()) do
+                if obj:IsA("BasePart") and obj.Name ~= "HumanoidRootPart" and obj.Name ~= "CUFF" then
+                    local apply_material = (isSelf and matcha.ESPSelfMaterial) or (not isSelf and matcha.ESPChamsMaterial)
+                    if apply_material then
+                        if not originalStates[obj] then
+                            originalStates[obj] = {Material = obj.Material, Color = obj.Color}
+                        end
+                        obj.Material = Enum.Material[matcha.ESPChamsMaterialType]
+                        obj.Color = isSelf and matcha.ESPSelfChamsColor or matcha.ESPChamsFillColor
+                    else
+                        if originalStates[obj] then
+                            obj.Material = originalStates[obj].Material
+                            obj.Color = originalStates[obj].Color
+                            originalStates[obj] = nil
+                        end
+                    end
+                end
+            end
+
+            local highlight = char:FindFirstChildOfClass("Highlight")  
+            local apply_chams = (isSelf and matcha.ESPSelfChams) or (not isSelf and matcha.ESPChams)  
+            if apply_chams then  
+                if not highlight then  
+                    highlight = Instance.new("Highlight")  
+                    highlight.Parent = char  
+                end  
+                highlight.FillColor = isSelf and matcha.ESPSelfChamsColor or matcha.ESPChamsFillColor  
+                highlight.OutlineColor = matcha.ESPChamsOutlineColor  
+                highlight.FillTransparency = matcha.ESPChamsFillHighlight and 0.5 or 1  
+                highlight.OutlineTransparency = 0  
+                highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop  
+                highlight.Enabled = true  
+            elseif highlight then  
+                highlight.Enabled = false  
+                highlight:Destroy()  
+            end
+        end
+    end
+
+    -- Add ESP if not present and conditions met  
+    for _, player in ipairs(Players:GetPlayers()) do  
+        if not esp.players[player] then  
+            if (player ~= LocalPlayer or matcha.ESPSelf) then  
+                local char = player.Character  
+                if char and char:FindFirstChild("HumanoidRootPart") and char:FindFirstChild("Head") then  
+                    local _, on_screen = Camera:WorldToViewportPoint(char.HumanoidRootPart.Position)  
+                    local is_target = matcha.SelectedTarget == player  
+                    local team_check = matcha.ESPTeamCheck  
+                    local only_target = matcha.ESPOnlyTarget  
+                    if on_screen and (not only_target or is_target) and (not team_check or player.Team ~= LocalPlayer.Team) then  
+                        esp.add_player(player)  
+                    end  
+                end  
+            end  
+        end  
+    end  
+
+    local players_esp = esp.players  
+    
+    for player, esp_obj in pairs(players_esp) do  
+        -- Check conditions to remove if no longer valid
+        if player == LocalPlayer and not matcha.ESPSelf then 
+            esp.remove_player(player) 
+            continue 
+        end  
+        if matcha.ESPOnlyTarget and player ~= matcha.SelectedTarget then 
+            esp.remove_player(player) 
+            continue 
+        end  
+        if matcha.ESPTeamCheck and player.Team == LocalPlayer.Team then 
+            esp.remove_player(player) 
+            continue 
+        end  
+        if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") or not player.Character:FindFirstChild("Head") then   
+            esp.remove_player(player)  
+            continue   
+        end  
+          
+        local character = player.Character  
+        local hrp = character.HumanoidRootPart  
+        local head = character:FindFirstChild("Head")  
+        local humanoid = character:FindFirstChildOfClass("Humanoid")  
+        local tool = character:FindFirstChildOfClass("Tool")  
+          
+        local screen_pos, on_screen = Camera:WorldToViewportPoint(hrp.Position)  
+        local screen_pos_head, on_screen_head = Camera:WorldToViewportPoint(head.Position)  
+          
+        if not on_screen then   
+            esp.remove_player(player)  
+            continue   
+        end  
+          
+        -- Tính min, max dùng get_bounding_box từ lib GitHub (update động vị trí/kích thước)
+        local min, max, onscreen = get_bounding_box(player.Character)
+        if not onscreen then 
+            esp.remove_player(player)
+            continue
+        end
+        box_position = min
+        box_size = max - min
+
+        -- Fixed rectangle dọc cho mode Corner (ratio 2:3, không scale theo body)
+        if matcha.ESPBoxMode == "Corner" then
+            local fixed_width = box_size.Y * (2/3)
+            box_size = Vector2.new(fixed_width, box_size.Y)
+        end
+        
+        local outline_offset = 2  
+        local box_outline_size = box_size + Vector2.new(outline_offset, outline_offset)  
+        local box_outline_position = box_position - Vector2.new(outline_offset / 2, outline_offset / 2)  
+        
+        local is_target = matcha.SelectedTarget == player  
+        local visible_fade = transparency > 0  
+
+        -- Xóa Visible tất cả box-related trước khi vẽ mode mới (khắc phục ESP cũ còn lại khi chuyển mode)
+        esp_obj.box_outline.Visible = false  
+        esp_obj.box_inline.Visible = false  
+        for _, line in ipairs(esp_obj.corner_outer_lines or {}) do line.Visible = false end
+        for _, line in ipairs(esp_obj.corner_inner_lines or {}) do line.Visible = false end
+        for _, line in ipairs(esp_obj.three_d_lines or {}) do line.Visible = false end
+        for _, quad in ipairs(esp_obj.three_d_quads or {}) do quad.Visible = false end
+
+        -- Boxes theo mode  
+        if matcha.ESPBoxes then  
+            if matcha.ESPBoxMode == "2D" then  
+                esp_obj.box_outline.Size = box_outline_size  
+                esp_obj.box_outline.Position = box_outline_position  
+                esp_obj.box_outline.Color = matcha.ESPBoxesOutlineColor  
+                esp_obj.box_outline.Thickness = 1 
+                esp_obj.box_outline.Transparency = transparency  
+                esp_obj.box_outline.Visible = visible_fade  
+                  
+                esp_obj.box_inline.Size = box_size  
+                esp_obj.box_inline.Position = box_position  
+                esp_obj.box_inline.Color = is_target and matcha.ESPBoxesTargetColor or matcha.ESPBoxesColor  
+                esp_obj.box_inline.Thickness = 1  -- Mỏng inline
+                esp_obj.box_inline.Transparency = transparency  
+                esp_obj.box_inline.Visible = visible_fade  
+            elseif matcha.ESPBoxMode == "Corner" then  -- Chỉ viền 4 cạnh (outer + inner lines, không full box)
+                local len = math.min(box_size.X, box_size.Y) * 0.25
+                local corners = {
+                    { Vector2.new(box_position.X, box_position.Y), Vector2.new(box_position.X + len, box_position.Y) },  -- Top left horiz
+                    { Vector2.new(box_position.X, box_position.Y), Vector2.new(box_position.X, box_position.Y + len) },  -- Top left vert
+                    { Vector2.new(box_position.X + box_size.X - len, box_position.Y), Vector2.new(box_position.X + box_size.X, box_position.Y) },  -- Top right horiz
+                    { Vector2.new(box_position.X + box_size.X, box_position.Y), Vector2.new(box_position.X + box_size.X, box_position.Y + len) },  -- Top right vert
+                    { Vector2.new(box_position.X, box_position.Y + box_size.Y), Vector2.new(box_position.X + len, box_position.Y + box_size.Y) },  -- Bottom left horiz
+                    { Vector2.new(box_position.X, box_position.Y + box_size.Y - len), Vector2.new(box_position.X, box_position.Y + box_size.Y) },  -- Bottom left vert
+                    { Vector2.new(box_position.X + box_size.X - len, box_position.Y + box_size.Y), Vector2.new(box_position.X + box_size.X, box_position.Y + box_size.Y) },  -- Bottom right horiz
+                    { Vector2.new(box_position.X + box_size.X, box_position.Y + box_size.Y - len), Vector2.new(box_position.X + box_size.X, box_position.Y + box_size.Y) }  -- Bottom right vert
+                }
+                for i = 1, 8 do
+                    local from, to = corners[i][1], corners[i][2]
+                    esp_obj.corner_outer_lines[i].From = from
+                    esp_obj.corner_outer_lines[i].To = to
+                    esp_obj.corner_outer_lines[i].Color = matcha.ESPBoxesOutlineColor
+                    esp_obj.corner_outer_lines[i].Thickness = 3  -- Dày outer
+                    esp_obj.corner_outer_lines[i].Transparency = transparency
+                    esp_obj.corner_outer_lines[i].Visible = visible_fade
+                    
+                    -- Inner lines (offset vào trong 2 pixels)
+                    local inner_from = from + Vector2.new(2, 2)  -- Offset inner
+                    local inner_to = to + Vector2.new(2, 2)
+                    esp_obj.corner_inner_lines[i].From = inner_from
+                    esp_obj.corner_inner_lines[i].To = inner_to
+                    esp_obj.corner_inner_lines[i].Color = is_target and matcha.ESPBoxesTargetColor or matcha.ESPBoxesColor
+                    esp_obj.corner_inner_lines[i].Thickness = 1  -- Mỏng inner
+                    esp_obj.corner_inner_lines[i].Transparency = transparency
+                    esp_obj.corner_inner_lines[i].Visible = visible_fade
+                end
+            elseif matcha.ESPBoxMode == "3D" then  -- Mode 3D
+                local CubeVertices = GetCorners({CFrame = hrp.CFrame * CFrame.new(0, -0.5, 0), Size = Vector3.new(3, 5, 3)})
+                local bottom_lines = {
+                    {CubeVertices[1], CubeVertices[2]},
+                    {CubeVertices[2], CubeVertices[6]},
+                    {CubeVertices[6], CubeVertices[5]},
+                    {CubeVertices[5], CubeVertices[1]}
+                }
+                local side_lines = {
+                    {CubeVertices[1], CubeVertices[3]},
+                    {CubeVertices[2], CubeVertices[4]},
+                    {CubeVertices[6], CubeVertices[8]},
+                    {CubeVertices[5], CubeVertices[7]}
+                }
+                local top_lines = {
+                    {CubeVertices[3], CubeVertices[4]},
+                    {CubeVertices[4], CubeVertices[8]},
+                    {CubeVertices[8], CubeVertices[7]},
+                    {CubeVertices[7], CubeVertices[3]}
+                }
+                local all_lines = {bottom_lines, side_lines, top_lines}
+                local line_index = 1
+                for _, group in ipairs(all_lines) do
+                    for _, conn in ipairs(group) do
+                        local from_pos, from_on = Camera:WorldToViewportPoint(conn[1])
+                        local to_pos, to_on = Camera:WorldToViewportPoint(conn[2])
+                        if from_on and to_on then
+                            esp_obj.three_d_lines[line_index].From = Vector2.new(from_pos.X, from_pos.Y)
+                            esp_obj.three_d_lines[line_index].To = Vector2.new(to_pos.X, to_pos.Y)
+                            esp_obj.three_d_lines[line_index].Color = matcha.ESPBoxesColor
+                            esp_obj.three_d_lines[line_index].Transparency = transparency
+                            esp_obj.three_d_lines[line_index].Visible = visible_fade
+                            line_index += 1
+                        end
+                    end
+                }
+                local quads = {
+                    {CubeVertices[1], CubeVertices[2], CubeVertices[6], CubeVertices[5]},  -- Bottom
+                    {CubeVertices[2], CubeVertices[4], CubeVertices[8], CubeVertices[6]},  -- Side 1
+                    {CubeVertices[1], CubeVertices[2], CubeVertices[4], CubeVertices[3]},  -- Side 2
+                    {CubeVertices[1], CubeVertices[5], CubeVertices[7], CubeVertices[3]},  -- Side 3
+                    {CubeVertices[5], CubeVertices[7], CubeVertices[8], CubeVertices[6]}   -- Side 4
+                    -- Top bỏ nếu không cần filled full
+                }
+                for i, q in ipairs(quads) do
+                    local a, a_on = Camera:WorldToViewportPoint(q[1])
+                    local b, b_on = Camera:WorldToViewportPoint(q[2])
+                    local c, c_on = Camera:WorldToViewportPoint(q[3])
+                    local d, d_on = Camera:WorldToViewportPoint(q[4])
+                    if a_on or b_on or c_on or d_on then
+                        esp_obj.three_d_quads[i].PointA = Vector2.new(a.X, a.Y)
+                        esp_obj.three_d_quads[i].PointB = Vector2.new(b.X, b.Y)
+                        esp_obj.three_d_quads[i].PointC = Vector2.new(c.X, c.Y)
+                        esp_obj.three_d_quads[i].PointD = Vector2.new(d.X, d.Y)
+                        esp_obj.three_d_quads[i].Color = matcha.ESPBoxesColor
+                        esp_obj.three_d_quads[i].Transparency = 0.25 * transparency  -- Filled nhẹ
+                        esp_obj.three_d_quads[i].Visible = visible_fade
+                    end
+                end
+            end
+        end
+
+        -- Box Fill (áp dụng cho 2D và 3D nếu bật, Corner không fill)
+        if matcha.ESPBoxFill and matcha.ESPBoxMode ~= "Corner" then  
+            esp_obj.box_inline.Filled = true  
+            esp_obj.box_inline.Color = is_target and matcha.ESPBoxFillTargetColor or matcha.ESPBoxFillColor  
+            esp_obj.box_inline.Transparency = matcha.ESPBoxFillTransparency * transparency  
+        else  
+            esp_obj.box_inline.Filled = false  
+        end  
+
+        -- Name  
+        if matcha.ESPName then  
+            esp_obj.name.Visible = visible_fade  
+            esp_obj.name.Text = matcha.ESPNameType == 'DisplayName' and player.DisplayName or player.Name  
+            esp_obj.name.Position = Vector2.new(box_size.X / 2 + box_position.X, box_position.Y - 16)  
+            esp_obj.name.Color = matcha.ESPNameColor  
+            esp_obj.name.Transparency = transparency  
+        else  
+            esp_obj.name.Visible = false  
+        end  
+          
+        -- Head Dot  
+        if matcha.ESPHeadDot and on_screen_head then  
+            esp_obj.head_dot_inline.Position = Vector2.new(screen_pos_head.X, screen_pos_head.Y)  
+            esp_obj.head_dot_inline.Radius = matcha.ESPHeadDotSize  
+            esp_obj.head_dot_inline.Color = matcha.ESPHeadDotColor  
+            esp_obj.head_dot_inline.Transparency = transparency  
+            esp_obj.head_dot_inline.Visible = visible_fade  
+              
+            esp_obj.head_dot_outline.Position = Vector2.new(screen_pos_head.X, screen_pos_head.Y)  
+            esp_obj.head_dot_outline.Radius = matcha.ESPHeadDotSize + 2  
+            esp_obj.head_dot_outline.Transparency = transparency  
+            esp_obj.head_dot_outline.Visible = visible_fade  
+        else  
+            esp_obj.head_dot_inline.Visible = false  
+            esp_obj.head_dot_outline.Visible = false  
+        end  
+          
+        -- Health Bar  
+        if matcha.ESPHealthBar and humanoid then  
+            local health_percentage = humanoid.Health / humanoid.MaxHealth  
+            local health_bar_height = health_percentage * box_size.Y  
+              
+            esp_obj.health_bar_outline.From = Vector2.new(box_position.X - 5, box_position.Y + box_size.Y)  
+            esp_obj.health_bar_outline.To = Vector2.new(box_position.X - 5, box_position.Y)  
+            esp_obj.health_bar_outline.Transparency = transparency  
+            esp_obj.health_bar_outline.Visible = visible_fade  
+              
+            esp_obj.health_bar_inline.From = Vector2.new(box_position.X - 5, box_position.Y + box_size.Y)  
+            esp_obj.health_bar_inline.To = Vector2.new(box_position.X - 5, box_position.Y + box_size.Y - health_bar_height)  
+            esp_obj.health_bar_inline.Color = matcha.ESPHealthBasedColor and Color3.new(1 - health_percentage, health_percentage, 0) or matcha.ESPHealthBarColor  
+            esp_obj.health_bar_inline.Transparency = transparency  
+            esp_obj.health_bar_inline.Visible = visible_fade  
+        else  
+            esp_obj.health_bar_outline.Visible = false  
+            esp_obj.health_bar_inline.Visible = false  
+        end  
+          
+        -- Health Text  
+        if matcha.ESPHealthText and humanoid then  
+            esp_obj.health_text.Visible = visible_fade  
+            esp_obj.health_text.Text = tostring(math.floor(humanoid.Health))  
+            esp_obj.health_text.Position = Vector2.new(box_position.X - 5 - esp_obj.health_text.TextBounds.X / 2, box_position.Y + box_size.Y - (humanoid.Health / humanoid.MaxHealth * box_size.Y))  
+            esp_obj.health_text.Color = matcha.ESPHealthTextColor  
+            esp_obj.health_text.Transparency = transparency  
+        else  
+            esp_obj.health_text.Visible = false  
+        end  
+          
+        -- Distance  
+        if matcha.ESPDistance then  
+            local dist = (LocalPlayer.Character.HumanoidRootPart.Position - hrp.Position).Magnitude  
+            esp_obj.distance.Visible = visible_fade  
+            esp_obj.distance.Text = tostring(math.floor(dist)) .. " studs"  
+            esp_obj.distance.Position = Vector2.new(box_size.X / 2 + box_position.X, box_position.Y + box_size.Y + 5)  
+            esp_obj.distance.Color = matcha.ESPDistanceColor  
+            esp_obj.distance.Transparency = transparency  
+        else  
+            esp_obj.distance.Visible = false  
+        end  
+          
+        -- Equipped Item  
+        if matcha.ESPEquippedItem and tool then  
+            esp_obj.equipped_item.Visible = visible_fade  
+            esp_obj.equipped_item.Text = tool.Name  
+            esp_obj.equipped_item.Position = Vector2.new(box_size.X / 2 + box_position.X, box_position.Y + box_size.Y + 20)  
+            esp_obj.equipped_item.Color = matcha.ESPEquippedItemColor  
+            esp_obj.equipped_item.Transparency = transparency  
+        else  
+            esp_obj.equipped_item.Visible = false  
+        end  
+          
+        -- Skeleton  
+        if matcha.ESPSkeleton then  
+            local parts = {  
+                head = head,  
+                upper_torso = character:FindFirstChild("UpperTorso"),  
+                lower_torso = character:FindFirstChild("LowerTorso"),  
+                left_upper_arm = character:FindFirstChild("LeftUpperArm"),  
+                left_lower_arm = character:FindFirstChild("LeftLowerArm"),  
+                left_hand = character:FindFirstChild("LeftHand"),  
+                right_upper_arm = character:FindFirstChild("RightUpperArm"),  
+                right_lower_arm = character:FindFirstChild("RightLowerArm"),  
+                right_hand = character:FindFirstChild("RightHand"),  
+                left_upper_leg = character:FindFirstChild("LeftUpperLeg"),  
+                left_lower_leg = character:FindFirstChild("LeftLowerLeg"),  
+                left_foot = character:FindFirstChild("LeftFoot"),  
+                right_upper_leg = character:FindFirstChild("RightUpperLeg"),  
+                right_lower_leg = character:FindFirstChild("RightLowerLeg"),  
+                right_foot = character:FindFirstChild("RightFoot")  
+            }  
+
+            if parts.upper_torso and parts.lower_torso and parts.head and parts.left_upper_arm and parts.left_lower_arm and parts.left_hand and parts.right_upper_arm and parts.right_lower_arm and parts.right_hand and parts.left_upper_leg and parts.left_lower_leg and parts.left_foot and parts.right_upper_leg and parts.right_lower_leg and parts.right_foot then  
+                local connections = {  
+                    {parts.head, parts.upper_torso, 1},  
+                    {parts.upper_torso, parts.lower_torso, 2},  
+                    {parts.upper_torso, parts.left_upper_arm, 3},  
+                    {parts.left_upper_arm, parts.left_lower_arm, 4},  
+                    {parts.left_lower_arm, parts.left_hand, 5},  
+                    {parts.upper_torso, parts.right_upper_arm, 6},  
+                    {parts.right_upper_arm, parts.right_lower_arm, 7},  
+                    {parts.right_lower_arm, parts.right_hand, 8},  
+                    {parts.lower_torso, parts.left_upper_leg, 9},  
+                    {parts.left_upper_leg, parts.left_lower_leg, 10},  
+                    {parts.left_lower_leg, parts.left_foot, 11},  
+                    {parts.lower_torso, parts.right_upper_leg, 12},  
+                    {parts.right_upper_leg, parts.right_lower_leg, 13},  
+                    {parts.right_lower_leg, parts.right_foot, 14}  
+                }  
+
+                for _, conn in ipairs(connections) do  
+                    local from_pos, from_on_screen = Camera:WorldToViewportPoint(conn[1].Position)  
+                    local to_pos, to_on_screen = Camera:WorldToViewportPoint(conn[2].Position)  
+                    if from_on_screen and to_on_screen then  
+                        esp_obj.skeleton_lines[conn[3]].From = Vector2.new(from_pos.X, from_pos.Y)  
+                        esp_obj.skeleton_lines[conn[3]].To = Vector2.new(to_pos.X, to_pos.Y)  
+                        esp_obj.skeleton_lines[conn[3]].Color = matcha.ESPSkeletonColor  
+                        esp_obj.skeleton_lines[conn[3]].Transparency = transparency  
+                        esp_obj.skeleton_lines[conn[3]].Visible = visible_fade  
+                    else  
+                        esp_obj.skeleton_lines[conn[3]].Visible = false  
+                    end  
+                end  
+            else  
+                for _, line in ipairs(esp_obj.skeleton_lines) do  
+                    line.Visible = false  
+                end  
+            end  
+        else  
+            for _, line in ipairs(esp_obj.skeleton_lines) do  
+                line.Visible = false  
+            end  
+        end  
+          
+        -- Tracer (now fades)  
+        if matcha.ESPTracer then  
+            local from_pos  
+            if matcha.ESPTracerType == 'Cursor' then  
+                from_pos = UserInputService:GetMouseLocation()  
+            elseif matcha.ESPTracerType == 'Bottom Screen' then  
+                from_pos = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)  
+            elseif matcha.ESPTracerType == 'Top Screen' then  
+                from_pos = Vector2.new(Camera.ViewportSize.X / 2, 0)  
+            else  
+                from_pos = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)  -- Default to bottom if invalid  
+            end  
+            esp_obj.tracer.From = from_pos  
+            esp_obj.tracer.To = Vector2.new(screen_pos.X, screen_pos.Y + (box_size.Y / 2))  -- Adjust To to bottom of box for better visibility  
+            esp_obj.tracer.Color = matcha.ESPTracerColor  
+            esp_obj.tracer.Thickness = matcha.ESPTracerThickness  
+            esp_obj.tracer.Transparency = transparency  
+            esp_obj.tracer.Visible = visible_fade  
+        else  
+            esp_obj.tracer.Visible = false  
+        end  
+    end
+end)
+
+
+-- Character Tab: Movement Group
+local MovementGroup = Tabs.Character:AddLeftGroupbox('Movement')
+
+-- 🌿 Fly
+MovementGroup:AddToggle('FlyEnabled', {
+    Text = 'Fly',
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.FlyEnabled = Value
+        Library:Notify("Fly " .. (Value and "Enabled" or "Disabled"), 2)
+    end
+}):AddKeyPicker('FlyKey', {
+    Default = 'NONE',
+    Mode = 'Toggle',
+    Text = 'Fly Key',
+    Callback = function()
+        getgenv().matcha.FlyEnabled = not getgenv().matcha.FlyEnabled
+        Library:Notify("Fly " .. (Value and "Enabled" or "Disabled"), 2)
+    end
+})
+MovementGroup:AddSlider('FlySpeed', {
+    Text = 'Fly Speed',
+    Default = 20,
+    Min = 1,
+    Max = 100,
+    Rounding = 0,
+    Callback = function(Value)
+        getgenv().matcha.FlySpeed = Value
+    end
+})
+
+-- 🚀 CFrame Speed
+MovementGroup:AddToggle('CFSpeedEnabled', {
+    Text = 'CFrame Speed',
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.CFSpeedEnabled = Value
+        Library:Notify("CF Speed " .. (Value and "Enabled" or "Disabled"), 2)
+    end
+}):AddKeyPicker('CFSpeedKey', {
+    Default = 'NONE',
+    Mode = 'Toggle',
+    Text = 'CF Speed Key',
+    Callback = function()
+        getgenv().matcha.CFSpeedEnabled = not getgenv().matcha.CFSpeedEnabled
+        Library:Notify("CF Speed " .. (Value and "Enabled" or "Disabled"), 2)
+    end
+})
+MovementGroup:AddSlider('CFSpeed', {
+    Text = 'CF Speed',
+    Default = 2,
+    Min = 1,
+    Max = 100,
+    Rounding = 0,
+    Callback = function(Value)
+        getgenv().matcha.CFSpeed = Value
+    end
+})
+
+-- 🏃 WalkSpeed + JumpPower
+MovementGroup:AddToggle('WalkJumpEnabled', {
+    Text = 'Walk/Jump Override',
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.WalkJumpEnabled = Value
+        Library:Notify("Walk/Jump " .. (Value and "Enabled" or "Disabled"), 2)
+        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
+            local humanoid = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+            applyStats(humanoid)
+        end
+    end
+}):AddKeyPicker('WalkJumpKey', {
+    Default = 'NONE',
+    Mode = 'Toggle',
+    Text = 'Walk/Jump Key',
+    Callback = function()
+        getgenv().matcha.WalkJumpEnabled = not getgenv().matcha.WalkJumpEnabled
+        Library:Notify("Walk/Jump " .. (Value and "Enabled" or "Disabled"), 2)
+        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
+            local humanoid = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+            applyStats(humanoid)
+        end
+    end
+})
+MovementGroup:AddSlider('WalkSpeedAmount', {
+    Text = 'WalkSpeed',
+    Default = getgenv().matcha.WalkSpeedAmount or 16,
+    Min = 1,
+    Max = 1000,
+    Rounding = 0,
+    Callback = function(Value)
+        getgenv().matcha.WalkSpeedAmount = Value
+    end
+})
+MovementGroup:AddSlider('JumpPowerAmount', {
+    Text = 'JumpPower',
+    Default = getgenv().matcha.JumpPowerAmount or 50,
+    Min = 1,
+    Max = 1000,
+    Rounding = 0,
+    Callback = function(Value)
+        getgenv().matcha.JumpPowerAmount = Value
+    end
+})
+
+-- No jump cooldown / No slowdown
+MovementGroup:AddToggle('NoJumpCooldown', { Text = 'No Jump Cooldown', Default = false, Callback = function(v) getgenv().matcha.NoJumpCooldown = v end })
+MovementGroup:AddToggle('NoSlowdown', { Text = 'No Slowdown', Default = false, Callback = function(v) getgenv().matcha.NoSlowdown = v end })
+
+-- Bunny Hop (toggle + slider)
+MovementGroup:AddToggle('BunnyHopEnabled', { Text = 'Bunny Hop', Default = false, Callback = function(v) getgenv().matcha.BunnyHopEnabled = v end })
+MovementGroup:AddSlider('BunnyHopSpeed', {
+    Text = 'Bhop Speed',
+    Default = getgenv().matcha.BunnyHopSpeed or 50,
+    Min = 25,
+    Max = 200,
+    Rounding = 0,
+    Callback = function(Value)
+        getgenv().matcha.BunnyHopSpeed = Value
+        Library:Notify("BunnyHop " .. (Value and "Enabled" or "Disabled"), 2)
+    end
+})
+
+local MiscGroup = Tabs.Character:AddRightGroupbox('Misc')
+
+-- Spinbot
+MiscGroup:AddToggle('SpinbotToggle', {
+    Text = 'Spinbot',
+    Default = false,
+    Callback = function(state)
+        getgenv().matcha.SpinbotEnabled = state
+        toggleSpinbot(state)
+    end,
+}):AddKeyPicker('SpinbotKey', {
+    Default = 'N',
+    Mode = 'Toggle',
+    Text = 'Spinbot Key',
+    Callback = function()
+        getgenv().matcha.SpinbotEnabled = not getgenv().matcha.SpinbotEnabled
+        toggleSpinbot(getgenv().matcha.SpinbotEnabled)
+    end
+})
+
+MiscGroup:AddSlider('SpinSpeedSlider', {
+    Text = 'Spin Speed',
+    Default = 10,
+    Min = 1,
+    Max = 50,
+    Rounding = 1,
+    Callback = function(val) getgenv().matcha.SpinSpeed = val end
+})
+
+MiscGroup:AddToggle('EmoteToggle', {
+    Text = 'Play Emote',
+    Default = false,
+    Callback = function(state)
+        getgenv().matcha.EmoteEnabled = state
+        refreshEmote()
+    end
+}):AddKeyPicker('EmoteKey', {
+    Default = 'C',
+    Mode = 'Toggle',
+    Text = 'Emote Key',
+    Callback = function()
+        getgenv().matcha.EmoteEnabled = not getgenv().matcha.EmoteEnabled
+        refreshEmote()
+    end
+}):AddDropdown('EmoteModeDropdown', {
+    Values = {"Normal", "Always"},
+    Default = "Normal",
+    Text = 'Mode',
+    Callback = function(mode)
+        getgenv().matcha.EmoteMode = mode
+        refreshEmote()
+    end
+})
+
+MiscGroup:AddDropdown('EmoteDropdown', {
+    Values = {
+        "Baby Queen - Bouncy Twirl",
+        "Floss",
+        "Yungblud Happier Jump",
+        "Godlike",
+        "Mae Stephens - Piano Hands",
+        "Victory Dance",
+        "Elton John - Heart Skip",
+        "Sturdy Dance - Ice Spice",
+        "Old Town Road Dance - Lil Nas X (LNX)",
+        "Sidekicks",
+        "Baby Dance",
+        "Rampage",
+        "Rambunctious",
+        "Griddy",
+        "Orange Justice"
+    },
+    Default = "Baby Queen - Bouncy Twirl",
+    Text = 'Select Emote',
+    Callback = function(val)
+        local map = {
+            ["Baby Queen - Bouncy Twirl"]="rbxassetid://14352343065",
+            ["Floss"]="rbxassetid://10714340543",
+            ["Yungblud Happier Jump"]="rbxassetid://15609995579",
+            ["Godlike"]="rbxassetid://10714347256",
+            ["Mae Stephens - Piano Hands"]="rbxassetid://16553163212",
+            ["Victory Dance"]="rbxassetid://15505456446",
+            ["Elton John - Heart Skip"]="rbxassetid://11309255148",
+            ["Sturdy Dance - Ice Spice"]="rbxassetid://17746180844",
+            ["Old Town Road Dance - Lil Nas X (LNX)"]="rbxassetid://10714391240",
+            ["Sidekicks"]="rbxassetid://10370362157",
+            ["Baby Dance"]="rbxassetid://10713983178",
+            ["Rampage"]="rbxassetid://139658061151500",
+            ["Rambunctious"]="rbxassetid://85916053135662",
+            ["Griddy"]="rbxassetid://121966805049108",
+            ["Orange Justice"]="rbxassetid://78927657777256"
+        }
+        getgenv().matcha.EmoteId = map[val] or "rbxassetid://14352343065"
+        refreshEmote()
+    end
+})
+
+MiscGroup:AddSlider('EmoteSpeed', {
+    Text = 'Speed',
+    Min = 0.1,
+    Max = 3,
+    Default = 1,
+    Rounding = 1,
+    Callback = function(val)
+        getgenv().matcha.AnimationSpeed = val
+        if currentTrack then
+            currentTrack:AdjustSpeed(val)
+        end
+    end
+})
+
+-- Noclip
+MiscGroup:AddToggle('NoclipToggle', {
+    Text = 'Noclip',
+    Default = false,
+    Callback = function(state)
+        getgenv().matcha.NoclipEnabled = state
+    end,
+}):AddKeyPicker('NoclipKey', {
+    Default = 'NONE',
+    Mode = 'Toggle',
+    Text = 'Noclip Key',
+    Callback = function()
+        getgenv().matcha.NoclipEnabled = not getgenv().matcha.NoclipEnabled
+    end
+})
+
+-- AntiFling
+MiscGroup:AddToggle('AntiFlingToggle', {
+    Text = 'Anti Fling',
+    Default = false,
+    Callback = function(state)
+        getgenv().matcha.AntiFlingEnabled = state
+    end
+})
+
+-- UI Settings
+local MenuGroup = Tabs['UI Settings']:AddLeftGroupbox('Menu')
+
+MenuGroup:AddButton({
+    Text = 'Unload',
+    Func = function() Library:Unload() end,
+    DoubleClick = false,
+    Disabled = false,
+    Visible = true
+})
+
+MenuGroup:AddLabel('Menu bind'):AddKeyPicker('MenuKeybind', {
+    Default = 'RightControl',
+    NoUI = true,
+    Text = 'Menu keybind',
+    Mode = 'Toggle',
+    ChangedCallback = function(New)
+        print('Menu keybind changed to:', New)
+    end
+})
+Library.ToggleKeybind = Options.MenuKeybind
+
+MenuGroup:AddToggle('KeybindListToggle', {
+    Text = 'Show Keybind List',
+    Default = false,
+    Callback = function(state)
+        Library.KeybindFrame.Visible = state
+    end,
+    Disabled = false,
+    Visible = true
+})
+
+MenuGroup:AddToggle('AntiAFKToggle', {
+    Text = 'Anti-AFK',
+    Default = false,
+    Callback = function(state)
+        getgenv().isAntiAfkEnabled = state
+        if state then
+            getgenv().antiAfkConnection = LocalPlayer.Idled:Connect(function()
+                getgenv().vu:CaptureController()
+                getgenv().vu:ClickButton2(Vector2.new())
+            end)
+        else
+            if getgenv().antiAfkConnection then
+                getgenv().antiAfkConnection:Disconnect()
+                getgenv().antiAfkConnection = nil
+            end
+        end
+    end,
+    Disabled = false,
+    Visible = true
+})
+
+MenuGroup:AddButton({
+    Text = 'Copy Job ID',
+    Func = function()
+        setclipboard(game.JobId)
+    end,
+    DoubleClick = false,
+    Disabled = false,
+    Visible = true
+})
+
+MenuGroup:AddButton({
+    Text = 'Copy JS Join Script',
+    Func = function()
+        local jsScript = 'Roblox.GameLauncher.joinGameInstance(' .. game.PlaceId .. ', "' .. game.JobId .. '")'
+        setclipboard(jsScript)
+    end,
+    DoubleClick = false,
+    Disabled = false,
+    Visible = true
+})
+
+MenuGroup:AddInput('JobIdInput', {
+    Default = '',
+    Numeric = false,
+    Finished = true,
+    Text = '..JobId..',
+    Placeholder = 'Enter Job ID here',
+    ClearTextOnFocus = true,
+    Callback = function(Value)
+        game:GetService('TeleportService'):TeleportToPlaceInstance(game.PlaceId, Value, LocalPlayer)
+    end,
+    Disabled = false,
+    Visible = true
+})
+
+MenuGroup:AddButton({
+    Text = 'Rejoin Server',
+    Func = function()
+        game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
+    end,
+    DoubleClick = false,
+    Disabled = false,
+    Visible = true
+})
+
+-- Theme and Save Manager
+ThemeManager:SetLibrary(Library)
+SaveManager:SetLibrary(Library)
+SaveManager:IgnoreThemeSettings()
+SaveManager:SetIgnoreIndexes({ 'MenuKeybind' })
+ThemeManager:SetFolder('matcha')
+SaveManager:SetFolder('matcha/configs')
+
+local themeFolder = ThemeManager.Folder .. "/themes"
+if not isfolder(themeFolder) then
+    makefolder(themeFolder)
+end
+
+if not isfile(themeFolder .. "/default.txt") then
+    writefile(themeFolder .. "/default.txt", "matcha.json")
+end
+
+if not isfile(themeFolder .. "/matcha.json") then
+    local themeData = {
+        MainColor = "1e1e1e",
+        AccentColor = "98fb98",
+        OutlineColor = "141414",
+        BackgroundColor = "232323",
+        FontColor = "e0ffff"
+    }
+    writefile(themeFolder .. "/matcha.json", HttpService:JSONEncode(themeData))
+end
+
+SaveManager:BuildConfigSection(Tabs['UI Settings'])
+ThemeManager:ApplyToTab(Tabs['UI Settings'])
+SaveManager:LoadAutoloadConfig()
+
+-- Watermark
+Library:SetWatermarkVisibility(true)
+
+-- Add to getgenv().matcha for Watermark settings
+getgenv().matcha.WatermarkEnabled = true
+getgenv().matcha.WatermarkShowFPS = true
+getgenv().matcha.WatermarkShowGameName = false
+getgenv().matcha.WatermarkShowUptime = false
+getgenv().matcha.WatermarkShowExecutor = false
+getgenv().matcha.WatermarkShowPing = true
+
+-- Modified Watermark Logic
+local FrameTimer = tick()
+local FrameCounter = 0
+local FPS = 60
+local StartTime = tick()
+
+local function getExecutor()
+    if syn then return "Synapse X" end
+    if secure_call then return "ScriptWare" end
+    if identifyexecutor then return identifyexecutor() end
+    return "Unknown"
+end
+
+local function getGameName(placeId)
+    local success, result = pcall(function()
+        return MarketplaceService:GetProductInfo(placeId).Name
+    end)
+    return success and result or "Unknown Game"
+end
+
+local function updateWatermark()
+    FrameCounter += 1
+    if (tick() - FrameTimer) >= 1 then
+        FPS = FrameCounter
+        FrameTimer = tick()
+        FrameCounter = 0
+    end
+
+    local Ping = math.floor(Stats.Network.ServerStatsItem["Data Ping"]:GetValue())
+    local Executor = getExecutor()
+    local Uptime = math.floor(tick() - StartTime)
+    local UptimeFormatted = string.format("%02d:%02d", math.floor(Uptime / 60), Uptime % 60)
+    local GameName = getGameName(game.PlaceId)
+
+    local watermarkParts = {"matcha.tea", " Anhchangm52 "}
+    
+    if getgenv().matcha.WatermarkShowExecutor then
+        table.insert(watermarkParts, Executor)
+    end
+    if getgenv().matcha.WatermarkShowGameName then
+        table.insert(watermarkParts, string.format("%s (%d)", GameName, game.PlaceId))
+    end
+    if getgenv().matcha.WatermarkShowUptime then
+        table.insert(watermarkParts, string.format("Uptime: %s", UptimeFormatted))
+    end
+    if getgenv().matcha.WatermarkShowFPS then
+        table.insert(watermarkParts, string.format("FPS %d", math.floor(FPS)))
+    end
+    if getgenv().matcha.WatermarkShowPing then
+        table.insert(watermarkParts, string.format("%d ms", Ping))
+    end
+
+    Library:SetWatermark(table.concat(watermarkParts, " | "))
+    Library:SetWatermarkVisibility(getgenv().matcha.WatermarkEnabled)
+end
+
+local WatermarkConnection = RunService.RenderStepped:Connect(updateWatermark)
+
+Library:OnUnload(function()
+    WatermarkConnection:Disconnect()
+    print('Unloaded!')
+    Library.Unloaded = true
+end)
+
+-- Watermark Customization UI
+local WatermarkGroup = Tabs['UI Settings']:AddRightGroupbox('Watermark')
+
+WatermarkGroup:AddToggle('WatermarkEnabled', {
+    Text = 'Enabled',
+    Default = true,
+    Callback = function(Value)
+        getgenv().matcha.WatermarkEnabled = Value
+    end
+})
+
+WatermarkGroup:AddToggle('WatermarkShowFPS', {
+    Text = 'Show FPS',
+    Default = true,
+    Callback = function(Value)
+        getgenv().matcha.WatermarkShowFPS = Value
+    end
+})
+
+WatermarkGroup:AddToggle('WatermarkShowGameName', {
+    Text = 'Show Game Name',
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.WatermarkShowGameName = Value
+    end
+})
+
+WatermarkGroup:AddToggle('WatermarkShowUptime', {
+    Text = 'Show Uptime',
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.WatermarkShowUptime = Value
+    end
+})
+
+WatermarkGroup:AddToggle('WatermarkShowExecutor', {
+    Text = 'Show Executor',
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.WatermarkShowExecutor = Value
+    end
+})
+
+WatermarkGroup:AddToggle('WatermarkShowPing', {
+    Text = 'Show Ping',
+    Default = true,
+    Callback = function(Value)
+        getgenv().matcha.WatermarkShowPing = Value
+    end
+})
+
+Library:OnUnload(function()
+    WatermarkConnection:Disconnect()
+    print('Unloaded!')
+    Library.Unloaded = true
+end)
+
+Library:Notify('Loaded matcha.tea!')
