@@ -2114,13 +2114,7 @@ ESPGroup:AddToggle('ESPBoxFill', {
     Default = Color3.fromRGB(70, 220, 110),
     Title = 'Fill Color 1',
     Callback = function(Color)
-        matcha.ESPBoxFillColor1 = Color
-    end
-}):AddColorPicker('ESPBoxFillColor2', {
-    Default = Color3.fromRGB(0, 100, 0),
-    Title = 'Fill Color 2',
-    Callback = function(Color)
-        matcha.ESPBoxFillColor2 = Color
+        matcha.ESPBoxFillColor = Color
     end
 }):AddColorPicker('ESPBoxFillTargetColor', {
     Default = Color3.fromRGB(255, 0, 0),
@@ -2461,7 +2455,7 @@ esp.add_player = function(player)
     new_esp.health_bar_outline.Visible = false  
     new_esp.health_bar_outline.Color = Color3.new(0, 0, 0)  
       
-    new_esp.health_bar_inline.Thickness = 3  
+    new_esp.health_bar_inline.Thickness = 1  
     new_esp.health_bar_inline.Visible = false  
       
     new_esp.health_text.Color = Color3.new(1, 1, 1)  
