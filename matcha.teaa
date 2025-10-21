@@ -153,7 +153,6 @@ getgenv().matcha = {
     AntiFlingEnabled = false,
 
     -- ESP Variables
-    ESPEnabled = false,
     ESPTeamCheck = false,
     ESPOnlyTarget = false,
     ESPSelf = false,
@@ -161,7 +160,7 @@ getgenv().matcha = {
     ESPBoxesColor = Color3.fromRGB(70, 220, 110),
     ESPBoxesOutlineColor = Color3.fromRGB(0, 0, 0),
     ESPBoxesTargetColor = Color3.fromRGB(255, 0, 0),
-    ESPBoxesType = "Full",
+    ESPBoxMode = "2D",  -- Default mode: "2D", "Corner", "3D"
     ESPBoxFill = false,
     ESPBoxFillColor = Color3.fromRGB(70, 220, 110),
     ESPBoxFillTransparency = 0.5,
@@ -2049,15 +2048,6 @@ end)
 -- Groupbox cho ESP trong World tab
 local ESPGroup = Tabs.World:AddLeftGroupbox('ESP')
 
--- Toggle ESP chính
-ESPGroup:AddToggle('ESPEnabled', {
-    Text = 'Enabled',
-    Default = false,
-    Callback = function(Value)
-        getgenv().matcha.ESPEnabled = Value
-    end
-})
-
 ESPGroup:AddToggle('ESPBoxes', {
     Text = 'Boxes',
     Default = false,
@@ -2083,12 +2073,12 @@ ESPGroup:AddToggle('ESPBoxes', {
         matcha.ESPBoxesTargetColor = Color
     end
 })
-ESPGroup:AddDropdown('ESPBoxesType', {
-    Values = {'Full', 'UICorner'},
-    Default = 'Full',
-    Text = 'Box Type',
+ESPGroup:AddDropdown('ESPBoxMode', {
+    Values = {'2D', 'Corner', '3D'},
+    Default = '2D',
+    Text = 'Box Mode',
     Callback = function(Value)
-        matcha.ESPBoxesType = Value
+        getgenv().matcha.ESPBoxMode = Value
     end
 })
 
@@ -2394,6 +2384,63 @@ local esp = {}; do
 esp.players = {};
 esp.fading = {};  -- Để quản lý fade (giữ nhưng không dùng vì fade global)
 
+local function get_bounding_box(instance)
+    local min, max = Vector2.new(math.huge, math.huge), Vector2.new(-math.huge, -math.huge)
+    local onscreen = false
+
+    if instance:IsA("Model") then
+        for _, p in ipairs(instance:GetChildren()) do
+            if p:IsA("BasePart") then
+                local size = (p.Size / 2) * 1.15  -- Padding từ lib
+                local cf = p.CFrame
+                for _, offset in ipairs({
+                    Vector3.new( size.X,  size.Y,  size.Z),
+                    Vector3.new(-size.X,  size.Y,  size.Z),
+                    Vector3.new( size.X, -size.Y,  size.Z),
+                    Vector3.new(-size.X, -size.Y,  size.Z),
+                    Vector3.new( size.X,  size.Y, -size.Z),
+                    Vector3.new(-size.X,  size.Y, -size.Z),
+                    Vector3.new( size.X, -size.Y, -size.Z),
+                    Vector3.new(-size.X, -size.Y, -size.Z),
+                }) do
+                    local pos, visible = Camera:WorldToViewportPoint(cf:PointToWorldSpace(offset))
+                    if visible then
+                        local v2 = Vector2.new(pos.X, pos.Y)
+                        min = min:Min(v2)
+                        max = max:Max(v2)
+                        onscreen = true
+                    end
+                end
+            elseif p:IsA("Accessory") then
+                local handle = p:FindFirstChild("Handle")
+                if handle and handle:IsA("BasePart") then
+                    local size = (handle.Size / 2) * 1.15
+                    local cf = handle.CFrame
+                    for _, offset in ipairs({
+                        Vector3.new( size.X,  size.Y,  size.Z),
+                        Vector3.new(-size.X,  size.Y,  size.Z),
+                        Vector3.new( size.X, -size.Y,  size.Z),
+                        Vector3.new(-size.X, -size.Y,  size.Z),
+                        Vector3.new( size.X,  size.Y, -size.Z),
+                        Vector3.new(-size.X,  size.Y, -size.Z),
+                        Vector3.new( size.X, -size.Y, -size.Z),
+                        Vector3.new(-size.X, -size.Y, -size.Z),
+                    }) do
+                        local pos, visible = Camera:WorldToViewportPoint(cf:PointToWorldSpace(offset))
+                        if visible then
+                            local v2 = Vector2.new(pos.X, pos.Y)
+                            min = min:Min(v2)
+                            max = max:Max(v2)
+                            onscreen = true
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return min, max, onscreen
+end
+
 esp.add_player = function(player)  
     if esp.players[player] then   
         esp.remove_player(player)   
@@ -2409,24 +2456,47 @@ esp.add_player = function(player)
         health_text = Drawing.new("Text"),  
         distance = Drawing.new("Text"),  
         equipped_item = Drawing.new("Text"),  
-        skeleton_lines = {  
-            Drawing.new("Line"), -- 1: head to upper torso  
-            Drawing.new("Line"), -- 2: upper torso to lower torso  
-            Drawing.new("Line"), -- 3: upper torso to left upper arm  
-            Drawing.new("Line"), -- 4: left upper arm to left lower arm  
-            Drawing.new("Line"), -- 5: left lower arm to left hand  
-            Drawing.new("Line"), -- 6: upper torso to right upper arm  
-            Drawing.new("Line"), -- 7: right upper arm to right lower arm  
-            Drawing.new("Line"), -- 8: right lower arm to right hand  
-            Drawing.new("Line"), -- 9: lower torso to left upper leg  
-            Drawing.new("Line"), -- 10: left upper leg to left lower leg  
-            Drawing.new("Line"), -- 11: left lower leg to left foot  
-            Drawing.new("Line"), -- 12: lower torso to right upper leg  
-            Drawing.new("Line"), -- 13: right upper leg to right lower leg  
-            Drawing.new("Line")  -- 14: right lower leg to right foot  
+       skeleton_lines = {  
+            Drawing.new("Line"), Drawing.new("Line"), Drawing.new("Line"), Drawing.new("Line"),  
+            Drawing.new("Line"), Drawing.new("Line"), Drawing.new("Line"), Drawing.new("Line"),  
+            Drawing.new("Line"), Drawing.new("Line"), Drawing.new("Line"), Drawing.new("Line"),  
+            Drawing.new("Line"), Drawing.new("Line")  
         },  
-        tracer = Drawing.new("Line")  
+        tracer = Drawing.new("Line"),  
+        corner_outer_lines = {},  -- 8 outer lines cho Corner
+        corner_inner_lines = {},  -- 8 inner lines cho Corner
+        three_d_lines = {},  -- 12 lines cho 3D
+        three_d_quads = {}   -- 5 quads cho 3D
     };  
+    for i = 1, 8 do
+        local outer = Drawing.new("Line")
+        outer.Thickness = 3  -- Dày cho outline
+        outer.Visible = false
+        table.insert(new_esp.corner_outer_lines, outer)
+        
+        local inner = Drawing.new("Line")
+        inner.Thickness = 1  -- Mỏng cho inline như lib
+        inner.Visible = false
+        table.insert(new_esp.corner_inner_lines, inner)
+    end
+    
+    -- Khởi tạo 3D lines (12 lines từ ví dụ)
+    for i = 1, 12 do
+        local line = Drawing.new("Line")
+        line.Thickness = 1
+        line.Visible = false
+        table.insert(new_esp.three_d_lines, line)
+    end
+    
+    -- Khởi tạo 3D quads (5 quads từ ví dụ: bottom, 4 sides)
+    for i = 1, 5 do
+        local quad = Drawing.new("Quad")
+        quad.Thickness = 0.5
+        quad.Filled = true
+        quad.Transparency = 0.25
+        quad.Visible = false
+        table.insert(new_esp.three_d_quads, quad)
+    end
       
     -- Cấu hình mặc định  
     new_esp.box_outline.Thickness = 1  
