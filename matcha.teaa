@@ -2577,7 +2577,7 @@ local function esp_add_player(player)
 
     for i = 1, 8 do
         local outline = Drawing.new("Line")
-        outline.Thickness = 1
+        outline.Thickness = 3
         outline.Transparency = 1
         outline.Visible = false
 
@@ -2641,7 +2641,7 @@ local function esp_add_player(player)
     new_esp.tracer.Thickness = getgenv().matcha.ESPTracerThickness
     new_esp.tracer.Visible = false
 
-    new_esp.tracer_outline.Thickness = getgenv().matcha.ESPTracerThickness
+    new_esp.tracer_outline.Thickness = getgenv().matcha.ESPTracerThickness + 2
     new_esp.tracer_outline.Visible = false
 
     new_esp.armor_bar_outline.Thickness = 1
