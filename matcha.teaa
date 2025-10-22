@@ -2341,7 +2341,14 @@ ESP2Group:AddToggle('ESPTracer', {
     Callback = function(Color)
         matcha.ESPTracerColor = Color
     end
-}):AddDropdown('ESPTracerType', {
+}):AddColorPicker('ESPTracerOutlineColor', {
+    Default = Color3.fromRGB(0, 0, 0),
+    Title = 'Tracer Outline Color',
+    Callback = function(Color)
+        getgenv().matcha.ESPTracerOutlineColor = Color
+    end
+})
+ESP2Group:AddDropdown('ESPTracerType', {
     Values = {'Cursor', 'Bottom Screen', 'Top Screen'},
     Default = 'Cursor',
     Text = 'Tracer Type',
@@ -2358,6 +2365,849 @@ ESP2Group:AddSlider('ESPTracerThickness', {
     Rounding = 0,
     Callback = function(Value)
         matcha.ESPTracerThickness = Value
+    end
+})
+
+-- 🌿 Thêm biến mới vào getgenv().matcha (chỉ các biến chưa có, bao gồm tất cả liên quan)
+getgenv().matcha.ESPEnabled = true  -- Để bật tổng ESP, giả sử chưa có
+getgenv().matcha.ESPArmorBar = false
+getgenv().matcha.ESPArmorBarColor = Color3.fromRGB(70, 220, 110)
+getgenv().matcha.ESPArrow = false
+getgenv().matcha.ESPArrowColor = Color3.fromRGB(70, 220, 110)
+getgenv().matcha.ESPArrowTargetColor = Color3.fromRGB(255, 0, 0)
+getgenv().matcha.ESPTracerOutlineColor = Color3.fromRGB(0, 0, 0)
+getgenv().matcha.ESPToolMaterial = false
+getgenv().matcha.DistFromCenterSize = 100  -- Cho arrow size
+
+-- 🌿 Hàm check game là Da Hood
+local function isDaHood()
+    for _, tool in ipairs(workspace:GetDescendants()) do
+        if tool:IsA("Tool") and (tool:FindFirstChild("Ammo") or tool:FindFirstChild("AmmoCount") or tool:FindFirstChild("GunScript")) then
+            return true
+        end
+    end
+    return false
+end
+
+-- 🌿 Logic ESP Fade (áp dụng cho tất cả chức năng ESP nếu bật)
+local fading = {}  -- Per player fading
+local function updateFading(player, dt)
+    if not fading[player] then
+        fading[player] = {value = 0, direction = 1}
+    end
+    local fade = fading[player]
+    fade.value = fade.value + fade.direction * (getgenv().matcha.ESPFadeSpeed / 100) * dt * 60
+    if fade.value <= 0 then
+        fade.value = 0
+        fade.direction = 1
+    elseif fade.value >= 1 then
+        fade.value = 1
+        fade.direction = -1
+    end
+    return getgenv().matcha.ESPFaded and fade.value or 1
+end
+
+-- 🌿 Logic Chams và SelfChams (sử dụng Highlight cho chams, material cho parts)
+local chamsHighlights = {}
+local function applyChams(player)
+    local char = player.Character
+    if not char or not getgenv().matcha.ESPChams then
+        if chamsHighlights[player] then
+            chamsHighlights[player]:Destroy()
+            chamsHighlights[player] = nil
+        end
+        return
+    end
+
+    if not chamsHighlights[player] then
+        local hl = Instance.new("Highlight")
+        hl.Parent = game.CoreGui
+        chamsHighlights[player] = hl
+    end
+
+    local hl = chamsHighlights[player]
+    hl.Adornee = char
+    hl.Enabled = true
+    hl.OutlineColor = getgenv().matcha.ESPChamsOutlineColor
+    hl.FillColor = getgenv().matcha.ESPChamsFillColor
+    hl.FillTransparency = getgenv().matcha.ESPChamsFillHighlight and 0.5 or 1
+    hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+
+    if getgenv().matcha.ESPChamsMaterial then
+        for _, part in pairs(char:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.Material = Enum.Material[getgenv().matcha.ESPChamsMaterialType]
+            end
+        end
+    end
+end
+
+local function applySelfChams()
+    local selfChar = LocalPlayer.Character
+    if not selfChar or not getgenv().matcha.ESPSelfChams then return end
+
+    for _, part in pairs(selfChar:GetDescendants()) do
+        if part:IsA("BasePart") then
+            if not part:FindFirstChild("SelfChamsHL") then
+                local hl = Instance.new("Highlight")
+                hl.Name = "SelfChamsHL"
+                hl.FillColor = getgenv().matcha.ESPSelfChamsColor
+                hl.Enabled = true
+                hl.Parent = part
+            end
+            if getgenv().matcha.ESPSelfMaterial then
+                part.Material = Enum.Material[getgenv().matcha.ESPChamsMaterialType]
+            end
+            if getgenv().matcha.ESPToolMaterial and part.Parent:IsA("Tool") then
+                part.Material = Enum.Material[getgenv().matcha.ESPChamsMaterialType]
+            end
+        end
+    end
+end
+
+-- 🌿 Hàm helper từ các code
+local function get_bounding_box(instance)
+    local min, max = Vector2.new(math.huge, math.huge), Vector2.new(-math.huge, -math.huge)
+    local onscreen = false
+
+    if instance:IsA("Model") then
+        for _, p in ipairs(instance:GetChildren()) do
+            if p:IsA("BasePart") then
+                local size = (p.Size / 2) * 1.15  -- Padding default
+                local cf = p.CFrame
+                for _, offset in ipairs({
+                    Vector3.new(size.X, size.Y, size.Z), Vector3.new(-size.X, size.Y, size.Z),
+                    Vector3.new(size.X, -size.Y, size.Z), Vector3.new(-size.X, -size.Y, size.Z),
+                    Vector3.new(size.X, size.Y, -size.Z), Vector3.new(-size.X, size.Y, -size.Z),
+                    Vector3.new(size.X, -size.Y, -size.Z), Vector3.new(-size.X, -size.Y, -size.Z),
+                }) do
+                    local pos, visible = Camera:WorldToViewportPoint(cf * offset)
+                    if visible then
+                        local v2 = Vector2.new(pos.X, pos.Y)
+                        min = min:Min(v2)
+                        max = max:Max(v2)
+                        onscreen = true
+                    end
+                end
+            end -- Thêm cho Accessory nếu cần
+        end
+    end
+    return min, max, onscreen
+end
+
+local function GetCorners(part)
+    local CF, Size = part.CFrame, part.Size / 2
+    local Corners = {}
+    for X = -1, 1, 2 do for Y = -1, 1, 2 do for Z = -1, 1, 2 do
+        table.insert(Corners, (CF * CFrame.new(Size * Vector3.new(X, Y, Z))).Position)
+    end end end
+    return Corners
+end
+
+local function DrawLine(From, To, color, thickness, transparency, visible)
+    local fromScreen, fromVis = Camera:WorldToViewportPoint(From)
+    local toScreen, toVis = Camera:WorldToViewportPoint(To)
+    if not fromVis and not toVis then return nil end
+    local line = Drawing.new("Line")
+    line.From = Vector2.new(fromScreen.X, fromScreen.Y)
+    line.To = Vector2.new(toScreen.X, toScreen.Y)
+    line.Color = color
+    line.Thickness = thickness or 1
+    line.Transparency = transparency or 1
+    line.Visible = visible or false
+    return line
+end
+
+local function DrawQuad(PosA, PosB, PosC, PosD, color, thickness, transparency, filled, visible)
+    local posAScreen, aVis = Camera:WorldToViewportPoint(PosA)
+    local posBScreen, bVis = Camera:WorldToViewportPoint(PosB)
+    local posCScreen, cVis = Camera:WorldToViewportPoint(PosC)
+    local posDScreen, dVis = Camera:WorldToViewportPoint(PosD)
+    if not (aVis or bVis or cVis or dVis) then return nil end
+    local quad = Drawing.new("Quad")
+    quad.PointA = Vector2.new(posAScreen.X, posAScreen.Y)
+    quad.PointB = Vector2.new(posBScreen.X, posBScreen.Y)
+    quad.PointC = Vector2.new(posCScreen.X, posCScreen.Y)
+    quad.PointD = Vector2.new(posDScreen.X, posDScreen.Y)
+    quad.Color = color
+    quad.Thickness = thickness or 0.5
+    quad.Transparency = transparency or 0.25
+    quad.Filled = filled or true
+    quad.Visible = visible or false
+    return quad
+end
+
+-- 🌿 ESPLib: add_player (gộp tất cả drawings)
+local esplib = {}
+esplib.players = {}
+
+local function esp_add_player(player)
+    if esplib.players[player] then esp_remove_player(player) end
+
+    local new_esp = {
+        box_outline = Drawing.new("Square"),
+        box_inline = Drawing.new("Square"),
+        name = Drawing.new("Text"),
+        head_dot_inline = Drawing.new("Circle"),
+        head_dot_outline = Drawing.new("Circle"),
+        health_bar_outline = Drawing.new("Line"),
+        health_bar_inline = Drawing.new("Line"),
+        health_text = Drawing.new("Text"),
+        distance = Drawing.new("Text"),
+        equipped_item = Drawing.new("Text"),
+        skeleton_lines = {},
+        chams = Instance.new("Highlight"),
+        tracer = Drawing.new("Line"),
+        tracer_outline = Drawing.new("Line"),
+        armor_bar_outline = Drawing.new("Line"),
+        armor_bar_inline = Drawing.new("Line"),
+        arrow_lines = {},  -- 3 lines for arrow
+        corner_fill = {}, corner_outline = {},  -- Cho corner box
+        lines3d = {}, quads3d = {}  -- Cho 3D box
+    }
+
+    -- Config default
+    new_esp.box_outline.Thickness = 1
+    new_esp.box_outline.Filled = false
+    new_esp.box_outline.Visible = false
+
+    new_esp.box_inline.Thickness = 1
+    new_esp.box_inline.Filled = false
+    new_esp.box_inline.Visible = false
+
+    for i = 1, 8 do
+        local outline = Drawing.new("Line")
+        outline.Thickness = 3
+        outline.Transparency = 1
+        outline.Visible = false
+
+        local fill = Drawing.new("Line")
+        fill.Thickness = 1
+        fill.Transparency = 1
+        fill.Visible = false
+        table.insert(new_esp.corner_fill, fill)
+        table.insert(new_esp.corner_outline, outline)
+    end
+
+    new_esp.name.Outline = true
+    new_esp.name.Center = true
+    new_esp.name.Size = 13
+    new_esp.name.Visible = false
+
+    new_esp.head_dot_inline.Radius = getgenv().matcha.ESPHeadDotSize
+    new_esp.head_dot_inline.Thickness = 1
+    new_esp.head_dot_inline.Visible = false
+
+    new_esp.head_dot_outline.Radius = getgenv().matcha.ESPHeadDotSize + 2
+    new_esp.head_dot_outline.Thickness = 1
+    new_esp.head_dot_outline.Color = Color3.new(0, 0, 0)
+    new_esp.head_dot_outline.Visible = false
+
+    new_esp.health_bar_outline.Thickness = 1
+    new_esp.health_bar_outline.Color = Color3.new(0, 0, 0)
+    new_esp.health_bar_outline.Visible = false
+
+    new_esp.health_bar_inline.Thickness = 3
+    new_esp.health_bar_inline.Visible = false
+
+    new_esp.health_text.Color = Color3.new(1, 1, 1)
+    new_esp.health_text.Size = 12
+    new_esp.health_text.Outline = true
+    new_esp.health_text.Center = true
+    new_esp.health_text.Visible = false
+
+    new_esp.distance.Color = Color3.new(1, 1, 1)
+    new_esp.distance.Size = 12
+    new_esp.distance.Outline = true
+    new_esp.distance.Center = true
+    new_esp.distance.Visible = false
+
+    new_esp.equipped_item.Color = Color3.new(1, 1, 1)
+    new_esp.equipped_item.Size = 12
+    new_esp.equipped_item.Outline = true
+    new_esp.equipped_item.Center = true
+    new_esp.equipped_item.Visible = false
+
+    for i = 1, 14 do
+        local line = Drawing.new("Line")
+        line.Thickness = 1
+        line.Visible = false
+        table.insert(new_esp.skeleton_lines, line)
+    end
+
+    new_esp.chams.Enabled = false
+    new_esp.chams.Parent = game.CoreGui
+
+    new_esp.tracer.Thickness = getgenv().matcha.ESPTracerThickness
+    new_esp.tracer.Visible = false
+
+    new_esp.tracer_outline.Thickness = getgenv().matcha.ESPTracerThickness + 2
+    new_esp.tracer_outline.Visible = false
+
+    new_esp.armor_bar_outline.Thickness = 1
+    new_esp.armor_bar_outline.Color = Color3.new(0, 0, 0)
+    new_esp.armor_bar_outline.Visible = false
+
+    new_esp.armor_bar_inline.Thickness = 3
+    new_esp.armor_bar_inline.Visible = false
+
+    for i = 1, 3 do
+        local line = Drawing.new("Line")
+        line.Thickness = 1
+        line.Visible = false
+        table.insert(new_esp.arrow_lines, line)
+    end
+
+    esplib.players[player] = new_esp
+end
+
+local function esp_remove_player(player)
+    local esp_obj = esplib.players[player]
+    if not esp_obj then return end
+
+    esp_obj.box_outline:Remove()
+    esp_obj.box_inline:Remove()
+    for _, line in ipairs(esp_obj.corner_fill) do line:Remove() end
+    for _, line in ipairs(esp_obj.corner_outline) do line:Remove() end
+    esp_obj.name:Remove()
+    esp_obj.head_dot_inline:Remove()
+    esp_obj.head_dot_outline:Remove()
+    esp_obj.health_bar_outline:Remove()
+    esp_obj.health_bar_inline:Remove()
+    esp_obj.health_text:Remove()
+    esp_obj.distance:Remove()
+    esp_obj.equipped_item:Remove()
+    for _, line in ipairs(esp_obj.skeleton_lines) do line:Remove() end
+    esp_obj.chams:Destroy()
+    esp_obj.tracer:Remove()
+    esp_obj.tracer_outline:Remove()
+    esp_obj.armor_bar_outline:Remove()
+    esp_obj.armor_bar_inline:Remove()
+    for _, line in ipairs(esp_obj.arrow_lines) do line:Remove() end
+    for _, line in ipairs(esp_obj.lines3d) do line:Remove() end
+    for _, quad in ipairs(esp_obj.quads3d) do quad:Remove() end
+
+    esplib.players[player] = nil
+    fading[player] = nil
+end
+
+-- 🌿 Main RunService.Heartbeat loop (full chi tiết, lấy biến trực tiếp từ getgenv().matcha, no separate separate settings fetch)
+RunService.Heartbeat:Connect(function(dt)
+    if not getgenv().matcha.ESPEnabled then return end
+
+    -- Add ESP if not present and conditions met
+    for _, player in ipairs(Players:GetPlayers()) do
+        if not esplib.players[player] then
+            if (player ~= LocalPlayer or getgenv().matcha.ESPSelf) then
+                local char = player.Character
+                if char and char:FindFirstChild("HumanoidRootPart") and char:FindFirstChild("Head") then
+                    local _, on_screen = Camera:WorldToViewportPoint(char.HumanoidRootPart.Position)
+                    local is_target = getgenv().matcha.SelectedTarget == player
+                    if on_screen and (not getgenv().matcha.ESPOnlyTarget or is_target) and (not getgenv().matcha.ESPTeamCheck or player.Team ~= LocalPlayer.Team) then
+                        esp_add_player(player)
+                    end
+                end
+            end
+        end
+    end
+
+    -- Loop per player
+    for player, esp_obj in pairs(esplib.players) do
+        if player == LocalPlayer and not getgenv().matcha.ESPSelf then continue end
+        if getgenv().matcha.ESPOnlyTarget and player ~= getgenv().matcha.SelectedTarget then continue end
+        if getgenv().matcha.ESPTeamCheck and player.Team == LocalPlayer.Team then continue end
+
+        local char = player.Character
+        if not char or not char:FindFirstChild("HumanoidRootPart") or not char:FindFirstChild("Head") then
+            esp_remove_player(player)
+            continue
+        end
+
+        local hrp = char.HumanoidRootPart
+        local head = char:FindFirstChild("Head")
+        local humanoid = char:FindFirstChildOfClass("Humanoid")
+        local tool = char:FindFirstChildOfClass("Tool")
+
+        local screen_pos, on_screen = Camera:WorldToViewportPoint(hrp.Position)
+        local screen_pos_head, on_screen_head = Camera:WorldToViewportPoint(head.Position)
+
+        if not on_screen then
+            -- Arrow ESP nếu bật
+            if getgenv().matcha.ESPArrow then
+                local dir = Camera:WorldToScreenPoint(hrp.Position)
+                local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+                local delta = Vector2.new(dir.X, dir.Y) - center
+                local dist = delta.Magnitude
+                if dist > 0 then
+                    local normalized = delta / dist
+                    local arrowPos = center + normalized * getgenv().matcha.DistFromCenterSize
+                    local size = 10  -- Size mũi tên
+                    local is_target = getgenv().matcha.SelectedTarget == player
+                    local color = is_target and getgenv().matcha.ESPArrowTargetColor or getgenv().matcha.ESPArrowColor
+
+                    -- Vẽ 3 lines thành mũi tên
+                    local rot = math.atan2(normalized.Y, normalized.X) + math.pi / 2
+                    local cosR = math.cos(rot)
+                    local sinR = math.sin(rot)
+                    local offset1 = Vector2.new(size * cosR, size * sinR)
+                    local offset2 = Vector2.new(-size * cosR, -size * sinR)
+                    esp_obj.arrow_lines[1].From = arrowPos - offset1
+                    esp_obj.arrow_lines[1].To = arrowPos
+                    esp_obj.arrow_lines[1].Color = color
+                    esp_obj.arrow_lines[1].Visible = true
+                    esp_obj.arrow_lines[1].Transparency = 1  -- Arrow không fade
+
+                    esp_obj.arrow_lines[2].From = arrowPos - offset2
+                    esp_obj.arrow_lines[2].To = arrowPos
+                    esp_obj.arrow_lines[2].Color = color
+                    esp_obj.arrow_lines[2].Visible = true
+                    esp_obj.arrow_lines[2].Transparency = 1
+
+                    esp_obj.arrow_lines[3].From = arrowPos - offset1
+                    esp_obj.arrow_lines[3].To = arrowPos - offset2
+                    esp_obj.arrow_lines[3].Color = color
+                    esp_obj.arrow_lines[3].Visible = true
+                    esp_obj.arrow_lines[3].Transparency = 1
+                end
+            else
+                esp_obj.arrow_lines[1].Visible = false
+                esp_obj.arrow_lines[2].Visible = false
+                esp_obj.arrow_lines[3].Visible = false
+            end
+
+            -- Ẩn tất cả các phần khác
+            esp_obj.box_outline.Visible = false
+            esp_obj.box_inline.Visible = false
+            for _, l in ipairs(esp_obj.corner_fill) do l.Visible = false end
+            for _, l in ipairs(esp_obj.corner_outline) do l.Visible = false end
+            esp_obj.name.Visible = false
+            esp_obj.head_dot_inline.Visible = false
+            esp_obj.head_dot_outline.Visible = false
+            esp_obj.health_bar_outline.Visible = false
+            esp_obj.health_bar_inline.Visible = false
+            esp_obj.health_text.Visible = false
+            esp_obj.distance.Visible = false
+            esp_obj.equipped_item.Visible = false
+            for _, l in ipairs(esp_obj.skeleton_lines) do l.Visible = false end
+            esp_obj.tracer.Visible = false
+            esp_obj.tracer_outline.Visible = false
+            esp_obj.armor_bar_outline.Visible = false
+            esp_obj.armor_bar_inline.Visible = false
+            for _, l in ipairs(esp_obj.lines3d) do l:Remove() end
+            esp_obj.lines3d = {}
+            for _, q in ipairs(esp_obj.quads3d) do q:Remove() end
+            esp_obj.quads3d = {}
+            esp_obj.chams.Enabled = false
+
+            continue
+        end
+
+        -- Nếu on_screen, ẩn arrow
+        esp_obj.arrow_lines[1].Visible = false
+        esp_obj.arrow_lines[2].Visible = false
+        esp_obj.arrow_lines[3].Visible = false
+
+        local scale = 1000 / (Camera.CFrame.Position - hrp.Position).Magnitude
+        local box_size = Vector2.new(3 * scale, 4.5 * scale)
+        local box_position = Vector2.new(screen_pos.X - box_size.X / 2, screen_pos.Y - box_size.Y / 2)
+
+        local outline_offset = 2
+        local box_outline_size = box_size + Vector2.new(outline_offset, outline_offset)
+        local box_outline_position = box_position - Vector2.new(outline_offset / 2, outline_offset / 2)
+
+        local is_target = getgenv().matcha.SelectedTarget == player
+
+        local transparency = updateFading(player, dt)
+
+        -- Boxes
+        if getgenv().matcha.ESPBoxes then
+            if getgenv().matcha.ESPBoxMode == "3D" then
+                -- Cleanup 2D
+                esp_obj.box_outline.Visible = false
+                esp_obj.box_inline.Visible = false
+                for _, l in ipairs(esp_obj.corner_fill) do l.Visible = false end
+                for _, l in ipairs(esp_obj.corner_outline) do l.Visible = false end
+
+                -- Vẽ 3D
+                local cubeVertices = GetCorners({CFrame = hrp.CFrame * CFrame.new(0, -0.5, 0), Size = Vector3.new(3, 5, 3)})
+
+                -- Bottom face
+                local l1 = DrawLine(cubeVertices[1], cubeVertices[2], getgenv().matcha.ESPBoxesColor, 1, transparency, true)
+                local l2 = DrawLine(cubeVertices[2], cubeVertices[6], getgenv().matcha.ESPBoxesColor, 1, transparency, true)
+                local l3 = DrawLine(cubeVertices[6], cubeVertices[5], getgenv().matcha.ESPBoxesColor, 1, transparency, true)
+                local l4 = DrawLine(cubeVertices[5], cubeVertices[1], getgenv().matcha.ESPBoxesColor, 1, transparency, true)
+                local q1 = DrawQuad(cubeVertices[1], cubeVertices[2], cubeVertices[6], cubeVertices[5], getgenv().matcha.ESPBoxesColor, 1, transparency, true, true)
+                table.insert(esp_obj.lines3d, l1)
+                table.insert(esp_obj.lines3d, l2)
+                table.insert(esp_obj.lines3d, l3)
+                table.insert(esp_obj.lines3d, l4)
+                table.insert(esp_obj.quads3d, q1)
+
+                -- Side faces
+                local l5 = DrawLine(cubeVertices[1], cubeVertices[3], getgenv().matcha.ESPBoxesColor, 1, transparency, true)
+                local l6 = DrawLine(cubeVertices[2], cubeVertices[4], getgenv().matcha.ESPBoxesColor, 1, transparency, true)
+                local l7 = DrawLine(cubeVertices[6], cubeVertices[8], getgenv().matcha.ESPBoxesColor, 1, transparency, true)
+                local l8 = DrawLine(cubeVertices[5], cubeVertices[7], getgenv().matcha.ESPBoxesColor, 1, transparency, true)
+                local q2 = DrawQuad(cubeVertices[2], cubeVertices[4], cubeVertices[8], cubeVertices[6], getgenv().matcha.ESPBoxesColor, 1, transparency, true, true)
+                local q3 = DrawQuad(cubeVertices[1], cubeVertices[2], cubeVertices[4], cubeVertices[3], getgenv().matcha.ESPBoxesColor, 1, transparency, true, true)
+                local q4 = DrawQuad(cubeVertices[1], cubeVertices[5], cubeVertices[7], cubeVertices[3], getgenv().matcha.ESPBoxesColor, 1, transparency, true, true)
+                local q5 = DrawQuad(cubeVertices[5], cubeVertices[7], cubeVertices[8], cubeVertices[6], getgenv().matcha.ESPBoxesColor, 1, transparency, true, true)
+                table.insert(esp_obj.lines3d, l5)
+                table.insert(esp_obj.lines3d, l6)
+                table.insert(esp_obj.lines3d, l7)
+                table.insert(esp_obj.lines3d, l8)
+                table.insert(esp_obj.quads3d, q2)
+                table.insert(esp_obj.quads3d, q3)
+                table.insert(esp_obj.quads3d, q4)
+                table.insert(esp_obj.quads3d, q5)
+
+                -- Top face
+                local l9 = DrawLine(cubeVertices[3], cubeVertices[4], getgenv().matcha.ESPBoxesColor, 1, transparency, true)
+                local l10 = DrawLine(cubeVertices[4], cubeVertices[8], getgenv().matcha.ESPBoxesColor, 1, transparency, true)
+                local l11 = DrawLine(cubeVertices[8], cubeVertices[7], getgenv().matcha.ESPBoxesColor, 1, transparency, true)
+                local l12 = DrawLine(cubeVertices[7], cubeVertices[3], getgenv().matcha.ESPBoxesColor, 1, transparency, true)
+                local q6 = DrawQuad(cubeVertices[3], cubeVertices[4], cubeVertices[8], cubeVertices[7], getgenv().matcha.ESPBoxesColor, 1, transparency, true, true)
+                table.insert(esp_obj.lines3d, l9)
+                table.insert(esp_obj.lines3d, l10)
+                table.insert(esp_obj.lines3d, l11)
+                table.insert(esp_obj.lines3d, l12)
+                table.insert(esp_obj.quads3d, q6)
+            elseif getgenv().matcha.ESPBoxMode == "Corner" then
+                -- Cleanup 3D
+                for _, l in ipairs(esp_obj.lines3d) do l:Remove() end
+                esp_obj.lines3d = {}
+                for _, q in ipairs(esp_obj.quads3d) do q:Remove() end
+                esp_obj.quads3d = {}
+
+                -- Vẽ corner
+                esp_obj.box_outline.Visible = false
+                esp_obj.box_inline.Visible = false
+
+                local x, y = box_position.X, box_position.Y
+                local w, h = box_size.X, box_size.Y
+                local len = math.min(w, h) * 0.25
+
+                local corners = {
+                    { Vector2.new(x, y), Vector2.new(x + len, y) },
+                    { Vector2.new(x, y), Vector2.new(x, y + len) },
+                    { Vector2.new(x + w - len, y), Vector2.new(x + w, y) },
+                    { Vector2.new(x + w, y), Vector2.new(x + w, y + len) },
+                    { Vector2.new(x, y + h), Vector2.new(x + len, y + h) },
+                    { Vector2.new(x, y + h - len), Vector2.new(x, y + h) },
+                    { Vector2.new(x + w - len, y + h), Vector2.new(x + w, y + h) },
+                    { Vector2.new(x + w, y + h - len), Vector2.new(x + w, y + h) },
+                }
+
+                for i = 1, 8 do
+                    local from, to = corners[i][1], corners[i][2]
+                    local dir = (to - from).Unit
+                    local oFrom = from - dir
+                    local oTo = to + dir
+
+                    local o = esp_obj.corner_outline[i]
+                    o.From = oFrom
+                    o.To = oTo
+                    o.Color = getgenv().matcha.ESPBoxesOutlineColor
+                    o.Visible = true
+                    o.Transparency = transparency
+
+                    local f = esp_obj.corner_fill[i]
+                    f.From = from
+                    f.To = to
+                    f.Color = is_target and getgenv().matcha.ESPBoxesTargetColor or getgenv().matcha.ESPBoxesColor
+                    f.Visible = true
+                    f.Transparency = transparency
+                end
+            else  -- 2D normal
+                -- Cleanup 3D and corner
+                for _, l in ipairs(esp_obj.lines3d) do l:Remove() end
+                esp_obj.lines3d = {}
+                for _, q in ipairs(esp_obj.quads3d) do q:Remove() end
+                esp_obj.quads3d = {}
+                for _, l in ipairs(esp_obj.corner_fill) do l.Visible = false end
+                for _, l in ipairs(esp_obj.corner_outline) do l.Visible = false end
+
+                -- Vẽ normal
+                esp_obj.box_outline.Size = box_outline_size
+                esp_obj.box_outline.Position = box_outline_position
+                esp_obj.box_outline.Color = getgenv().matcha.ESPBoxesOutlineColor
+                esp_obj.box_outline.Transparency = transparency
+                esp_obj.box_outline.Visible = true
+
+                esp_obj.box_inline.Size = box_size
+                esp_obj.box_inline.Position = box_position
+                esp_obj.box_inline.Color = is_target and getgenv().matcha.ESPBoxesTargetColor or getgenv().matcha.ESPBoxesColor
+                esp_obj.box_inline.Transparency = transparency
+                esp_obj.box_inline.Visible = true
+            end
+        else
+            esp_obj.box_outline.Visible = false
+            esp_obj.box_inline.Visible = false
+            for _, l in ipairs(esp_obj.corner_fill) do l.Visible = false end
+            for _, l in ipairs(esp_obj.corner_outline) do l.Visible = false end
+            for _, l in ipairs(esp_obj.lines3d) do l:Remove() end
+            esp_obj.lines3d = {}
+            for _, q in ipairs(esp_obj.quads3d) do q:Remove() end
+            esp_obj.quads3d = {}
+        end
+
+        -- Box Fill (áp dụng cho 2D and corner, for 3D use quads)
+        if getgenv().matcha.ESPBoxFill and getgenv().matcha.ESPBoxMode ~= "3D" then
+            esp_obj.box_inline.Filled = true
+            esp_obj.box_inline.Color = is_target and getgenv().matcha.ESPBoxFillTargetColor or getgenv().matcha.ESPBoxFillColor
+            esp_obj.box_inline.Transparency = getgenv().matcha.ESPBoxFillTransparency * transparency
+        else
+            esp_obj.box_inline.Filled = false
+        end
+
+        -- Name
+        if getgenv().matcha.ESPName then
+            esp_obj.name.Visible = true
+            esp_obj.name.Text = getgenv().matcha.ESPNameType == 'DisplayName' and player.DisplayName or player.Name
+            esp_obj.name.Position = Vector2.new(box_size.X / 2 + box_position.X, box_position.Y - 16)
+            esp_obj.name.Color = getgenv().matcha.ESPNameColor
+            esp_obj.name.Transparency = transparency
+        else
+            esp_obj.name.Visible = false
+        end
+
+        -- Head Dot
+        if getgenv().matcha.ESPHeadDot and on_screen_head then
+            esp_obj.head_dot_inline.Position = Vector2.new(screen_pos_head.X, screen_pos_head.Y)
+            esp_obj.head_dot_inline.Radius = getgenv().matcha.ESPHeadDotSize
+            esp_obj.head_dot_inline.Color = getgenv().matcha.ESPHeadDotColor
+            esp_obj.head_dot_inline.Transparency = transparency
+            esp_obj.head_dot_inline.Visible = true
+
+            esp_obj.head_dot_outline.Position = Vector2.new(screen_pos_head.X, screen_pos_head.Y)
+            esp_obj.head_dot_outline.Radius = getgenv().matcha.ESPHeadDotSize + 2
+            esp_obj.head_dot_outline.Transparency = transparency
+            esp_obj.head_dot_outline.Visible = true
+        else
+            esp_obj.head_dot_inline.Visible = false
+            esp_obj.head_dot_outline.Visible = false
+        end
+
+        -- Health Bar + Text + Based Color
+        if getgenv().matcha.ESPHealthBar and humanoid then
+            local health_percentage = humanoid.Health / humanoid.MaxHealth
+            local health_bar_height = health_percentage * box_size.Y
+
+            esp_obj.health_bar_outline.From = Vector2.new(box_position.X - 5, box_position.Y + box_size.Y)
+            esp_obj.health_bar_outline.To = Vector2.new(box_position.X - 5, box_position.Y)
+            esp_obj.health_bar_outline.Transparency = transparency
+            esp_obj.health_bar_outline.Visible = true
+
+            esp_obj.health_bar_inline.From = Vector2.new(box_position.X - 5, box_position.Y + box_size.Y)
+            esp_obj.health_bar_inline.To = Vector2.new(box_position.X - 5, box_position.Y + box_size.Y - health_bar_height)
+            esp_obj.health_bar_inline.Color = getgenv().matcha.ESPHealthBasedColor and Color3.new(1 - health_percentage, health_percentage, 0) or getgenv().matcha.ESPHealthBarColor
+            esp_obj.health_bar_inline.Transparency = transparency
+            esp_obj.health_bar_inline.Visible = true
+
+            if getgenv().matcha.ESPHealthText then
+                esp_obj.health_text.Visible = true
+                esp_obj.health_text.Text = tostring(math.floor(humanoid.Health))
+                esp_obj.health_text.Position = Vector2.new(box_position.X - 5 - esp_obj.health_text.TextBounds.X / 2, box_position.Y + box_size.Y - (health_percentage * box_size.Y))
+                esp_obj.health_text.Color = getgenv().matcha.ESPHealthTextColor
+                esp_obj.health_text.Transparency = transparency
+            else
+                esp_obj.health_text.Visible = false
+            end
+        else
+            esp_obj.health_bar_outline.Visible = false
+            esp_obj.health_bar_inline.Visible = false
+            esp_obj.health_text.Visible = false
+        end
+
+        -- Distance
+        if getgenv().matcha.ESPDistance then
+            local dist = (LocalPlayer.Character.HumanoidRootPart.Position - hrp.Position).Magnitude
+            esp_obj.distance.Visible = true
+            esp_obj.distance.Text = tostring(math.floor(dist)) .. " studs"
+            esp_obj.distance.Position = Vector2.new(box_size.X / 2 + box_position.X, box_position.Y + box_size.Y + 5)
+            esp_obj.distance.Color = getgenv().matcha.ESPDistanceColor
+            esp_obj.distance.Transparency = transparency
+        else
+            esp_obj.distance.Visible = false
+        end
+
+        -- Equipped Item
+        if getgenv().matcha.ESPEquippedItem and tool then
+            esp_obj.equipped_item.Visible = true
+            esp_obj.equipped_item.Text = tool.Name
+            esp_obj.equipped_item.Position = Vector2.new(box_size.X / 2 + box_position.X, box_position.Y + box_size.Y + 20)
+            esp_obj.equipped_item.Color = getgenv().matcha.ESPEquippedItemColor
+            esp_obj.equipped_item.Transparency = transparency
+        else
+            esp_obj.equipped_item.Visible = false
+        end
+
+        -- Skeleton
+        if getgenv().matcha.ESPSkeleton then
+            local parts = {
+                head = head,
+                upper_torso = char:FindFirstChild("UpperTorso"),
+                lower_torso = char:FindFirstChild("LowerTorso"),
+                left_upper_arm = char:FindFirstChild("LeftUpperArm"),
+                left_lower_arm = char:FindFirstChild("LeftLowerArm"),
+                left_hand = char:FindFirstChild("LeftHand"),
+                right_upper_arm = char:FindFirstChild("RightUpperArm"),
+                right_lower_arm = char:FindFirstChild("RightLowerArm"),
+                right_hand = char:FindFirstChild("RightHand"),
+                left_upper_leg = char:FindFirstChild("LeftUpperLeg"),
+                left_lower_leg = char:FindFirstChild("LeftLowerLeg"),
+                left_foot = char:FindFirstChild("LeftFoot"),
+                right_upper_leg = char:FindFirstChild("RightUpperLeg"),
+                right_lower_leg = char:FindFirstChild("RightLowerLeg"),
+                right_foot = char:FindFirstChild("RightFoot")
+            }
+            if parts.upper_torso and parts.lower_torso and parts.head and parts.left_upper_arm and parts.left_lower_arm and parts.left_hand and parts.right_upper_arm and parts.right_lower_arm and parts.right_hand and parts.left_upper_leg and parts.left_lower_leg and parts.left_foot and parts.right_upper_leg and parts.right_lower_leg and parts.right_foot then
+                local connections = {
+                    {parts.head, parts.upper_torso, 1},
+                    {parts.upper_torso, parts.lower_torso, 2},
+                    {parts.upper_torso, parts.left_upper_arm, 3},
+                    {parts.left_upper_arm, parts.left_lower_arm, 4},
+                    {parts.left_lower_arm, parts.left_hand, 5},
+                    {parts.upper_torso, parts.right_upper_arm, 6},
+                    {parts.right_upper_arm, parts.right_lower_arm, 7},
+                    {parts.right_upper_arm, parts.right_hand, 8},
+                    {parts.lower_torso, parts.left_upper_leg, 9},
+                    {parts.left_upper_leg, parts.left_lower_leg, 10},
+                    {parts.left_lower_leg, parts.left_foot, 11},
+                    {parts.lower_torso, parts.right_upper_leg, 12},
+                    {parts.right_upper_leg, parts.right_lower_leg, 13},
+                    {parts.right_lower_leg, parts.right_foot, 14}
+                }
+                for _, conn in ipairs(connections) do
+                    local from_pos, from_on_screen = Camera:WorldToViewportPoint(conn[1].Position)
+                    local to_pos, to_on_screen = Camera:WorldToViewportPoint(conn[2].Position)
+                    if from_on_screen and to_on_screen then
+                        esp_obj.skeleton_lines[conn[3]].From = Vector2.new(from_pos.X, from_pos.Y)
+                        esp_obj.skeleton_lines[conn[3]].To = Vector2.new(to_pos.X, to_pos.Y)
+                        esp_obj.skeleton_lines[conn[3]].Color = getgenv().matcha.ESPSkeletonColor
+                        esp_obj.skeleton_lines[conn[3]].Transparency = transparency
+                        esp_obj.skeleton_lines[conn[3]].Visible = true
+                    else
+                        esp_obj.skeleton_lines[conn[3]].Visible = false
+                    end
+                end
+            else
+                for _, line in ipairs(esp_obj.skeleton_lines) do line.Visible = false end
+            end
+        else
+            for _, line in ipairs(esp_obj.skeleton_lines) do line.Visible = false end
+        end
+
+        -- Tracer
+        if getgenv().matcha.ESPTracer then
+            local from_pos
+            if getgenv().matcha.ESPTracerType == 'Cursor' then
+                from_pos = UserInputService:GetMouseLocation()
+            elseif getgenv().matcha.ESPTracerType == 'Bottom Screen' then
+                from_pos = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
+            elseif getgenv().matcha.ESPTracerType == 'Top Screen' then
+                from_pos = Vector2.new(Camera.ViewportSize.X / 2, 0)
+            end
+            esp_obj.tracer.From = from_pos
+            esp_obj.tracer.To = Vector2.new(screen_pos.X, screen_pos.Y)
+            esp_obj.tracer.Color = getgenv().matcha.ESPTracerColor
+            esp_obj.tracer.Thickness = getgenv().matcha.ESPTracerThickness
+            esp_obj.tracer.Transparency = transparency
+            esp_obj.tracer.Visible = true
+
+            esp_obj.tracer_outline.From = from_pos
+            esp_obj.tracer_outline.To = Vector2.new(screen_pos.X, screen_pos.Y)
+            esp_obj.tracer_outline.Color = getgenv().matcha.ESPTracerOutlineColor
+            esp_obj.tracer_outline.Thickness = getgenv().matcha.ESPTracerThickness + 2
+            esp_obj.tracer_outline.Transparency = transparency
+            esp_obj.tracer_outline.Visible = true
+        else
+            esp_obj.tracer.Visible = false
+            esp_obj.tracer_outline.Visible = false
+        end
+
+        -- Armor Bar
+        if getgenv().matcha.ESPArmorBar and isDaHood() and humanoid then
+            local bodyEffects = char:FindFirstChild("BodyEffects")
+            local armor = bodyEffects and bodyEffects:FindFirstChild("Armor")
+            if armor then
+                local armor_percentage = armor.Value / 100  -- Giả sử max 100
+                local armor_bar_height = armor_percentage * box_size.Y
+
+                esp_obj.armor_bar_outline.From = Vector2.new(box_position.X + box_size.X + 5, box_position.Y + box_size.Y)
+                esp_obj.armor_bar_outline.To = Vector2.new(box_position.X + box_size.X + 5, box_position.Y)
+                esp_obj.armor_bar_outline.Transparency = transparency
+                esp_obj.armor_bar_outline.Visible = true
+
+                esp_obj.armor_bar_inline.From = Vector2.new(box_position.X + box_size.X + 5, box_position.Y + box_size.Y)
+                esp_obj.armor_bar_inline.To = Vector2.new(box_position.X + box_size.X + 5, box_position.Y + box_size.Y - armor_bar_height)
+                esp_obj.armor_bar_inline.Color = getgenv().matcha.ESPArmorBarColor
+                esp_obj.armor_bar_inline.Transparency = transparency
+                esp_obj.armor_bar_inline.Visible = true
+            else
+                esp_obj.armor_bar_outline.Visible = false
+                esp_obj.armor_bar_inline.Visible = false
+            end
+        else
+            esp_obj.armor_bar_outline.Visible = false
+            esp_obj.armor_bar_inline.Visible = false
+        end
+
+        -- Áp chams
+        applyChams(player)
+    end
+
+    -- Self chams
+    applySelfChams()
+end)
+
+-- 🌿 Nút UI (thêm vào groupbox ESP và ESP2)
+-- Trong ESPGroup:
+if isDaHood() then
+    ESPGroup:AddToggle('ESPArmorBar', {
+        Text = 'Armor Bar',
+        Default = false,
+        Callback = function(Value)
+            getgenv().matcha.ESPArmorBar = Value
+        end
+    }):AddColorPicker('ESPArmorBarColor', {
+        Default = Color3.fromRGB(70, 220, 110),
+        Title = 'Armor Color',
+        Callback = function(Color)
+            getgenv().matcha.ESPArmorBarColor = Color
+        end
+    })
+end
+
+-- Trong ESP2Group:
+ESP2Group:AddToggle('ESPArrow', {
+    Text = 'Arrow ESP',
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.ESPArrow = Value
+    end
+}):AddColorPicker('ESPArrowColor', {
+    Default = Color3.fromRGB(70, 220, 110),
+    Title = 'Arrow Color',
+    Callback = function(Color)
+        getgenv().matcha.ESPArrowColor = Color
+    end
+}):AddColorPicker('ESPArrowTargetColor', {
+    Default = Color3.fromRGB(255, 0, 0),
+    Title = 'Target Arrow Color',
+    Callback = function(Color)
+        getgenv().matcha.ESPArrowTargetColor = Color
+    end
+})
+
+ESP2Group:AddSlider('DistFromCenterSize', {
+    Text = 'Arrow Dist From Center',
+    Min = 50,
+    Max = 500,
+    Default = 100,
+    Rounding = 0,
+    Callback = function(Value)
+        getgenv().matcha.DistFromCenterSize = Value
     end
 })
 
