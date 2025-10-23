@@ -1,0 +1,1319 @@
+local repo = 'https://raw.githubusercontent.com/mstudio45/LinoriaLib/main/'
+
+local Library = loadstring(game:HttpGet(repo .. 'Library.lua'))()
+local ThemeManager = loadstring(game:HttpGet('https://raw.githubusercontent.com/Kazamatcha/matcha.tea/refs/heads/main/ThemeManager1'))()
+local SaveManager = loadstring(game:HttpGet(repo .. 'addons/SaveManager.lua'))()
+local Options = Library.Options
+local Toggles = Library.Toggles
+
+Library.ShowToggleFrameInKeybinds = true 
+Library.ShowCustomCursor = true 
+Library.NotifySide = "Left" 
+
+local Window = Library:CreateWindow({
+	Title = 'Matrix-mini',
+	Center = true,
+	AutoShow = true,
+	Resizable = true,
+	ShowCustomCursor = true,
+	UnlockMouseWhileOpen = true,
+	NotifySide = "Left",
+	TabPadding = 8,
+	MenuFadeTime = 0.2
+})
+Library:Notify("Loading")
+local Tabs = {
+	Aim = Window:AddTab('Main'),
+	Visual = Window:AddTab('Visual'),
+	Movement = Window:AddTab('Movement'),
+	['UI Settings'] = Window:AddTab('UI Settings'),
+}
+
+local UserInputService = game:GetService("UserInputService")
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+local Stats = game:GetService("Stats")
+local CoreGui = game:GetService("CoreGui")
+local StarterGui = game:GetService("StarterGui")
+local SoundService = game:GetService("SoundService")
+
+local LocalPlayer = Players.LocalPlayer
+
+local TargBindEnabled = true
+local TargetPlr
+local TargResolvePos
+
+-- ⚙️ Hai biến prediction được đưa ra ngoài
+getgenv().Prediction = 0.07
+getgenv().RealPrediction = 0.07
+
+-- ⚙️ TargetAimbot trở thành biến toàn cục (getgenv)
+getgenv().TargetAimbot = {
+    Enabled = true, 
+    Autoselect = false,
+    Resolver = true, 
+    ResolverType = "MoveDirection", 
+    JumpOffset = 0.00, 
+    RealJumpOffset = 0.00, 
+    HitParts = {"Head"}, 
+    RealHitPart = "Head", 
+    KoCheck = true, 
+    LookAt = false,
+    ViewAt = false,
+    Tracer = true,
+    TracerColor = Color3.fromRGB(255, 255, 255),
+    Highlight = true,
+    FillingColor = Color3.fromRGB(255, 255, 255),
+    OutliningColor = Color3.fromRGB(255, 255, 255),
+    HitEffect = true,
+    HitEffectType = "Electric", -- Dots, Electric
+    HitEffectColor = Color3.fromRGB(255, 255, 255),
+    CheckWall = false,
+    CheckAlive = true,
+    HitSound = false,
+    HitSoundId = "Bameware", -- Default
+    HitNotify = false,
+    Smoothing = true,  -- New: Enable smoothing
+    SmoothingFactor = 0.964323546  -- New: Smoothing factor (0.1 = smooth, 1 = instant)
+}
+local HitSoundIds = {
+    Bameware = "rbxassetid://3124331820",
+    Bell = "rbxassetid://6534947240",
+    Bubble = "rbxassetid://6534947588",
+    Pick = "rbxassetid://1347140027",
+    Pop = "rbxassetid://198598793",
+    Rust = "rbxassetid://1255040462",
+    Sans = "rbxassetid://3188795283",
+    Fart = "rbxassetid://130833677",
+    Big = "rbxassetid://5332005053",
+    Vine = "rbxassetid://5332680810",
+    Bruh = "rbxassetid://4578740568",
+    Skeet = "rbxassetid://5633695679",
+    Neverlose = "rbxassetid://6534948092",
+    Fatality = "rbxassetid://6534947869",
+    Bonk = "rbxassetid://5766898159",
+    Minecraft = "rbxassetid://4018616850"
+}
+
+local mobile = false
+-- 🔍 Kiểm tra nếu là thiết bị mobile hoặc tablet
+if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled and mobile then
+    getgenv().keytoclick = Q
+
+    local tool = Instance.new("Tool")
+    tool.RequiresHandle = false
+    tool.Name = getgenv().keytoclick
+    tool.Activated:Connect(function()
+        local vim = game:GetService("VirtualInputManager")
+        vim:SendKeyEvent(true, getgenv().keytoclick, false, game)
+    end)
+    tool.Parent = game.Players.LocalPlayer.Backpack
+
+    local player = game.Players.LocalPlayer
+
+    -- Khi spawn nhân vật mới → tool vẫn có trong backpack
+    player.CharacterAdded:Connect(function()
+        tool.Parent = player.Backpack
+    end)
+
+    -- Khi nhân vật bị xóa → đảm bảo tool vẫn lưu lại
+    player.CharacterRemoving:Connect(function()
+        tool.Parent = player.Backpack
+    end)
+end
+
+local TargHighlight = Instance.new("Highlight")
+TargHighlight.Parent = CoreGui
+TargHighlight.FillColor = Color3.new(1, 1, 1)
+TargHighlight.OutlineColor = Color3.new(0, 0, 0)
+TargHighlight.FillTransparency = 0.5
+TargHighlight.OutlineTransparency = 0
+TargHighlight.Enabled = false
+
+local Tracer = Drawing.new("Line")
+Tracer.Visible = false
+Tracer.Color = Color3.new(1, 1, 1)
+Tracer.Thickness = 1
+Tracer.Transparency = 1
+
+local HitEffectModule = {
+    Locals = {
+        Type = {
+            ["Dots"] = nil,
+            ["Electric"] = nil,
+        },
+    },
+    Functions = {},
+    Settings = {HitEffect = {Color = getgenv().TargetAimbot.HitEffectColor}}
+}
+
+do --// Dots
+
+    local character = game.Players.LocalPlayer.Character or game.Players.LocalPlayer.CharacterAdded:Wait()
+
+    local Attachment = Instance.new("Attachment")
+    Attachment.Name = "RightFootAttachment"
+    Attachment.Parent = character:WaitForChild("RightFoot")
+
+    HitEffectModule.Locals.Type["Dots"] = Attachment
+
+    local Specs = Instance.new("ParticleEmitter")
+    Specs.Name = "Specs"
+    Specs.Lifetime = NumberRange.new(0.5, 1.6)
+    Specs.SpreadAngle = Vector2.new(45, 45)
+    Specs.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 255, 255)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 255, 255))
+    })
+    Specs.Drag = 5
+    Specs.VelocitySpread = 40
+    Specs.Speed = NumberRange.new(10, 30)
+    Specs.Brightness = 7
+    Specs.Size = NumberSequence.new({
+        NumberSequenceKeypoint.new(0, 0),
+        NumberSequenceKeypoint.new(0.5, 2),
+        NumberSequenceKeypoint.new(1, 0)
+    })
+    Specs.Transparency = NumberSequence.new(0, 1)
+    Specs.Enabled = false
+    Specs.Acceleration = Vector3.new(0, 2, 0)
+    Specs.Rate = 100
+    Specs.Texture = "rbxassetid://8030760338"
+    Specs.EmissionDirection = Enum.NormalId.Top
+    Specs.Parent = Attachment
+
+    local Specs1 = Instance.new("ParticleEmitter")
+    Specs1.Name = "Specs1"
+    Specs1.Lifetime = NumberRange.new(0.33, 2)
+    Specs1.SpreadAngle = Vector2.new(60, 60)
+    Specs1.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 255, 255))
+    })
+    Specs1.Drag = 3
+    Specs1.VelocitySpread = 60
+    Specs1.Speed = NumberRange.new(10, 30)
+    Specs1.Brightness = 9
+    Specs1.Size = NumberSequence.new({
+        NumberSequenceKeypoint.new(0, 0),
+        NumberSequenceKeypoint.new(0.5, 2),
+        NumberSequenceKeypoint.new(1, 0)
+    })
+    Specs1.Transparency = NumberSequence.new(0, 1)
+    Specs1.Enabled = false
+    Specs1.Acceleration = Vector3.new(0, 5, 0)
+    Specs1.Rate = 75
+    Specs1.Texture = "rbxassetid://8030760338"
+    Specs1.EmissionDirection = Enum.NormalId.Top
+    Specs1.Parent = Attachment
+    
+end
+
+do --// Electric
+local Part = Instance.new("Part")
+Part.Parent = ReplicatedStorage
+
+local Attachment = Instance.new("Attachment")
+Attachment.Parent = Part
+
+HitEffectModule.Locals.Type["Electric"] = Attachment
+
+local ParticleEmitter2 = Instance.new("ParticleEmitter")
+ParticleEmitter2.Name = "ParticleEmitter2"
+ParticleEmitter2.FlipbookFramerate = NumberRange.new(20, 20)
+ParticleEmitter2.Lifetime = NumberRange.new(0.19, 0.38)
+ParticleEmitter2.FlipbookLayout = Enum.ParticleFlipbookLayout.Grid4x4
+ParticleEmitter2.SpreadAngle = Vector2.new(360, 360)
+ParticleEmitter2.Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.209842, 0.5), NumberSequenceKeypoint.new(0.503842, 0.263333), NumberSequenceKeypoint.new(0.799842, 0.5), NumberSequenceKeypoint.new(1, 1)})
+ParticleEmitter2.LightEmission = 1
+ParticleEmitter2.Color = ColorSequence.new(Color3.fromRGB(103, 192, 253))
+ParticleEmitter2.VelocitySpread = 360
+ParticleEmitter2.Speed = NumberRange.new(0.0161231, 0.0161231)
+ParticleEmitter2.Size = NumberSequence.new({NumberSequenceKeypoint.new(0, 4.3125), NumberSequenceKeypoint.new(0.3985056, 7.9375), NumberSequenceKeypoint.new(1, 10)})
+ParticleEmitter2.Enabled = false
+ParticleEmitter2.ZOffset = 0.15
+ParticleEmitter2.Rate = 100
+ParticleEmitter2.Texture = "http://www.roblox.com/asset/?id=12394566430"
+ParticleEmitter2.FlipbookMode = Enum.ParticleFlipbookMode.OneShot
+ParticleEmitter2.Rotation = NumberRange.new(39, 999)
+ParticleEmitter2.Orientation = Enum.ParticleOrientation.VelocityParallel
+ParticleEmitter2.Parent = Attachment
+
+Part.Parent = workspace
+end
+
+HitEffectModule.Functions.Effect = function(character, color)
+    if not character then return end
+    local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+    if not humanoidRootPart then return end
+
+    local effectAttachment = HitEffectModule.Locals.Type[getgenv().TargetAimbot.HitEffectType]:Clone()
+    effectAttachment.Parent = humanoidRootPart
+
+    for _, emitter in pairs(effectAttachment:GetChildren()) do
+        if emitter:IsA("ParticleEmitter") then
+            emitter.Color = ColorSequence.new({
+                ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 0, 0)),
+                ColorSequenceKeypoint.new(0.495, color or HitEffectModule.Settings.HitEffect.Color),
+                ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 0, 0))
+            })
+            emitter:Emit()
+        end
+    end
+
+    task.delay(2, function()
+        effectAttachment:Destroy()
+    end)
+end
+
+local targetHealth = nil
+local hitSoundInstance = Instance.new("Sound")
+hitSoundInstance.Parent = SoundService
+
+local function updateTargetHealth()
+    if TargBindEnabled and TargetPlr and TargetPlr.Character then
+        local humanoid = TargetPlr.Character:FindFirstChild("Humanoid")
+        if humanoid then
+            local currentHealth = humanoid.Health
+            if currentHealth < targetHealth then
+                if getgenv().TargetAimbot.HitEffect then
+                    HitEffectModule.Functions.Effect(TargetPlr.Character, getgenv().TargetAimbot.HitEffectColor)
+                end
+                if getgenv().TargetAimbot.HitSound then
+                    hitSoundInstance.SoundId = HitSoundIds[getgenv().TargetAimbot.HitSoundId]
+                    hitSoundInstance:Play()
+                    task.delay(1, function()
+                        hitSoundInstance:Stop()
+                    end)
+                end
+                if getgenv().TargetAimbot.HitNotify then
+					Library:Notify("Hit" .. TargetPlr.DisplayName)
+                end
+            end
+            targetHealth = currentHealth
+        end
+    end
+end
+
+local function canSeeTarget(target, partName)
+    if not target or not target.Character or not target.Character:FindFirstChild(partName) then
+        return false
+    end
+    local camera = Workspace.CurrentCamera
+    local targetPart = target.Character[partName]
+    local rayOrigin = camera.CFrame.Position
+    local rayDirection = (targetPart.Position - rayOrigin)
+    local raycastParams = RaycastParams.new()
+    raycastParams.FilterDescendantsInstances = {LocalPlayer.Character, target.Character}
+    raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+    raycastParams.IgnoreWater = true
+    local raycastResult = Workspace:Raycast(rayOrigin, rayDirection, raycastParams)
+    return not raycastResult or (raycastResult.Instance and raycastResult.Instance:IsDescendantOf(target.Character))
+end
+
+local function isAlive(plr)
+    if not plr or not plr.Character then return false end
+    local hum = plr.Character:FindFirstChildOfClass("Humanoid")
+    if not hum or hum.Health <= 0 then
+        return false
+    end
+
+    -- Check riêng cho Da Hood (BodyEffects)
+    local be = plr.Character:FindFirstChild("BodyEffects")
+    if be then
+        local ko = be:FindFirstChild("K.O")
+        local grabbed = be:FindFirstChild("GRABBING_CONSTRAINT")
+        if (ko and ko.Value) or (grabbed and grabbed.Value) then
+            return false
+        end
+    end
+
+    return true
+end
+
+local function isTyping()
+    return UserInputService:GetFocusedTextBox() ~= nil
+end
+
+local function ClosestPlr(Part)
+    local Closest
+    local Distance = math.huge
+    local ReferencePoint
+
+    -- Determine reference point based on platform
+    if UserInputService.TouchEnabled and not UserInputService.MouseEnabled then
+        -- Mobile: Use screen center
+        ReferencePoint = Vector2.new(Workspace.CurrentCamera.ViewportSize.X / 2, Workspace.CurrentCamera.ViewportSize.Y / 2)
+    else
+        -- PC: Use mouse position
+        ReferencePoint = UserInputService:GetMouseLocation()
+    end
+
+    for _, Target in pairs(Players:GetPlayers()) do
+        if Target ~= LocalPlayer and Target.Character and Target.Character:FindFirstChild(Part) then
+            -- Check if target is alive and not K.O'd or grabbed
+            if getgenv().TargetAimbot.CheckAlive and not isAlive(Target) then
+                continue
+            end
+            -- Check if target is visible (no wall)
+            if getgenv().TargetAimbot.CheckWall and not canSeeTarget(Target, Part) then
+                continue
+            end
+            local Position = Workspace.CurrentCamera:WorldToViewportPoint(Target.Character[Part].Position)
+            local Magnitude = (Vector2.new(Position.X, Position.Y) - ReferencePoint).Magnitude
+            if Magnitude < Distance then
+                Closest = Target
+                Distance = Magnitude
+            end
+        end
+    end
+
+    return Closest
+end
+
+local function Resolver(Target, Aimbot)
+    local Part = Target.Character[Aimbot.RealHitPart]
+    local CurrentPosition = Part.Position
+    local CurrentTime = tick()
+    wait()
+    local NewPosition = Part.Position
+    local NewTime = tick()
+    local DistanceTraveled = (NewPosition - CurrentPosition)
+    local TimeInterval = NewTime - CurrentTime
+    local Velocity = DistanceTraveled / TimeInterval
+    CurrentPosition = NewPosition
+    CurrentTime = NewTime
+    if Aimbot.ResolverType == "MoveDirection" then
+        return Target.Character.Humanoid.MoveDirection * Target.Character.Humanoid.WalkSpeed
+    end
+    return Velocity
+end
+
+local function CalculateAutoPrediction(target)
+    if not target or not target.Character or not target.Character:FindFirstChild("HumanoidRootPart") then
+        return 0.1
+    end
+
+    local ping = math.clamp(Stats.Network.ServerStatsItem["Data Ping"]:GetValue() / 1000, 0.01, 1)
+    local root = target.Character.HumanoidRootPart
+    local velocity = root.AssemblyLinearVelocity.Magnitude
+    local distance = (root.Position - Workspace.CurrentCamera.CFrame.Position).Magnitude
+
+    -- công thức prediction dựa theo ping + khoảng cách + vận tốc
+    local predicted_time = (distance / math.max(velocity, 1)) * 0.05 + ping * 0.5
+    predicted_time = math.clamp(predicted_time, 0.05, 0.4)
+    return predicted_time
+end
+
+local function AimRedirect()
+    if not (TargetAimbot.Enabled and TargBindEnabled and TargetPlr and TargetPlr.Character and TargetPlr.Character:FindFirstChild(TargetAimbot.RealHitPart)) then
+        return
+    end
+    -- Check if local player and target are alive
+    if (getgenv().TargetAimbot.CheckAlive and not isAlive(LocalPlayer)) or (getgenv().TargetAimbot.CheckAlive and not isAlive(TargetPlr)) then
+        return
+    end
+    -- Check if target is behind a wall
+    if getgenv().TargetAimbot.CheckWall and not canSeeTarget(TargetPlr, getgenv().TargetAimbot.RealHitPart) then
+        return
+    end
+
+    local cam = Workspace.CurrentCamera
+    local rootPart = TargetPlr.Character[TargetAimbot.RealHitPart]
+    local targetVelocity = rootPart.AssemblyLinearVelocity
+
+    -- Tính toán prediction tự động
+    local predictionTime = CalculateAutoPrediction(TargetPlr)
+    local predictedPosition = rootPart.Position + (targetVelocity * predictionTime)
+
+    -- Nếu có jump offset, áp dụng thêm
+    predictedPosition += Vector3.new(0, TargetAimbot.RealJumpOffset, 0)
+
+    -- ⚡ Đặt camera và hướng aim với smoothing
+    local newCF = CFrame.lookAt(cam.CFrame.Position, predictedPosition)
+    if getgenv().TargetAimbot.Smoothing then
+        cam.CFrame = cam.CFrame:Lerp(newCF, getgenv().TargetAimbot.SmoothingFactor)
+    else
+        cam.CFrame = newCF
+    end
+
+    -- Nếu muốn quay nhân vật theo hướng aim với smoothing:
+    if TargetAimbot.LookAt and LocalPlayer.Character and LocalPlayer.Character.PrimaryPart then
+        local charNewCF = CFrame.lookAt(LocalPlayer.Character.PrimaryPart.Position, predictedPosition)
+        if getgenv().TargetAimbot.Smoothing then
+            LocalPlayer.Character:SetPrimaryPartCFrame(LocalPlayer.Character.PrimaryPart.CFrame:Lerp(charNewCF, getgenv().TargetAimbot.SmoothingFactor))
+        else
+            LocalPlayer.Character:SetPrimaryPartCFrame(charNewCF)
+        end
+    end
+end
+
+RunService.Heartbeat:Connect(function()
+    if TargetAimbot.Enabled and TargBindEnabled and TargetPlr then
+        TargResolvePos = Resolver(TargetPlr, TargetAimbot)
+    end
+    updateTargetHealth()
+    if TargetAimbot.Enabled and TargBindEnabled and TargetPlr then
+        AimRedirect()
+    end
+end)
+
+UserInputService.InputBegan:Connect(function(input, gameProcessedEvent)
+    if gameProcessedEvent then return end
+
+    if input.KeyCode == Enum.KeyCode.Q then
+	    if isTyping() then
+			return
+		end
+
+        if getgenv().TargetAimbot.Enabled then
+            local Closest = ClosestPlr(getgenv().TargetAimbot.RealHitPart)
+            if Closest then
+                if TargBindEnabled then
+                    TargBindEnabled = false
+                    targetHealth = nil
+                    if getgenv().TargetAimbot.LookAt then
+                        LocalPlayer.Character.Humanoid.AutoRotate = true
+                    end
+                    if getgenv().TargetAimbot.ViewAt then
+                        Workspace.CurrentCamera.CameraSubject = LocalPlayer.Character.Humanoid
+                    end
+                    StarterGui:SetCore("SendNotification", {
+                        Title = "Matrix.cc",
+                        Text = "Untargeted: " .. TargetPlr.DisplayName,
+                        Duration = 1
+                    })
+                else
+                    TargBindEnabled = true
+                    TargetPlr = Closest
+                    targetHealth = TargetPlr.Character:FindFirstChild("Humanoid").Health
+                    StarterGui:SetCore("SendNotification", {
+                        Title = "Matrix.cc",
+                        Text = "Targeting: " .. TargetPlr.DisplayName,
+                        Duration = 1
+                    })
+                end
+            end
+        end
+    end
+end)
+
+RunService.Heartbeat:Connect(function()
+    if getgenv().TargetAimbot.Enabled and TargBindEnabled and TargetPlr then
+        TargResolvePos = Resolver(TargetPlr, getgenv().TargetAimbot)
+    end
+    updateTargetHealth()
+end)
+
+RunService.Heartbeat:Connect(function()
+    if getgenv().TargetAimbot.Enabled and getgenv().TargetAimbot.Autoselect then
+        TargetPlr = ClosestPlr(getgenv().TargetAimbot.RealHitPart)
+    end
+end)
+
+RunService.RenderStepped:Connect(function()
+    if getgenv().TargetAimbot.Enabled and TargBindEnabled and getgenv().TargetAimbot.Highlight and TargetPlr and TargetPlr.Character then
+        TargHighlight.Adornee = TargetPlr.Character
+        TargHighlight.FillColor = getgenv().TargetAimbot.FillingColor
+        TargHighlight.OutlineColor = getgenv().TargetAimbot.OutliningColor
+        TargHighlight.Enabled = true
+    else
+        TargHighlight.Adornee = nil
+        TargHighlight.Enabled = false
+    end
+end)
+
+RunService.RenderStepped:Connect(function()
+    if getgenv().TargetAimbot.Enabled and getgenv().TargetAimbot.Tracer and TargBindEnabled and TargetPlr and TargetPlr.Character and TargetPlr.Character:FindFirstChild(getgenv().TargetAimbot.RealHitPart) then
+        local MousePos = UserInputService:GetMouseLocation()
+        local TargetPos = Workspace.CurrentCamera:WorldToViewportPoint(TargetPlr.Character[getgenv().TargetAimbot.RealHitPart].Position)
+        Tracer.From = Vector2.new(MousePos.X, MousePos.Y)
+        Tracer.To = Vector2.new(TargetPos.X, TargetPos.Y)
+        Tracer.Color = getgenv().TargetAimbot.TracerColor
+        Tracer.Visible = true
+    else
+        Tracer.Visible = false
+    end
+end)
+
+local LeftGroupBox = Tabs.Aim:AddLeftGroupbox('Aimlock Settings')
+
+LeftGroupBox:AddToggle('AimlockEnabled', {
+	Text = 'Aimlock Enabled',
+	Default = getgenv().TargetAimbot.Enabled,
+	Callback = function(Value)
+		getgenv().TargetAimbot.Enabled = Value
+	end
+})
+LeftGroupBox:AddLabel("Press Q to set target")
+
+LeftGroupBox:AddToggle('Autoselect', {
+	Text = 'Autoselect',
+	Default = getgenv().TargetAimbot.Autoselect,
+	Callback = function(Value)
+		getgenv().TargetAimbot.Autoselect = Value
+	end
+})
+
+LeftGroupBox:AddToggle('Resolver', {
+	Text = 'Resolver',
+	Default = getgenv().TargetAimbot.Resolver,
+	Callback = function(Value)
+		getgenv().TargetAimbot.Resolver = Value
+	end
+})
+
+LeftGroupBox:AddInput('JumpOffset', {
+	Default = tostring(getgenv().TargetAimbot.JumpOffset),
+	Numeric = true,
+	Finished = true,
+	Text = 'Jump Offset',
+	Callback = function(Value)
+		getgenv().TargetAimbot.JumpOffset = tonumber(Value) or 0
+		getgenv().TargetAimbot.RealJumpOffset = getgenv().TargetAimbot.JumpOffset
+	end
+})
+
+local HitPartsList = {"Head", "HumanoidRootPart", "Torso", "Left Arm", "Right Arm", "Left Leg", "Right Leg", "UpperTorso", "LowerTorso", "LeftHand", "RightHand", "LeftFoot", "RightFoot", "LeftUpperArm", "RightUpperArm", "LeftLowerArm", "RightLowerArm", "LeftUpperLeg", "RightUpperLeg", "LeftLowerLeg", "RightLowerLeg"}
+LeftGroupBox:AddDropdown('HitPart', {
+	Values = HitPartsList,
+	Default = getgenv().TargetAimbot.RealHitPart,
+	Multi = false,
+	Text = 'Hit Part',
+	Callback = function(Value)
+		getgenv().TargetAimbot.RealHitPart = Value
+	end
+})
+LeftGroupBox:AddToggle('SmoothingToggle', {
+    Text = 'Smoothing',
+    Default = getgenv().TargetAimbot.Smoothing,
+    Callback = function(Value)
+        getgenv().TargetAimbot.Smoothing = Value
+    end
+})
+
+LeftGroupBox:AddInput('SmoothingFactor', {
+    Default = tostring(getgenv().TargetAimbot.SmoothingFactor),
+    Numeric = true,
+    Finished = true,
+    Text = 'Smoothing Factor',
+    Callback = function(Value)
+        local numValue = tonumber(Value) or 0.1
+        getgenv().TargetAimbot.SmoothingFactor = math.clamp(numValue, 0.01, 1)
+    end
+})
+local CheckOptions = {"Check Wall", "Check Alive"}
+LeftGroupBox:AddDropdown('', {
+    Values = CheckOptions,
+    Default = 0,
+    Multi = true,
+    Text = 'Checks',
+    Callback = function(Value)
+        -- Value is a table of selected options
+        getgenv().TargetAimbot.CheckWall = Value["Check Wall"] or false
+        getgenv().TargetAimbot.CheckAlive = Value["Check Alive"] or false
+    end
+})
+
+LeftGroupBox:AddToggle('LookAt', {
+	Text = 'Look At',
+	Default = getgenv().TargetAimbot.LookAt,
+	Callback = function(Value)
+		getgenv().TargetAimbot.LookAt = Value
+	end
+})
+
+LeftGroupBox:AddToggle('ViewAt', {
+	Text = 'View At',
+	Default = getgenv().TargetAimbot.ViewAt,
+	Callback = function(Value)
+		getgenv().TargetAimbot.ViewAt = Value
+	end
+})
+
+local RightGroupBox = Tabs.Aim:AddRightGroupbox('Visual Settings')
+
+RightGroupBox:AddToggle('TracerTarget', {
+	Text = 'Tracer Target',
+	Default = getgenv().TargetAimbot.Tracer,
+	Callback = function(Value)
+		getgenv().TargetAimbot.Tracer = Value
+	end
+})
+
+RightGroupBox:AddLabel('Tracer Color'):AddColorPicker('TracerColor', {
+	Default = getgenv().TargetAimbot.TracerColor,
+	Callback = function(Color)
+		getgenv().TargetAimbot.TracerColor = Color
+	end
+})
+
+RightGroupBox:AddToggle('HighlightTarget', {
+	Text = 'Highlight Target',
+	Default = getgenv().TargetAimbot.Highlight,
+	Callback = function(Color)
+		getgenv().TargetAimbot.Highlight = Color
+	end
+})
+
+RightGroupBox:AddLabel('Filling Color'):AddColorPicker('FillingColor', {
+	Default = getgenv().TargetAimbot.FillingColor,
+	Callback = function(Color)
+		getgenv().TargetAimbot.FillingColor = Color
+	end
+})
+
+RightGroupBox:AddLabel('Outlining Color'):AddColorPicker('OutliningColor', {
+	Default = getgenv().TargetAimbot.OutliningColor,
+	Callback = function(Color)
+		getgenv().TargetAimbot.OutliningColor = Color
+	end
+})
+
+RightGroupBox:AddToggle('HitEffect', {
+	Text = 'Hit Effect',
+	Default = getgenv().TargetAimbot.HitEffect,
+	Callback = function(Value)
+		getgenv().TargetAimbot.HitEffect = Value
+	end
+})
+
+RightGroupBox:AddDropdown('HitEffectType', {
+	Values = {"Dots", "Electric"},
+	Default = getgenv().TargetAimbot.HitEffectType,
+	Multi = false,
+	Text = 'Hit Effect Type',
+	Callback = function(Value)
+		getgenv().TargetAimbot.HitEffectType = Value
+	end
+})
+
+RightGroupBox:AddLabel('Hit Effect Color'):AddColorPicker('HitEffectColor', {
+	Default = getgenv().TargetAimbot.HitEffectColor,
+	Callback = function(Color)
+		getgenv().TargetAimbot.HitEffectColor = Color
+	end
+})
+
+RightGroupBox:AddToggle('HitSound', {
+	Text = 'Hit Sound',
+	Default = getgenv().TargetAimbot.HitSound,
+	Callback = function(Value)
+		getgenv().TargetAimbot.HitSound = Value
+	end
+})
+
+RightGroupBox:AddDropdown('HitSoundId', {
+	Values = {"Bameware", "Bell", "Bubble", "Pick", "Pop", "Rust", "Sans", "Fart", "Big", "Vine", "Bruh", "Skeet", "Neverlose", "Fatality", "Bonk", "Minecraft"},
+	Default = getgenv().TargetAimbot.HitSoundId,
+	Multi = false,
+	Text = 'Hit Sound Id',
+	Callback = function(Value)
+		getgenv().TargetAimbot.HitSoundId = Value
+	end
+})
+
+RightGroupBox:AddToggle('HitNotify', {
+	Text = 'Hit Notify',
+	Default = getgenv().TargetAimbot.HitNotify,
+	Callback = function(Value)
+		getgenv().TargetAimbot.HitNotify = Value
+	end
+})
+
+local PlayerGroup = Tabs.Aim:AddRightGroupbox('Player List')
+
+local SelectedPlayer
+PlayerGroup:AddDropdown('MyPlayerDropdown', {
+	SpecialType = 'Player',
+	ExcludeLocalPlayer = true, -- true / false, excludes the localplayer from the Player type
+	Text = 'A player dropdown',
+
+	Callback = function(Value)
+		SelectedPlayer = Players:FindFirstChild(Value)
+	end
+})
+
+PlayerGroup:AddButton({
+	Text = 'View',
+	Func = function()
+		if SelectedPlayer and SelectedPlayer.Character then
+			Workspace.CurrentCamera.CameraSubject = SelectedPlayer.Character.Humanoid
+		end
+	end
+})
+
+PlayerGroup:AddButton({
+	Text = 'Set Target',
+	Func = function()
+		if SelectedPlayer then
+			TargetPlr = SelectedPlayer
+			TargBindEnabled = true
+			StarterGui:SetCore("SendNotification", {
+				Title = "Set Target",
+				Text = "Target set to: " .. SelectedPlayer.DisplayName,
+				Duration = 1
+			})
+		end
+	end
+})
+
+PlayerGroup:AddButton({
+	Text = 'TP',
+	Func = function()
+		if SelectedPlayer and SelectedPlayer.Character and LocalPlayer.Character then
+			LocalPlayer.Character.HumanoidRootPart.CFrame = SelectedPlayer.Character.HumanoidRootPart.CFrame
+		end
+	end
+})
+
+local ZixyESP = loadstring(game:HttpGet('https://raw.githubusercontent.com/zixypy/zixyx/refs/heads/main/zixyesp.txt'))()
+local esp = ZixyESP.new()
+
+local VisualsGroup = Tabs.Visual:AddLeftGroupbox('ESP Controls')
+
+-- Box ESP
+VisualsGroup:AddToggle('BoxESPToggle', {
+    Text = 'Box ESP',
+    Default = false,
+    Callback = function(Value)
+        if Value then
+            esp:InitiateBox(Color3.new(0.403922, 0.349020, 0.701961))
+        else
+            esp.State.BoxEnabled = false
+        end
+    end,
+})
+
+VisualsGroup:AddLabel('Box Color'):AddColorPicker('BoxColorPicker', {
+    Default = Color3.new(0.403922, 0.349020, 0.701961),
+    Callback = function(Color)
+        esp.Config.BoxColor = Color
+        for _, espObj in pairs(esp.Caches.BoxCache) do
+            espObj.Box.Color = Color
+        end
+    end,
+})
+
+-- Name ESP
+VisualsGroup:AddToggle('NameESPToggle', {
+    Text = 'Name ESP',
+    Default = false,
+    Callback = function(Value)
+        esp:InitiateName(Value)
+    end,
+})
+
+-- Distance ESP
+VisualsGroup:AddToggle('DistanceESPToggle', {
+    Text = 'Distance ESP',
+    Default = false,
+    Callback = function(Value)
+        esp:InitiateDistance(Value)
+    end,
+})
+
+-- Skeleton ESP
+VisualsGroup:AddToggle('SkeletonESPToggle', {
+    Text = 'Skeleton ESP',
+    Default = false,
+    Callback = function(Value)
+        if Value then
+            esp:InitiateSkeleton(Color3.new(0.403922, 0.349020, 0.701961))
+        else
+            esp.State.SkeletonEnabled = false
+        end
+    end,
+})
+
+VisualsGroup:AddLabel('Skeleton Color'):AddColorPicker('SkeletonColorPicker', {
+    Default = Color3.new(0.403922, 0.349020, 0.701961),
+    Callback = function(Color)
+        esp.Config.SkeletonColor = Color
+        for _, skeleton in pairs(esp.Caches.SkeletonCache) do
+            for _, line in pairs(skeleton) do
+                line.Color = Color
+            end
+        end
+    end,
+})
+
+-- Health Text ESP
+VisualsGroup:AddToggle('HealthTextESPToggle', {
+    Text = 'Health Text ESP',
+    Default = false,
+    Callback = function(Value)
+        esp:InitiateHealthText(Value)
+    end,
+})
+
+-- Health Bar ESP
+VisualsGroup:AddToggle('HealthBarESPToggle', {
+    Text = 'Health Bar ESP',
+    Default = false,
+    Callback = function(Value)
+        esp:InitiateHealthBar(Value)
+    end,
+})
+
+-- Tracer ESP
+VisualsGroup:AddToggle('TracerESPToggle', {
+    Text = 'Tracer ESP',
+    Default = false,
+    Callback = function(Value)
+        if Value then
+            esp:InitiateTracer(Color3.new(0.403922, 0.349020, 0.701961), esp.Config.TracerOrigin)
+        else
+            esp.State.TracerEnabled = false
+        end
+    end,
+})
+
+VisualsGroup:AddLabel('Tracer Color'):AddColorPicker('TracerColorPicker', {
+    Default = Color3.new(0.403922, 0.349020, 0.701961),
+    Callback = function(Color)
+        esp.Config.TracerColor = Color
+        for _, tracer in pairs(esp.Caches.TracerCache) do
+            tracer.Color = Color
+        end
+    end,
+})
+
+VisualsGroup:AddDropdown('TracerOriginDropdown', {
+    Text = 'Tracer Origin',
+    Default = 'Bottom Screen',
+    Values = {'Bottom Screen', 'Cursor', 'Top Screen'},
+    Callback = function(Value)
+        esp.Config.TracerOrigin = Value
+    end,
+})
+
+-- Chams
+VisualsGroup:AddToggle('ChamsToggle', {
+    Text = 'Chams',
+    Default = false,
+    Callback = function(Value)
+        if Value then
+            esp:InitiateChams(Color3.new(1, 0, 0))
+        else
+            esp.State.ChamsEnabled = false
+        end
+    end,
+})
+
+VisualsGroup:AddLabel('Chams Color'):AddColorPicker('ChamsColorPicker', {
+    Default = Color3.new(1, 0, 0),
+    Callback = function(Color)
+        esp.Config.ChamsColor = Color
+        for _, chams in pairs(esp.Caches.ChamsCache) do
+            chams.FillColor = Color
+        end
+    end,
+})
+
+-- Team Check
+VisualsGroup:AddToggle('TeamCheckToggle', {
+    Text = 'Team Check',
+    Default = true,
+    Callback = function(Value)
+        esp:TeamCheck(Value)
+    end,
+})
+
+-- ESP Distance
+VisualsGroup:AddSlider('ESPDistanceSlider', {
+    Text = 'ESP Distance',
+    Default = 325,
+    Min = 100,
+    Max = 1000,
+    Rounding = 0,
+    Suffix = ' studs',
+    Callback = function(Value)
+        esp:SetDistance(Value)
+    end,
+})
+
+esp:Initialize()
+
+local MiscGroup = Tabs.Visual:AddRightGroupbox('Misc')
+
+local Services = {
+    Players = game:GetService("Players")
+}
+Services.LocalPlayer = Services.Players.LocalPlayer
+
+getgenv().ChinaHatSettings = {
+    enabled = false, 
+    hatColor = Color3.fromRGB(255, 105, 180), 
+    lightColor = Color3.fromRGB(255, 105, 180), 
+    lightBrightness = 0, 
+    lightRange = 12, 
+    scale = Vector3.new(1.7, 1.1, 1.7), 
+}
+
+local function CreateHat(Character)
+    local Head = Character:FindFirstChild("Head")
+    if not Head then return end 
+
+    local Cone = Instance.new("Part")
+    Cone.Size = Vector3.new(1, 1, 1)
+    Cone.BrickColor = BrickColor.new("Hot pink")
+    Cone.Material = Enum.Material.Neon
+    Cone.Transparency = 0.2
+    Cone.Anchored = false
+    Cone.CanCollide = false
+    Cone.Color = getgenv().ChinaHatSettings.hatColor 
+
+    local Mesh = Instance.new("SpecialMesh")
+    Mesh.MeshType = Enum.MeshType.FileMesh
+    Mesh.MeshId = "rbxassetid://1033714"
+    Mesh.Scale = getgenv().ChinaHatSettings.scale 
+    Mesh.Parent = Cone
+
+    local Weld = Instance.new("Weld")
+    Weld.Part0 = Head
+    Weld.Part1 = Cone
+    Weld.C0 = CFrame.new(0, 0.9, 0)
+    Weld.Parent = Cone
+
+    local Light = Instance.new("PointLight")
+    Light.Color = getgenv().ChinaHatSettings.lightColor 
+    Light.Brightness = getgenv().ChinaHatSettings.lightBrightness 
+    Light.Range = getgenv().ChinaHatSettings.lightRange 
+    Light.Shadows = true
+    Light.Parent = Cone
+
+    Cone.Parent = Character
+end
+
+local function OnCharacterAdded(Character)
+    if getgenv().ChinaHatSettings.enabled then
+        Character:WaitForChild("Head")
+        CreateHat(Character)
+    end
+end
+
+for _, player in pairs(Players:GetPlayers()) do
+    if player ~= LocalPlayer then
+        player.CharacterAdded:Connect(OnCharacterAdded)
+        if player.Character then
+            OnCharacterAdded(player.Character)
+        end
+    end
+end
+
+Players.PlayerAdded:Connect(function(player)
+    player.CharacterAdded:Connect(OnCharacterAdded)
+end)
+
+Services.LocalPlayer.CharacterAdded:Connect(OnCharacterAdded)
+
+if Services.LocalPlayer.Character then
+    OnCharacterAdded(Services.LocalPlayer.Character)
+end
+
+MiscGroup:AddToggle('ChinaHat', {
+	Text = 'China Hat',
+	Default = getgenv().ChinaHatSettings.enabled,
+	Callback = function(Value)
+		getgenv().ChinaHatSettings.enabled = Value
+		for _, player in pairs(Players:GetPlayers()) do
+            if player.Character then
+                OnCharacterAdded(player.Character)
+            end
+        end
+	end
+})
+
+MiscGroup:AddLabel('Hat Color'):AddColorPicker('HatColor', {
+	Default = getgenv().ChinaHatSettings.hatColor,
+	Callback = function(Color)
+		getgenv().ChinaHatSettings.hatColor = Color
+	end
+})
+
+getgenv().matcha = {
+    FlyEnabled = false,
+    FlySpeed = 20,
+    CFSpeedEnabled = false,
+    CFSpeed = 2,
+    WalkJumpEnabled = false,
+    WalkSpeedAmount = 16,
+    JumpPowerAmount = 50,
+    NoJumpCooldown = false,
+    NoSlowdown = false,
+    BunnyHopEnabled = false,
+    BunnyHopSpeed = 50,
+}
+
+local MovementGroup = Tabs.Movement:AddLeftGroupbox('Movement')
+
+MovementGroup:AddToggle('FlyEnabled', {
+    Text = 'Fly',
+    Default = getgenv().matcha.FlyEnabled,
+    Callback = function(Value)
+        getgenv().matcha.FlyEnabled = Value
+        Library:Notify("Fly " .. (Value and "Enabled" or "Disabled"), 2)
+    end
+}):AddKeyPicker('FlyKey', {
+    Default = 'NONE',
+    Mode = 'Toggle',
+    Text = 'Fly Key',
+    Callback = function()
+        getgenv().matcha.FlyEnabled = not getgenv().matcha.FlyEnabled
+        Library:Notify("Fly " .. (getgenv().matcha.FlyEnabled and "Enabled" or "Disabled"), 2)
+    end
+})
+MovementGroup:AddSlider('FlySpeed', {
+    Text = 'Fly Speed',
+    Default = getgenv().matcha.FlySpeed,
+    Min = 1,
+    Max = 100,
+    Rounding = 0,
+    Callback = function(Value)
+        getgenv().matcha.FlySpeed = Value
+    end
+})
+
+-- 🚀 CFrame Speed
+MovementGroup:AddToggle('CFSpeedEnabled', {
+    Text = 'CFrame Speed',
+    Default = getgenv().matcha.CFSpeedEnabled,
+    Callback = function(Value)
+        getgenv().matcha.CFSpeedEnabled = Value
+        Library:Notify("CF Speed " .. (Value and "Enabled" or "Disabled"), 2)
+    end
+}):AddKeyPicker('CFSpeedKey', {
+    Default = 'NONE',
+    Mode = 'Toggle',
+    Text = 'CF Speed Key',
+    Callback = function()
+        getgenv().matcha.CFSpeedEnabled = not getgenv().matcha.CFSpeedEnabled
+        Library:Notify("CF Speed " .. (getgenv().matcha.CFSpeedEnabled and "Enabled" or "Disabled"), 2)
+    end
+})
+MovementGroup:AddSlider('CFSpeed', {
+    Text = 'CF Speed',
+    Default = getgenv().matcha.CFSpeed,
+    Min = 1,
+    Max = 100,
+    Rounding = 0,
+    Callback = function(Value)
+        getgenv().matcha.CFSpeed = Value
+    end
+})
+
+-- 🏃 WalkSpeed + JumpPower
+MovementGroup:AddToggle('WalkJumpEnabled', {
+    Text = 'Walk/Jump Override',
+    Default = getgenv().matcha.WalkJumpEnabled,
+    Callback = function(Value)
+        getgenv().matcha.WalkJumpEnabled = Value
+        Library:Notify("Walk/Jump " .. (Value and "Enabled" or "Disabled"), 2)
+        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
+            local humanoid = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+            if Value then
+                humanoid.WalkSpeed = getgenv().matcha.WalkSpeedAmount
+                humanoid.JumpPower = getgenv().matcha.JumpPowerAmount
+            else
+                humanoid.WalkSpeed = 16
+                humanoid.JumpPower = 50
+            end
+        end
+    end
+}):AddKeyPicker('WalkJumpKey', {
+    Default = 'NONE',
+    Mode = 'Toggle',
+    Text = 'Walk/Jump Key',
+    Callback = function()
+        getgenv().matcha.WalkJumpEnabled = not getgenv().matcha.WalkJumpEnabled
+        Library:Notify("Walk/Jump " .. (getgenv().matcha.WalkJumpEnabled and "Enabled" or "Disabled"), 2)
+        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
+            local humanoid = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+            if getgenv().matcha.WalkJumpEnabled then
+                humanoid.WalkSpeed = getgenv().matcha.WalkSpeedAmount
+                humanoid.JumpPower = getgenv().matcha.JumpPowerAmount
+            else
+                humanoid.WalkSpeed = 16
+                humanoid.JumpPower = 50
+            end
+        end
+    end
+})
+MovementGroup:AddSlider('WalkSpeedAmount', {
+    Text = 'WalkSpeed',
+    Default = getgenv().matcha.WalkSpeedAmount or 16,
+    Min = 1,
+    Max = 1000,
+    Rounding = 0,
+    Callback = function(Value)
+        getgenv().matcha.WalkSpeedAmount = Value
+        if getgenv().matcha.WalkJumpEnabled and LocalPlayer.Character then
+            LocalPlayer.Character.Humanoid.WalkSpeed = Value
+        end
+    end
+})
+MovementGroup:AddSlider('JumpPowerAmount', {
+    Text = 'JumpPower',
+    Default = getgenv().matcha.JumpPowerAmount or 50,
+    Min = 1,
+    Max = 1000,
+    Rounding = 0,
+    Callback = function(Value)
+        getgenv().matcha.JumpPowerAmount = Value
+        if getgenv().matcha.WalkJumpEnabled and LocalPlayer.Character then
+            LocalPlayer.Character.Humanoid.JumpPower = Value
+        end
+    end
+})
+
+-- No jump cooldown / No slowdown
+MovementGroup:AddToggle('NoJumpCooldown', { Text = 'No Jump Cooldown', Default = getgenv().matcha.NoJumpCooldown, Callback = function(v) getgenv().matcha.NoJumpCooldown = v end })
+MovementGroup:AddToggle('NoSlowdown', { Text = 'No Slowdown', Default = getgenv().matcha.NoSlowdown, Callback = function(v) getgenv().matcha.NoSlowdown = v end })
+
+-- Bunny Hop (toggle + slider)
+MovementGroup:AddToggle('BunnyHopEnabled', { Text = 'Bunny Hop', Default = getgenv().matcha.BunnyHopEnabled, Callback = function(v) getgenv().matcha.BunnyHopEnabled = v end })
+MovementGroup:AddSlider('BunnyHopSpeed', {
+    Text = 'Bhop Speed',
+    Default = getgenv().matcha.BunnyHopSpeed or 50,
+    Min = 25,
+    Max = 200,
+    Rounding = 0,
+    Callback = function(Value)
+        getgenv().matcha.BunnyHopSpeed = Value
+    end
+})
+
+local DefaultWalkSpeed = 16
+local DefaultJumpPower = 50
+
+LocalPlayer.CharacterAdded:Connect(function(char)
+    local humanoid = char:WaitForChild("Humanoid")
+    DefaultWalkSpeed = humanoid.WalkSpeed
+    DefaultJumpPower = humanoid.JumpPower
+    if getgenv().matcha.WalkJumpEnabled then
+        humanoid.WalkSpeed = getgenv().matcha.WalkSpeedAmount
+        humanoid.JumpPower = getgenv().matcha.JumpPowerAmount
+    end
+end)
+
+local Camera = Workspace.CurrentCamera
+
+RunService.Heartbeat:Connect(function(dt)
+    local char = LocalPlayer.Character
+    if not char then return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if not hrp or not hum then return end
+
+    if getgenv().matcha.FlyEnabled then
+        local moveDirection = hum.MoveDirection
+        local addY = 0
+
+        -- Logic cho PC
+        if not UserInputService.TouchEnabled then
+            -- ⚙️ PC: điều khiển bằng phím Space và Ctrl
+            if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+                addY = getgenv().matcha.FlySpeed / 8
+            elseif UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
+                addY = -getgenv().matcha.FlySpeed / 8
+            end
+        else
+            -- 📱 Mobile: bay theo hướng nhìn + di chuyển theo MoveDirection
+            local lookDir = Camera.CFrame.LookVector
+            -- Nếu có di chuyển, mới tính toán hướng bay
+            if moveDirection.Magnitude > 0 then
+                -- Di chuyển theo hướng nhìn cộng với hướng di chuyển (MoveDirection)
+                moveDirection = Vector3.new(moveDirection.X, 0, moveDirection.Z) + Vector3.new(lookDir.X, 0, lookDir.Z)
+            else
+            end
+
+            -- Cập nhật bay lên/xuống theo hướng nhìn camera
+            if lookDir.Y > 0.1 then
+                addY = getgenv().matcha.FlySpeed / 8  -- Bay lên
+            elseif lookDir.Y < -0.1 then
+                addY = -getgenv().matcha.FlySpeed / 8  -- Bay xuống
+            end
+        end
+
+        -- Cập nhật vị trí bay
+        hrp.CFrame = hrp.CFrame + (moveDirection * dt) * getgenv().matcha.FlySpeed * 10
+        hrp.CFrame = hrp.CFrame + Vector3.new(0, addY, 0)
+        hrp.Velocity = Vector3.new(0, 1.9, 0)
+    end
+
+    -- ⚡ CFrame Speed  
+    if getgenv().matcha.CFSpeedEnabled then  
+        local moveDir = hum.MoveDirection  
+        hrp.CFrame = hrp.CFrame + (moveDir * dt) * (getgenv().matcha.CFSpeed or 20) * 10  
+    end  
+
+    -- 🚀 NoJumpCooldown  
+    if getgenv().matcha.NoJumpCooldown then  
+        hum.UseJumpPower = false  
+    else  
+        hum.UseJumpPower = true  
+    end  
+
+    -- 🦶 NoSlowdown  
+    if getgenv().matcha.NoSlowdown and char:FindFirstChild("BodyEffects") then  
+        local slow = {"NoWalkSpeed", "NoJumping", "ReduceWalk"}  
+        for _, eff in ipairs(slow) do  
+            local found = char.BodyEffects.Movement and char.BodyEffects.Movement:FindFirstChild(eff)  
+            if found then found:Destroy() end  
+        end  
+        if char.BodyEffects:FindFirstChild("Reload") and char.BodyEffects.Reload.Value == true then  
+            char.BodyEffects.Reload.Value = false  
+        end  
+    end  
+
+    -- 🐇 BunnyHop  
+    if getgenv().matcha.BunnyHopEnabled and UserInputService:IsKeyDown(Enum.KeyCode.Space) then  
+        hum.Jump = true  
+        local dir = Camera.CFrame.LookVector * Vector3.new(1, 0, 1)  
+        local move = Vector3.zero  
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then move += dir end  
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then move -= dir end  
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then move += Vector3.new(-dir.Z, 0, dir.X) end  
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then move += Vector3.new(dir.Z, 0, -dir.X) end  
+        if move.Magnitude > 0 then  
+            hrp.Velocity = Vector3.new(move.Unit.X * getgenv().matcha.BunnyHopSpeed, hrp.Velocity.Y, move.Unit.Z * getgenv().matcha.BunnyHopSpeed)  
+        end  
+    end
+end)
+
+-- UI Settings
+local MenuGroup = Tabs['UI Settings']:AddLeftGroupbox('Menu')
+
+MenuGroup:AddToggle("KeybindMenuOpen", { Default = Library.KeybindFrame.Visible, Text = "Open Keybind Menu", Callback = function(value) Library.KeybindFrame.Visible = value end})
+MenuGroup:AddToggle("ShowCustomCursor", {Text = "Custom Cursor", Default = true, Callback = function(Value) Library.ShowCustomCursor = Value end})
+MenuGroup:AddDivider()
+MenuGroup:AddLabel("Menu bind"):AddKeyPicker("MenuKeybind", { Default = "RightShift", NoUI = true, Text = "Menu keybind" })
+MenuGroup:AddButton("Unload", function() Library:Unload() end)
+
+Library.ToggleKeybind = Options.MenuKeybind -- Allows you to have a custom keybind for the menu
+
+-- Hand the library over to our managers
+ThemeManager:SetLibrary(Library)
+SaveManager:SetLibrary(Library)
+
+-- Ignore keys that are used by ThemeManager.
+-- (we dont want configs to save themes, do we?)
+SaveManager:IgnoreThemeSettings()
+
+-- Adds our MenuKeybind to the ignore list
+-- (do you want each config to have a different menu key? probably not.)
+SaveManager:SetIgnoreIndexes({ 'MenuKeybind' })
+
+-- use case for doing it this way:
+-- a script hub could have themes in a global folder
+-- and game configs in a separate folder per game
+ThemeManager:SetFolder('MyScriptHub')
+SaveManager:SetFolder('MyScriptHub/specific-game')
+
+SaveManager:BuildConfigSection(Tabs['UI Settings'])
+ThemeManager:ApplyToTab(Tabs['UI Settings'])
+SaveManager:LoadAutoloadConfig()
