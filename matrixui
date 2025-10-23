@@ -413,7 +413,7 @@ local function ClosestPlr(Part)
     return Closest
 end
 
-local function Resolver(Target, getgenv().TargetAimbot.Aimbot)
+local function Resolver(Target, getgenv().TargetAimbot)
     local Part = Target.Character[getgenv().TargetAimbot.RealHitPart]
     local CurrentPosition = Part.Position
     local CurrentTime = tick()
@@ -425,7 +425,7 @@ local function Resolver(Target, getgenv().TargetAimbot.Aimbot)
     local Velocity = DistanceTraveled / TimeInterval
     CurrentPosition = NewPosition
     CurrentTime = NewTime
-    if Aimbot.ResolverType == "MoveDirection" then
+    if getgenv().TargetAimbot.ResolverType == "MoveDirection" then
         return Target.Character.Humanoid.MoveDirection * Target.Character.Humanoid.WalkSpeed
     end
     return Velocity
@@ -492,7 +492,7 @@ end
 
 RunService.Heartbeat:Connect(function()
     if getgenv().TargetAimbot.Enabled and TargBindEnabled and TargetPlr then
-        TargResolvePos = Resolver(TargetPlr, TargetAimbot)
+        TargResolvePos = Resolver(TargetPlr, getgenv().TargetAimbot)
     end
     updateTargetHealth()
     if getgenv().TargetAimbot.Enabled and TargBindEnabled and TargetPlr then
