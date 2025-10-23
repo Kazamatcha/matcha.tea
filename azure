@@ -7356,89 +7356,93 @@ fpsEvent:bindConnection(runservice.RenderStepped, "FPSEvent1", LPH_JIT_ULTRA(fun
 end))
 
 local movementEvent = event:new("movementEvent")
-movementEvent:bindConnection(runservice.Heartbeat, "movementConnection", LPH_JIT_ULTRA(function()
+movementEvent:bindConnection(runservice.Heartbeat, "movementConnection", LPH_JIT_ULTRA(function(dt)
+    local char = localplayer.Character
+    if not char then return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if not hrp or not hum then return end
+
+    -- Speed logic (unchanged)
     if library.pointers.speedenabled:get() then
         if library.pointers.speedmode:get() == "Always" then
             if character.isAlive() then
-                if localplayer.Character.Humanoid.MoveDirection.Magnitude > 0 then
-                    localplayer.Character.HumanoidRootPart.CFrame = localplayer.Character.HumanoidRootPart.CFrame + localplayer.Character.Humanoid.MoveDirection * library.pointers.speedmultiplier:get()
+                if hum.MoveDirection.Magnitude > 0 then
+                    hrp.CFrame = hrp.CFrame + hum.MoveDirection * library.pointers.speedmultiplier:get()
                 end
             end
         elseif library.pointers.speedmode:get() == "Keybind" then
             if library.pointers.speedkeybind:is_active() then
                 if character.isAlive() then
-                    if localplayer.Character.Humanoid.MoveDirection.Magnitude > 0 then
-                        localplayer.Character.HumanoidRootPart.CFrame = localplayer.Character.HumanoidRootPart.CFrame + localplayer.Character.Humanoid.MoveDirection * library.pointers.speedmultiplier:get()
+                    if hum.MoveDirection.Magnitude > 0 then
+                        hrp.CFrame = hrp.CFrame + hum.MoveDirection * library.pointers.speedmultiplier:get()
                     end
                 end
             end
         end
     end
+
+    -- Updated fly logic
     if library.pointers.flyenabled:get() then
-        if library.pointers.flymode:get() == "Always" then
-            local velVector3 = Vector3.new(0, 1, 0)
-            if userinputservice:IsKeyDown(Enum.KeyCode.W) then
-                velVector3 = velVector3 + (camera.CoordinateFrame.lookVector * library.pointers.flymultiplier:get() * 50)
-            end
-            if userinputservice:IsKeyDown(Enum.KeyCode.A) then
-                velVector3 = velVector3 + (camera.CoordinateFrame.rightVector * -library.pointers.flymultiplier:get() * 50)
-            end
-            if userinputservice:IsKeyDown(Enum.KeyCode.S) then
-                velVector3 = velVector3 + (camera.CoordinateFrame.lookVector * -library.pointers.flymultiplier:get() * 50)
-            end
-            if userinputservice:IsKeyDown(Enum.KeyCode.D) then
-                velVector3 = velVector3 + (camera.CoordinateFrame.rightVector * library.pointers.flymultiplier:get() * 50)
-            end
-            
-            if character.isAlive() then
-                localplayer.Character.HumanoidRootPart.Velocity = velVector3
-                if localplayer.Character.Humanoid:GetState() == "Landing" then
-                    localplayer.Character.Humanoid:ChangeState("Landing")
-                elseif localplayer.Character.Humanoid:GetState() == "Freefall" then
-                    localplayer.Character.Humanoid:ChangeState("Freefall")
-                end
-            end
-        elseif library.pointers.flymode:get() == "Keybind" then
-            if library.pointers.flykeybind:is_active() then
-                local velVector3 = Vector3.new(0, 1, 0)
-                if userinputservice:IsKeyDown(Enum.KeyCode.W) then
-                    velVector3 = velVector3 + (camera.CoordinateFrame.lookVector * library.pointers.flymultiplier:get() * 50)
-                end
-                if userinputservice:IsKeyDown(Enum.KeyCode.A) then
-                    velVector3 = velVector3 + (camera.CoordinateFrame.rightVector * -library.pointers.flymultiplier:get() * 50)
-                end
-                if userinputservice:IsKeyDown(Enum.KeyCode.S) then
-                    velVector3 = velVector3 + (camera.CoordinateFrame.lookVector * -library.pointers.flymultiplier:get() * 50)
-                end
-                if userinputservice:IsKeyDown(Enum.KeyCode.D) then
-                    velVector3 = velVector3 + (camera.CoordinateFrame.rightVector * library.pointers.flymultiplier:get() * 50)
+        if library.pointers.flymode:get() == "Always" or (library.pointers.flymode:get() == "Keybind" and library.pointers.flykeybind:is_active()) then
+            local moveDirection = hum.MoveDirection
+            local addY = 0
+            local lookDir = camera.CFrame.LookVector
+
+            -- Logic for PC
+            if not userinputservice.TouchEnabled then
+                -- Control with Space and Ctrl
+                if userinputservice:IsKeyDown(Enum.KeyCode.Space) then
+                    addY = library.pointers.flymultiplier:get() / 8
+                elseif userinputservice:IsKeyDown(Enum.KeyCode.LeftControl) then
+                    addY = -library.pointers.flymultiplier:get() / 8
                 end
 
-                if character.isAlive() then
-                    localplayer.Character.HumanoidRootPart.Velocity = velVector3
-                    if localplayer.Character.Humanoid:GetState() == "Landing" then
-                        localplayer.Character.Humanoid:ChangeState("Landing")
-                    elseif localplayer.Character.Humanoid:GetState() == "Freefall" then
-                        localplayer.Character.Humanoid:ChangeState("Freefall")
-                    end
+                -- Camera look direction for vertical movement
+                if lookDir.Y > 0.1 then
+                    addY = library.pointers.flymultiplier:get() / 8
+                elseif lookDir.Y < -0.1 then
+                    addY = -library.pointers.flymultiplier:get() / 8
+                end
+            end
+
+            -- Update fly position
+            if character.isAlive() then
+                hrp.CFrame = hrp.CFrame + (moveDirection * dt) * library.pointers.flymultiplier:get() * 10
+                hrp.CFrame = hrp.CFrame + Vector3.new(0, addY, 0)
+                hrp.Velocity = Vector3.new(0, 1.9, 0)
+
+                -- Maintain humanoid state
+                if hum:GetState() == Enum.HumanoidStateType.Landing then
+                    hum:ChangeState(Enum.HumanoidStateType.Landing)
+                elseif hum:GetState() == Enum.HumanoidStateType.Freefall then
+                    hum:ChangeState(Enum.HumanoidStateType.Freefall)
                 end
             end
         end
     else
-        if character.isAlive() then localplayer.Character.Humanoid:ChangeState("Landing") end
+        if character.isAlive() then
+            hum:ChangeState(Enum.HumanoidStateType.Landing)
+        end
     end
-    if character.isAlive() and library.pointers.autojumpenabled:get() and localplayer.Character.Humanoid:GetState() ~= Enum.HumanoidStateType.Freefall and localplayer.Character.Humanoid.MoveDirection.Magnitude > 0 then
-        localplayer.Character.Humanoid:ChangeState("Jumping")
+
+    -- Autojump logic (unchanged)
+    if character.isAlive() and library.pointers.autojumpenabled:get() and hum:GetState() ~= Enum.HumanoidStateType.Freefall and hum.MoveDirection.Magnitude > 0 then
+        hum:ChangeState(Enum.HumanoidStateType.Jumping)
     end
+
+    -- No jump cooldown logic (unchanged)
     if library.pointers.nojumpcooldownenabled:get() then
         if character.isAlive() then
-            localplayer.Character.Humanoid.UseJumpPower = false
+            hum.UseJumpPower = false
         end
     else
         if character.isAlive() then
-            localplayer.Character.Humanoid.UseJumpPower = true
+            hum.UseJumpPower = true
         end
     end
+
+    -- No slowdown logic (unchanged)
     if library.pointers.noslowdownenabled:get() then
         if character.isAlive() then
             local slowdownEffects = {
@@ -7446,14 +7450,13 @@ movementEvent:bindConnection(runservice.Heartbeat, "movementConnection", LPH_JIT
                 "NoJumping",
                 "ReduceWalk"
             }
-            --// desktop fixed this ;)
             for _, effect in next, slowdownEffects do
-                if localplayer.Character.BodyEffects.Movement:FindFirstChild(effect) then
-                    localplayer.Character.BodyEffects.Movement:FindFirstChild(effect):Destroy()
+                if char.BodyEffects.Movement:FindFirstChild(effect) then
+                    char.BodyEffects.Movement:FindFirstChild(effect):Destroy()
                 end
             end
-            if localplayer.Character.BodyEffects.Reload.Value == true then
-                localplayer.Character.BodyEffects.Reload.Value = false
+            if char.BodyEffects.Reload.Value == true then
+                char.BodyEffects.Reload.Value = false
             end
         end
     end
@@ -7757,7 +7760,6 @@ targetaimEvent:bindConnection(runservice.Heartbeat, "#targetaimConnection_x", LP
     else
         targetaim__prediction = library.pointers["#prediction"]:get()
     end
-    --ELEGANT WORK ON THIS, DONT DO ANYTHING ELSE!
     if library.pointers["#autoprediction"]:get() then
         local ping = tonumber(stats.Network.ServerStatsItem["Data Ping"]:GetValueString():split(".")[1])
         if ping < 100 then
