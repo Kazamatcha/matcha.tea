@@ -15,7 +15,7 @@ local Notification = Fatality:CreateNotifier();
 
 Fatality:Loader({
 	Name = "matcha.tea",
-	Duration = 4
+	Duration = 2
 });
 
 Notification:Notify({
@@ -195,6 +195,27 @@ getgenv().matcha = {
     ESPTracerColor = Color3.fromRGB(70, 220, 110),
     ESPTracerType = "Cursor",
     ESPTracerThickness = 1,
+    ESPEnabled = true,  -- Để bật tổng ESP
+    ESPArmorBar = false,
+    ESPArmorBarColor = Color3.fromRGB(70, 220, 110),
+    ESPArrow = false,
+    ESPArrowColor = Color3.fromRGB(70, 220, 110),
+    ESPArrowTargetColor = Color3.fromRGB(255, 0, 0),
+    ESPTracerOutlineColor = Color3.fromRGB(0, 0, 0),
+    ESPToolMaterial = false,
+    DistFromCenterSize = 100,  -- Cho arrow size
+    ESPShowTeam = false,  -- Biến mới
+    ESPRainbow = false,  -- Biến mới
+    ESPRainbowSpeed = 1,  -- Biến mới
+    ESPMaxDistance = 1000,  -- Biến mới
+    ESPArrowEnabled = false,  -- Biến mới cho arrow
+    ESPArrowDistFromCenter = 100,  -- Biến mới
+    ESPArrowHeight = 16,  -- Biến mới
+    ESPArrowWidth = 16,  -- Biến mới
+    ESPArrowFilled = true,  -- Biến mới
+    ESPArrowTransparency = 0,  -- Biến mới
+    ESPArrowThickness = 1,  -- Biến mới
+    ESPArrowAntiAliasing = false  -- Biến mới
 }
 
 -- Hit parts
@@ -354,6 +375,15 @@ end
 
 local function isKO(plr)
     return not isAlive(plr)
+end
+
+local function isDaHood()
+    for _, tool in ipairs(workspace:GetDescendants()) do
+        if tool:IsA("Tool") and (tool:FindFirstChild("Ammo") or tool:FindFirstChild("AmmoCount") or tool:FindFirstChild("GunScript")) then
+            return true
+        end
+    end
+    return false
 end
 
 local function canSeeThroughWall(localPlayer, target)
@@ -2241,25 +2271,6 @@ ESPGroup:AddSlider('ESPHeadDotSize', {
     end
 })
 
--- Toggle ESP Faded
-ESPGroup:AddToggle('ESPFaded', {
-    Text = 'Faded ESP',
-    Default = false,
-    Callback = function(Value)
-        getgenv().matcha.ESPFaded = Value
-    end
-})
-ESPGroup:AddSlider('ESPFadeSpeed', {
-    Text = 'Fade Speed',
-    Min = 1,
-    Max = 10,
-    Default = 5,
-    Rounding = 0,
-    Callback = function(Value)
-        getgenv().matcha.ESPFadeSpeed = Value
-    end
-})
-
 
 local ESP2Group = Tabs.World:AddRightGroupbox('ESP 2')
 
@@ -2365,27 +2376,6 @@ ESP2Group:AddSlider('ESPTracerThickness', {
         matcha.ESPTracerThickness = Value
     end
 })
-
--- 🌿 Thêm biến mới vào getgenv().matcha (chỉ các biến chưa có, bao gồm tất cả liên quan)
-getgenv().matcha.ESPEnabled = true  -- Để bật tổng ESP, giả sử chưa có
-getgenv().matcha.ESPArmorBar = false
-getgenv().matcha.ESPArmorBarColor = Color3.fromRGB(70, 220, 110)
-getgenv().matcha.ESPArrow = false
-getgenv().matcha.ESPArrowColor = Color3.fromRGB(70, 220, 110)
-getgenv().matcha.ESPArrowTargetColor = Color3.fromRGB(255, 0, 0)
-getgenv().matcha.ESPTracerOutlineColor = Color3.fromRGB(0, 0, 0)
-getgenv().matcha.ESPToolMaterial = false
-getgenv().matcha.DistFromCenterSize = 100  -- Cho arrow size
-
--- 🌿 Hàm check game là Da Hood
-local function isDaHood()
-    for _, tool in ipairs(workspace:GetDescendants()) do
-        if tool:IsA("Tool") and (tool:FindFirstChild("Ammo") or tool:FindFirstChild("AmmoCount") or tool:FindFirstChild("GunScript")) then
-            return true
-        end
-    end
-    return false
-end
 
 -- 🌿 Logic ESP Fade (áp dụng cho tất cả chức năng ESP nếu bật)
 local fading = {}  -- Per player fading
@@ -2682,14 +2672,14 @@ local function esp_remove_player(player)
     esp_obj.armor_bar_outline:Remove()
     esp_obj.armor_bar_inline:Remove()
     for _, line in ipairs(esp_obj.arrow_lines) do line:Remove() end
-    for _, line in ipairs(esp_obj.lines3d) do line:Remove() end
-    for _, quad in ipairs(esp_obj.quads3d) do quad:Remove() end
+    for _, l in ipairs(esp_obj.lines3d) do l:Remove() end
+    for _, q in ipairs(esp_obj.quads3d) do q:Remove() end
 
     esplib.players[player] = nil
     fading[player] = nil
 end
 
--- 🌿 Main RunService.Heartbeat loop (full chi tiết, lấy biến trực tiếp từ getgenv().matcha, no separate separate settings fetch)
+-- 🌿 Main RunService.Heartbeat loop (full chi tiết, lấy biến trực tiếp từ getgenv().matcha, no separate settings fetch)
 RunService.Heartbeat:Connect(function(dt)
     if not getgenv().matcha.ESPEnabled then return end
 
