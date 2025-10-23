@@ -413,8 +413,8 @@ local function ClosestPlr(Part)
     return Closest
 end
 
-local function Resolver(Target, Aimbot)
-    local Part = Target.Character[Aimbot.RealHitPart]
+local function Resolver(Target, getgenv().TargetAimbot.Aimbot)
+    local Part = Target.Character[getgenv().TargetAimbot.RealHitPart]
     local CurrentPosition = Part.Position
     local CurrentTime = tick()
     wait()
@@ -448,7 +448,7 @@ local function CalculateAutoPrediction(target)
 end
 
 local function AimRedirect()
-    if not (TargetAimbot.Enabled and TargBindEnabled and TargetPlr and TargetPlr.Character and TargetPlr.Character:FindFirstChild(TargetAimbot.RealHitPart)) then
+    if not (getgenv().TargetAimbot.Enabled and TargBindEnabled and TargetPlr and TargetPlr.Character and TargetPlr.Character:FindFirstChild(getgenv().TargetAimbot.RealHitPart)) then
         return
     end
     -- Check if local player and target are alive
@@ -461,7 +461,7 @@ local function AimRedirect()
     end
 
     local cam = Workspace.CurrentCamera
-    local rootPart = TargetPlr.Character[TargetAimbot.RealHitPart]
+    local rootPart = TargetPlr.Character[getgenv().TargetAimbot.RealHitPart]
     local targetVelocity = rootPart.AssemblyLinearVelocity
 
     -- Tính toán prediction tự động
@@ -469,7 +469,7 @@ local function AimRedirect()
     local predictedPosition = rootPart.Position + (targetVelocity * predictionTime)
 
     -- Nếu có jump offset, áp dụng thêm
-    predictedPosition += Vector3.new(0, TargetAimbot.RealJumpOffset, 0)
+    predictedPosition += Vector3.new(0, getgenv().TargetAimbot.RealJumpOffset, 0)
 
     -- ⚡ Đặt camera và hướng aim với smoothing
     local newCF = CFrame.lookAt(cam.CFrame.Position, predictedPosition)
@@ -480,7 +480,7 @@ local function AimRedirect()
     end
 
     -- Nếu muốn quay nhân vật theo hướng aim với smoothing:
-    if TargetAimbot.LookAt and LocalPlayer.Character and LocalPlayer.Character.PrimaryPart then
+    if getgenv().TargetAimbot.LookAt and LocalPlayer.Character and LocalPlayer.Character.PrimaryPart then
         local charNewCF = CFrame.lookAt(LocalPlayer.Character.PrimaryPart.Position, predictedPosition)
         if getgenv().TargetAimbot.Smoothing then
             LocalPlayer.Character:SetPrimaryPartCFrame(LocalPlayer.Character.PrimaryPart.CFrame:Lerp(charNewCF, getgenv().TargetAimbot.SmoothingFactor))
@@ -491,11 +491,11 @@ local function AimRedirect()
 end
 
 RunService.Heartbeat:Connect(function()
-    if TargetAimbot.Enabled and TargBindEnabled and TargetPlr then
+    if getgenv().TargetAimbot.Enabled and TargBindEnabled and TargetPlr then
         TargResolvePos = Resolver(TargetPlr, TargetAimbot)
     end
     updateTargetHealth()
-    if TargetAimbot.Enabled and TargBindEnabled and TargetPlr then
+    if getgenv().TargetAimbot.Enabled and TargBindEnabled and TargetPlr then
         AimRedirect()
     end
 end)
