@@ -1976,8 +1976,6 @@ RunService.Heartbeat:Connect(function(dt)
                 -- Di chuyển theo hướng nhìn cộng với hướng di chuyển (MoveDirection)
                 moveDirection = Vector3.new(moveDirection.X, 0, moveDirection.Z) + Vector3.new(lookDir.X, 0, lookDir.Z)
             else
-                -- Nếu không di chuyển, chỉ tính độ cao
-                moveDirection = Vector3.zero
             end
 
             -- Cập nhật bay lên/xuống theo hướng nhìn camera
