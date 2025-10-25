@@ -11,19 +11,19 @@ if not getgenv().SYC then
 end
 
 if not getgenv().load_game then
-    getgenv().load_game = "da_hood"
+    getgenv().load_game = "matcha.tea"
 end
 
-if not isfolder("drax") then
-    makefolder("drax")
+if not isfolder("matcha") then
+    makefolder("matcha")
 end
 
-if not isfolder("drax/configs") then
-    makefolder("drax/configs")
+if not isfolder("matcha/configs") then
+    makefolder("matcha/configs")
 end
 
-if not isfolder("drax/configs/da_hood") then
-    makefolder("drax/configs/da_hood")
+if not isfolder("matcha/configs/matcha.tea") then
+    makefolder("matcha/configs/matcha.tea")
 end
 
 -- make services global. self-explanatory.
