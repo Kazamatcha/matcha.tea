@@ -1,0 +1,1188 @@
+getgenv().matcha = {
+    AimbotEnabled = false,
+    StickyAim = false,
+    CheckSelect = {},
+    AimCheck = {},
+    AimDistanceCheck = false,
+    AimDistance = 250,
+    HealthCheck = false,
+    HealthThreshold = 50,
+    Resolver = false,
+    ResolverMethod = "move direction",
+    AutoPrediction = false,
+    AutoPredMode = "0-225",
+    PredictionX = 0.13,
+    PredictionY = 0.13,
+    HitPart = "Head",
+    ClosestPart = false,
+    Offset = 0,
+    JumpOffset = 0,
+    AirPartEnabled = false,
+    AirPart = "Head",
+    SmoothingEnabled = false,
+    Smooth = 0.5,
+    SmoothMethod = "Linear",
+    ToggleAimbot = true,
+    NotifySelect = false,
+    Target = nil,
+    SelectedTarget = nil,
+TriggerbotEnabled = false,
+    TriggerFOV = 20,
+    OnlyTarget = false,
+    TriggerCheckWall = false,
+    TriggerCheckKO = false,
+    TriggerCheckKnife = false,
+    TriggerCheckGrab = false,
+    TriggerCheckTeam = false,
+    TriggerCheckFriend = false,
+    TriggerDelay = 1,
+
+    -- Hitbox Expander vars
+    HitboxExpanderEnabled = false,
+    HitboxSize = 10,
+    VisualizeHitbox = false,
+    HitboxColor = Color3.fromRGB(70, 220, 110),
+    HitboxOutlineColor = Color3.fromRGB(255, 255, 255),
+    HitboxCheckTeam = false,
+    HitboxOnlyTarget = false,
+}
+-- Logic implementation
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+local RunService = game:GetService("RunService")
+local Stats = game:GetService("Stats")
+local UserInputService = game:GetService("UserInputService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local lastNotifiedTarget = nil
+local targeting = false
+
+local function isAlive(plr)
+    if not plr or not plr.Character then return false end
+    local hum = plr.Character:FindFirstChildOfClass("Humanoid")
+    if not hum or hum.Health <= 0 then
+        return false
+    end
+
+    local be = plr.Character:FindFirstChild("BodyEffects")
+    if be then
+        local ko = be:FindFirstChild("K.O")
+        local grabbed = be:FindFirstChild("GRABBING_CONSTRAINT")
+        if (ko and ko.Value) or (grabbed and grabbed.Value) then
+            return false
+        end
+    end
+
+    return true
+end
+local function isKO(plr)
+    return not isAlive(plr)
+end
+local function canSeeThroughWall(localPlayer, target)
+    local ray = Ray.new(Camera.CFrame.Position, (target.Character.HumanoidRootPart.Position - Camera.CFrame.Position).unit * 10000)
+    local hit, pos = workspace:FindPartOnRayWithIgnoreList(ray, {localPlayer.Character})
+    return hit and hit:IsDescendantOf(target.Character)
+end
+local function canSeeTarget(target, partName)
+    if not target or not target.Character or not target.Character:FindFirstChild(partName) then
+        return false
+    end
+    local camera = Workspace.CurrentCamera
+    local targetPart = target.Character[partName]
+    local rayOrigin = camera.CFrame.Position
+    local rayDirection = (targetPart.Position - rayOrigin).Unit * 10000
+    local raycastParams = RaycastParams.new()
+    raycastParams.FilterDescendantsInstances = {LocalPlayer.Character}
+    raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+    raycastParams.IgnoreWater = true
+    local raycastResult = Workspace:Raycast(rayOrigin, rayDirection, raycastParams)
+    return raycastResult == nil or (raycastResult.Instance and raycastResult.Instance:IsDescendantOf(target.Character))
+end
+
+local function getClosestPlayerToMouse()
+    local closestPlayer = nil
+    local shortestDistance = math.huge
+    local mousePos = game:GetService("UserInputService"):GetMouseLocation()
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and isAlive(player) then
+            local character = player.Character
+            if character then
+                local root = character:FindFirstChild("HumanoidRootPart")
+                if root then
+                    local screenPos, onScreen = Camera:WorldToViewportPoint(root.Position)
+                    if onScreen then
+                        local distance = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
+                        if distance < shortestDistance then
+                            local valid = true
+                            if table.find(getgenv().matcha.CheckSelect, "Check Wall") and not canSeeTarget(player, "HumanoidRootPart") then
+                                valid = false
+                            end
+                            if table.find(getgenv().matcha.CheckSelect, "Check Alive") and not isAlive(player) then
+                                valid = false
+                            end
+                            if table.find(getgenv().matcha.CheckSelect, "Check Team") and player.Team == LocalPlayer.Team then
+                                valid = false
+                            end
+                            if table.find(getgenv().matcha.CheckSelect, "Check Friend") then
+                                valid = false -- Placeholder for friend check
+                            end
+                            if valid then
+                                shortestDistance = distance
+                                closestPlayer = player
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    return closestPlayer
+end
+
+local function toggleTarget()
+    targeting = not targeting
+    if targeting then
+        getgenv().matcha.Target = getClosestPlayerToMouse()
+        if getgenv().matcha.Target then
+            getgenv().matcha.SelectedTarget = getgenv().matcha.Target
+            if getgenv().matcha.NotifySelect and getgenv().matcha.Target ~= lastNotifiedTarget then
+                Library:Notification("Selected Target: " .. getgenv().matcha.Target.DisplayName .. " (@" .. getgenv().matcha.Target.Name .. ")", "", 3)
+                lastNotifiedTarget = getgenv().matcha.Target
+            end
+        else
+            targeting = false
+        end
+    else
+        getgenv().matcha.Target = nil
+        getgenv().matcha.SelectedTarget = nil
+        lastNotifiedTarget = nil
+    end
+end
+
+local function getVelocity(targetPart)
+    local velocity
+    if getgenv().matcha.Resolver then
+        if getgenv().matcha.ResolverMethod == "move direction" then
+            local humanoid = targetPart.Parent:FindFirstChild("Humanoid")
+            if humanoid then
+                velocity = humanoid.MoveDirection * humanoid.WalkSpeed
+            end
+        elseif getgenv().matcha.ResolverMethod == "lookvector" then
+            velocity = targetPart.CFrame.LookVector * getgenv().matcha.PredictionX * 1.0
+        elseif getgenv().matcha.ResolverMethod == "combined" then
+            local target = getgenv().matcha.Target
+            if target and target.Character then
+                local part = target.Character:FindFirstChild(getgenv().matcha.HitPart)
+                if part then
+                    part.Velocity = Vector3.new(part.Velocity.X, 0, part.Velocity.Z)
+                    part.AssemblyLinearVelocity = Vector3.new(part.Velocity.X, 0, part.Velocity.Z)
+                    local hrp = target.Character:FindFirstChild("HumanoidRootPart")
+                    if hrp and hrp.Velocity.Magnitude > 30 then
+                        part.Velocity = Vector3.zero
+                        part.AssemblyLinearVelocity = Vector3.zero
+                    end
+                end
+            end
+            velocity = targetPart.Velocity
+        else
+            velocity = targetPart.Velocity
+        end
+    else
+        velocity = targetPart.Velocity
+    end
+    return velocity or Vector3.zero
+end
+
+local function CalculateAutoPrediction(target)
+    if not target or not target.Character or not target.Character:FindFirstChild("HumanoidRootPart") then
+        return 0.1
+    end
+
+    local ping = math.clamp(Stats.Network.ServerStatsItem["Data Ping"]:GetValue() / 1000, 0.01, 1)
+    local root = target.Character.HumanoidRootPart
+    local velocity = root.AssemblyLinearVelocity.Magnitude
+    local distance = (root.Position - Camera.CFrame.Position).Magnitude
+
+    local predicted_time = (distance / math.max(velocity, 1)) * 0.05 + ping * 0.5
+    predicted_time = math.clamp(predicted_time, 0.05, 0.4)
+    return predicted_time
+end
+
+local function getPing()
+    return math.floor(Stats.Network.ServerStatsItem["Data Ping"]:GetValue())
+end
+
+local function calculateAdvancePrediction(target, cameraPosition, pingBase)
+    local character = target.Character
+    if character then
+        local hrp = character:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            local vel = hrp.Velocity
+            local dist = (cameraPosition - hrp.Position).Magnitude
+            return pingBase + (dist / 1000) * (vel.Magnitude / 50)
+        end
+    end
+    return pingBase
+end
+
+local Blatant = {
+    {50, 0.12758545757236864},
+    {60, 0.12593338424986178},
+    {70, 0.1416310605747206},
+    {80, 0.1441481061236737},
+    {90, 0.14306050263254388},
+    {100, 0.14698413210558095},
+    {110, 0.14528324362031425},
+    {120, 0.14556534594403},
+    {130, 0.14614337395777216},
+    {140, 0.14645603036905414},
+    {150, 0.14736848095666674},
+    {160, 0.14696985547996216},
+    {170, 0.14718530231216217},
+    {180, 0.1471532933015037},
+    {190, 0.1471212842908452},
+    {200, 0.14708927528018672},
+    {210, 0.14705726626952823},
+    {220, 0.14702525725886974},
+    {230, 0.14699324824821125},
+    {240, 0.14696123923755276},
+    {250, 0.14692923022689427},
+    {260, 0.14689722121623578},
+    {270, 0.1468652122055773},
+    {280, 0.1468332031949188},
+    {290, 0.1468011941842603},
+    {300, 0.1467691851736018},
+}
+
+local predictionTable = {
+    {0, 0.1332},
+    {10, 0.1234555},
+    {20, 0.12435},
+    {30, 0.124123},
+    {40, 0.12766},
+    {50, 0.128643},
+    {60, 0.1264236},
+    {70, 0.12533},
+    {80, 0.1321042},
+    {90, 0.1421951},
+    {100, 0.134143},
+    {105, 0.141199},
+    {110, 0.142199},
+    {125, 0.15465},
+    {130, 0.12399},
+    {135, 0.1659921},
+    {140, 0.1659921},
+    {145, 0.129934},
+    {150, 0.1652131},
+    {155, 0.125333},
+    {160, 0.1223333},
+    {165, 0.1652131},
+    {170, 0.16863},
+    {175, 0.16312},
+    {180, 0.1632},
+    {185, 0.16823},
+    {190, 0.18659},
+    {205, 0.17782},
+    {215, 0.16937},
+    {225, 0.176332},
+}
+
+local function updatePredictionValue()
+    if not getgenv().matcha.AutoPrediction then return end
+
+    local ping = getPing()
+    local pred = 0.13
+
+    if getgenv().matcha.AutoPredMode == "0-225" then
+        for _, entry in ipairs(predictionTable) do
+            if ping < entry[1] then
+                pred = entry[2]
+                break
+            end
+        end
+    elseif getgenv().matcha.AutoPredMode == "Calculation" then
+        pred = 0.1 + (ping / 1000) * 0.32
+    elseif getgenv().matcha.AutoPredMode == "AdvanceCalculation" then
+        for _, entry in ipairs(predictionTable) do
+            if ping < entry[1] then
+                local base = entry[2]
+                pred = calculateAdvancePrediction(getgenv().matcha.SelectedTarget, Camera.CFrame.Position, base)
+                break
+            end
+        end
+    elseif getgenv().matcha.AutoPredMode == "Blatant" then
+        for _, entry in ipairs(Blatant) do
+            if ping < entry[1] then
+                pred = entry[2]
+                break
+            end
+        end
+    elseif getgenv().matcha.AutoPredMode == "50-290" then
+        if ping >= 50 and ping <= 290 then
+            local map = {
+                [50]=0.1433,[55]=0.1412,[60]=0.1389,[65]=0.1367,[70]=0.1346,[75]=0.1324,[80]=0.1303,
+                [85]=0.1282,[90]=0.1261,[95]=0.1240,[100]=0.1219,[105]=0.1198,[110]=0.1177,[115]=0.1157,
+                [120]=0.1136,[125]=0.1116,[130]=0.1095,[135]=0.1075,[140]=0.1055,[145]=0.1035,[150]=0.1015,
+                [155]=0.0995,[160]=0.0975,[165]=0.0956,[170]=0.0936,[175]=0.0917,[180]=0.0897,[185]=0.0878,
+                [190]=0.0859,[195]=0.0840,[200]=0.0821,[205]=0.0802,[210]=0.0783,[215]=0.0765,[220]=0.0746,
+                [225]=0.0728,[230]=0.0710,[235]=0.0692,[240]=0.0674,[245]=0.0656,[250]=0.0638,[255]=0.0620,
+                [260]=0.0603,[265]=0.0585,[270]=0.0568,[275]=0.0551,[280]=0.0534,[285]=0.0517,[290]=0.0500
+            }
+            for k,v in pairs(map) do if ping <= k then pred = v break end end
+        end
+    elseif getgenv().matcha.AutoPredMode == "10-190" then
+        if ping > 190 then pred = 0.206547
+        elseif ping > 180 then pred = 0.19284
+        elseif ping > 170 then pred = 0.1923111
+        elseif ping > 160 then pred = 0.1823111
+        elseif ping > 150 then pred = 0.171
+        elseif ping > 140 then pred = 0.165773
+        elseif ping > 130 then pred = 0.1223333
+        elseif ping > 120 then pred = 0.143765
+        elseif ping > 110 then pred = 0.1455
+        elseif ping > 100 then pred = 0.130340
+        elseif ping > 90 then pred = 0.136
+        elseif ping > 80 then pred = 0.1347
+        elseif ping > 70 then pred = 0.119
+        elseif ping > 60 then pred = 0.12731
+        elseif ping > 50 then pred = 0.127668
+        elseif ping > 40 then pred = 0.125
+        elseif ping > 30 then pred = 0.11
+        elseif ping > 20 then pred = 0.12588
+        elseif ping > 10 then pred = 0.9
+        end
+    elseif getgenv().matcha.AutoPredMode == "10-1000" then
+        local map = {
+            [1000]=0.345,[900]=0.290724,[800]=0.254408,[700]=0.23398,[600]=0.215823,[500]=0.19284,
+            [400]=0.18321,[360]=0.16537,[280]=0.16780,[270]=0.195566,[260]=0.175566,[250]=0.1651,
+            [240]=0.16780,[230]=0.15692,[220]=0.165566,[210]=0.165566,[200]=0.16942,[190]=0.166547,
+            [180]=0.19284,[170]=0.1923111,[160]=0.16,[150]=0.15,[140]=0.1223333,[130]=0.156692,
+            [120]=0.14376,[110]=0.1455,[100]=0.130340,[90]=0.136,[80]=0.1347,[70]=0.119,[60]=0.12731,
+            [50]=0.127668,[40]=0.125,[30]=0.11,[20]=0.12588,[10]=0.9
+        }
+        for k,v in pairs(map) do if ping <= k then pred = v break end end
+    elseif getgenv().matcha.AutoPredMode == "5-500" then
+        local map = {
+            [5]=0.1030773,[10]=0.1061546,[15]=0.1092319,[20]=0.1123092,[25]=0.1153865,[30]=0.1184638,
+            [35]=0.1215411,[40]=0.1246184,[45]=0.1276957,[50]=0.130773,[55]=0.1338503,[60]=0.1369276,
+            [65]=0.1400049,[70]=0.1430822,[75]=0.1461595,[80]=0.1492368,[85]=0.1523141,[90]=0.1553914,
+            [95]=0.1584687,[100]=0.161546,[105]=0.1646233,[110]=0.1677006,[115]=0.1707779,[120]=0.1738552,
+            [125]=0.1769325,[130]=0.1800098,[135]=0.1830871,[140]=0.1861644,[145]=0.1892417,[150]=0.192319,
+            [155]=0.1953963,[160]=0.1984736,[165]=0.2015509,[170]=0.2046282,[175]=0.2077055,[180]=0.2107828,
+            [185]=0.2138601,[190]=0.2169374,[195]=0.2200147,[200]=0.223092,[205]=0.2261693,[210]=0.2292466,
+            [215]=0.2323239,[220]=0.2354012,[225]=0.2384785,[230]=0.2415558,[235]=0.2446331,[240]=0.2477104,
+            [245]=0.2507877,[250]=0.253865,[255]=0.2569423,[260]=0.2600196,[265]=0.2630969,[270]=0.2661742,
+            [275]=0.2692515,[280]=0.2723288,[285]=0.2754061,[290]=0.2784834,[295]=0.2815607,[300]=0.284638,
+            [305]=0.2877153,[310]=0.2907926,[315]=0.2938699,[320]=0.2969472,[325]=0.3000245,[330]=0.3031018,
+            [335]=0.3061791,[340]=0.3092564,[345]=0.3123337,[350]=0.315411,[355]=0.3184883,[360]=0.3215656,
+            [365]=0.3246429,[370]=0.3277202,[375]=0.3307975,[380]=0.3338748,[385]=0.3369521,[390]=0.3400294,
+            [395]=0.3431067,[400]=0.346184,[405]=0.3492613,[410]=0.3523386,[415]=0.3554159,[420]=0.3584932,
+            [425]=0.3615705,[430]=0.3646478,[435]=0.3677251,[440]=0.3708024,[445]=0.3738797,[450]=0.376957,
+            [455]=0.3800343,[460]=0.3831116,[465]=0.3861889,[470]=0.3892662,[475]=0.3923435,[480]=0.3954208,
+            [485]=0.3984981,[490]=0.4015754,[495]=0.4046527,[500]=0.40773
+        }
+        for k,v in pairs(map) do if ping <= k then pred = v break end end
+    elseif getgenv().matcha.AutoPredMode == "drax" then
+        pred = (ping / 1000) + 0.125
+    elseif getgenv().matcha.AutoPredMode == "110-140" then
+        if ping >= 110 and ping <= 140 then
+            local vals = {0.1345, 0.1409, 0.141199, 0.143765}
+            pred = vals[math.random(1,#vals)]
+        end
+    elseif getgenv().matcha.AutoPredMode == "matcha" then
+        pred = CalculateAutoPrediction(getgenv().matcha.SelectedTarget)
+    end
+
+    getgenv().matcha.PredictionX = pred
+    getgenv().matcha.PredictionY = pred
+end
+
+local HitParts = {
+    "Head", "HumanoidRootPart", "UpperTorso", "LowerTorso",
+    "LeftUpperArm", "RightUpperArm", "LeftLowerArm", "RightLowerArm",
+    "LeftHand", "RightHand", "LeftUpperLeg", "RightUpperLeg",
+    "LeftLowerLeg", "RightLowerLeg", "LeftFoot", "RightFoot",
+    "Torso", "Left Arm", "Right Arm", "Left Leg", "Right Leg"
+}
+local function isHoldingKnife()
+    local char = LocalPlayer.Character
+    if char then
+        local tool = char:FindFirstChildWhichIsA("Tool")
+        if tool and tool.Name:lower():find("knife") then
+            return true
+        end
+    end
+    return false
+end
+
+local function isValidTriggerTarget(plr)
+    if plr == LocalPlayer then return false end
+    if getgenv().matcha.OnlyTarget and plr ~= getgenv().matcha.SelectedTarget then return false end
+    if getgenv().matcha.TriggerCheckTeam and plr.Team == LocalPlayer.Team then return false end
+    if getgenv().matcha.TriggerCheckFriend and LocalPlayer:IsFriendsWith(plr.UserId) then return false end
+    if getgenv().matcha.TriggerCheckKO and isKO(plr) then return false end
+    if getgenv().matcha.TriggerCheckGrab and plr.Character:FindFirstChild("BodyEffects") and plr.Character.BodyEffects:FindFirstChild("GRABBING_CONSTRAINT") and plr.Character.BodyEffects.GRABBING_CONSTRAINT.Value then return false end
+    if getgenv().matcha.TriggerCheckWall and not canSeeThroughWall(LocalPlayer, plr) then return false end
+    if getgenv().matcha.TriggerCheckKnife and isHoldingKnife() then return false end
+    return isAlive(plr)
+end
+
+local function distToCursor(part)
+    local v, vis = Camera:WorldToViewportPoint(part.Position)
+    if not vis then return math.huge end
+    local m = UserInputService.TouchEnabled and Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2) or UserInputService:GetMouseLocation()
+    return (Vector2.new(v.X, v.Y) - m).Magnitude
+end
+
+local function click()
+    if UserInputService.TouchEnabled then
+        local touchPos = UserInputService:GetMouseLocation()
+        VirtualInputManager:SendTouchEvent(0, Enum.UserInputState.Begin, touchPos)
+        task.wait()
+        VirtualInputManager:SendTouchEvent(0, Enum.UserInputState.End, touchPos)
+    else
+        if mouse1press then
+            mouse1press()
+            mouse1release()
+        elseif mouse1click then
+            mouse1click()
+        end
+    end
+end
+
+local function toolActivate(tool)
+    pcall(function() tool:Activate() end)
+end
+
+local function GetBestTargetPart()
+    local bestPart, bestDist = nil, getgenv().matcha.TriggerFOV
+    for _, plr in pairs(Players:GetPlayers()) do
+        if isValidTriggerTarget(plr) and plr.Character then
+            for _, partName in ipairs(HitParts) do
+                local part = plr.Character:FindFirstChild(partName)
+                if part and part:IsA("BasePart") then
+                    local dist = distToCursor(part)
+                    if dist < bestDist then
+                        bestPart = part
+                        bestDist = dist
+                    end
+                end
+            end
+        end
+    end
+    return bestPart
+end
+
+-- Hitbox Expander Logic
+local highlights = {}
+
+local function removeVisuals(Player)
+    if highlights[Player] then
+        highlights[Player]:Destroy()
+        highlights[Player] = nil
+    end
+end
+
+local function resetCharacter(Character, Player)
+    if not Character then return end
+    local HRP = Character:FindFirstChild("HumanoidRootPart")
+    if HRP then
+        HRP.Size = Vector3.new(2, 1, 2)
+        HRP.Transparency = 1
+        HRP.CanCollide = true
+    end
+    removeVisuals(Player)
+end
+
+local function handleCharacter(Character, Player)
+    if not Character or not getgenv().matcha.HitboxExpanderEnabled then
+        resetCharacter(Character, Player)
+        return
+    end
+
+    if not Player or Player == LocalPlayer then return end
+
+    if getgenv().matcha.HitboxOnlyTarget and Player ~= getgenv().matcha.SelectedTarget then 
+        resetCharacter(Character, Player)
+        return 
+    end
+    if getgenv().matcha.HitboxCheckTeam and Player.Team == LocalPlayer.Team then 
+        resetCharacter(Character, Player)
+        return 
+    end
+
+    local HRP = Character:FindFirstChild("HumanoidRootPart")
+    if not HRP then return end
+
+    HRP.Size = Vector3.new(getgenv().matcha.HitboxSize, getgenv().matcha.HitboxSize, getgenv().matcha.HitboxSize)
+    HRP.Transparency = 0.9
+    HRP.CanCollide = false
+
+    if getgenv().matcha.VisualizeHitbox then
+        if not highlights[Player] then
+            local hl = Instance.new("Highlight")
+            hl.Name = "HitboxHighlight"
+            hl.Adornee = Character
+            hl.FillColor = getgenv().matcha.HitboxColor
+            hl.OutlineColor = getgenv().matcha.HitboxOutlineColor
+            hl.FillTransparency = 0.8
+            hl.OutlineTransparency = 0
+            hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+            hl.Parent = HRP
+            highlights[Player] = hl
+        else
+            local hl = highlights[Player]
+            hl.FillColor = getgenv().matcha.HitboxColor
+            hl.OutlineColor = getgenv().matcha.HitboxOutlineColor
+            hl.FillTransparency = 0.8
+            hl.OutlineTransparency = 0
+        end
+    else
+        removeVisuals(Player)
+    end
+end
+
+local function handlePlayer(Player)
+    if Player == LocalPlayer then return end
+    Player.CharacterAdded:Connect(function(Character)
+        Character:WaitForChild("HumanoidRootPart")
+        handleCharacter(Character, Player)
+    end)
+    if Player.Character then
+        handleCharacter(Player.Character, Player)
+    end
+end
+
+for _, Player in pairs(Players:GetPlayers()) do
+    handlePlayer(Player)
+end
+
+Players.PlayerAdded:Connect(handlePlayer)
+
+RunService.RenderStepped:Connect(function()
+    updatePredictionValue()
+
+    if getgenv().matcha.AimbotEnabled and targeting and getgenv().matcha.ToggleAimbot then
+        if not getgenv().matcha.StickyAim then
+            getgenv().matcha.Target = getClosestPlayerToMouse()
+            if getgenv().matcha.Target and getgenv().matcha.Target ~= lastNotifiedTarget and getgenv().matcha.NotifySelect then
+                Library:Notification("Selected Target: " .. getgenv().matcha.Target.DisplayName .. " (@" .. getgenv().matcha.Target.Name .. ")", "", 3)
+                lastNotifiedTarget = getgenv().matcha.Target
+            end
+            getgenv().matcha.SelectedTarget = getgenv().matcha.Target
+        end
+
+        local target = getgenv().matcha.SelectedTarget
+        if target and target.Character then
+            local valid = true
+            local hitPartName = getgenv().matcha.HitPart
+            if hitPartName == "Torso (R6)" then hitPartName = "Torso" end
+
+            if table.find(getgenv().matcha.AimCheck, "Check Wall") and not canSeeTarget(target, hitPartName) then
+                valid = false
+            end
+            if table.find(getgenv().matcha.AimCheck, "Check Alive") and not isAlive(target) then
+                valid = false
+            end
+
+            if getgenv().matcha.AimDistanceCheck then
+                local dist = (target.Character.HumanoidRootPart.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
+                if dist > getgenv().matcha.AimDistance then
+                    valid = false
+                end
+            end
+
+            if getgenv().matcha.HealthCheck then
+                local hum = target.Character:FindFirstChildOfClass("Humanoid")
+                if hum and hum.Health <= getgenv().matcha.HealthThreshold then
+                    valid = false
+                end
+            end
+
+            if valid then
+                local targetPart = target.Character:FindFirstChild(hitPartName) or target.Character.HumanoidRootPart
+
+                if getgenv().matcha.ClosestPart then
+                    local closestDist = math.huge
+                    for _, part in ipairs(target.Character:GetChildren()) do
+                        if part:IsA("BasePart") then
+                            local dist = (part.Position - Camera.CFrame.Position).Magnitude
+                            if dist < closestDist then
+                                targetPart = part
+                                closestDist = dist
+                            end
+                        end
+                    end
+                end
+
+                local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+                local targetHum = target.Character:FindFirstChildOfClass("Humanoid")
+                local inFreefall = (hum and hum:GetState() == Enum.HumanoidStateType.Freefall) or (targetHum and targetHum:GetState() == Enum.HumanoidStateType.Freefall)
+
+                if getgenv().matcha.AirPartEnabled and inFreefall then
+                    local airPartName = getgenv().matcha.AirPart
+                    if airPartName == "Torso (R6)" then airPartName = "Torso" end
+                    targetPart = target.Character:FindFirstChild(airPartName) or targetPart
+                end
+
+                local velocity = getVelocity(targetPart)
+                local prediction = Vector3.new(velocity.X * getgenv().matcha.PredictionX, velocity.Y * getgenv().matcha.PredictionY, velocity.Z * getgenv().matcha.PredictionX)
+                local aimPos = targetPart.Position + prediction
+
+                if inFreefall then
+                    aimPos = aimPos + Vector3.new(0, getgenv().matcha.JumpOffset, 0)
+                else
+                    aimPos = aimPos + Vector3.new(0, getgenv().matcha.Offset, 0)
+                end
+
+                local currentCFrame = Camera.CFrame
+                local smooth = getgenv().matcha.Smooth
+                local method = getgenv().matcha.SmoothMethod
+
+                Camera.CFrame = Camera.CFrame:Lerp(CFrame.new(Camera.CFrame.Position, aimPos), smooth, Enum.EasingStyle[method], Enum.EasingDirection.InOut)
+            end
+        end
+    end
+end)
+
+Players.PlayerAdded:Connect(handlePlayer)
+
+-- ✅ RunService loop update
+RunService.RenderStepped:Connect(function()
+    for _, Player in pairs(Players:GetPlayers()) do
+        if Player ~= LocalPlayer and Player.Character then
+            handleCharacter(Player.Character, Player)
+        end
+    end
+end)
+RunService.RenderStepped:Connect(function()
+    if not getgenv().matcha.HitboxExpanderEnabled then
+        for _, Player, hl in pairs(Players:GetPlayers()) do
+            if Playerl ~= LocalPlayer and Player.Character then
+                resetCharacter(Player.Character)
+            end
+        end
+    else
+        for _, Player, hl in pairs(Players:GetPlayers()) do
+            if Player ~= LocalPlayer and Player.Character then
+                handleCharacter(Player.Character)
+            end
+        end
+    end
+    if getgenv().matcha.TriggerbotEnabled then
+        local part = GetBestTargetPart()
+        if part then
+            task.spawn(function()
+                local cap = part
+                task.wait(getgenv().matcha.TriggerDelay / 1000)
+                if getgenv().matcha.TriggerbotEnabled and distToCursor(cap) <= getgenv().matcha.TriggerFOV then
+                    local origin = Camera.CFrame.Position
+                    local direction = (cap.Position - origin)
+                    local rayParams = RaycastParams.new()
+                    rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+                    rayParams.FilterDescendantsInstances = {LocalPlayer.Character}
+
+                    local result = workspace:Raycast(origin, direction, rayParams)
+
+                    if not result or result.Instance:IsDescendantOf(cap.Parent) then
+                        local char = LocalPlayer.Character
+                        local tool = char and char:FindFirstChildWhichIsA("Tool")
+                        local ammo = tool and tool:FindFirstChild("Ammo")
+                        if tool and ammo then
+                            toolActivate(tool)
+                        else
+                            click()
+                        end
+                    end
+                end
+            end)
+        end
+    end
+end)
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/Kazamatcha/matcha.tea/refs/heads/main/library"))()
+
+local Window = Library:Window({
+    Logo = "77218680285262",
+    FadeTime = 0.3,
+})
+-- Watermark setup
+local Watermark = Library:Watermark("matcha.tea | FPS | MS")
+local FrameTimer = tick()
+local FrameCounter = 0
+local FPS = 60
+RunService.RenderStepped:Connect(function()
+    FrameCounter += 1
+    if (tick() - FrameTimer) >= 1 then
+        FPS = FrameCounter
+        FrameTimer = tick()
+        FrameCounter = 0
+    end
+    local Ping = math.floor(Stats.Network.ServerStatsItem["Data Ping"]:GetValue())
+    Watermark:Set("matcha.tea | " .. FPS .. " | " .. Ping .. "ms")
+end)
+
+local KeybindList = Library:KeybindList()
+local MainPage = Window:Page({Name = "Main", SubPages = true})
+local SettingsPage = Library:CreateSettingsPage(Window, Watermark, KeybindList) 
+local CombatTab = MainPage:SubPage({Name = "Combat", Columns = 2})
+local AimbotSection = CombatTab:Section({Name = "Aimbot", Side = 1})
+local TriggerbotSection = CombatTab:Section({Name = "Triggerbot", Side = 1})
+local AimbotSettings = CombatTab:Section({Name = "Aimbot Settings", Side = 2})
+local HitboxSection = CombatTab:Section({Name = "Hitbox Expander", Side = 1})
+-- Toggle Aimbot
+local aimbotToggle = AimbotSection:Toggle({
+    Name = "Aimbot Enabled",
+    Flag = "AimbotEnabled",
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.AimbotEnabled = Value
+    end
+})
+
+-- Keybind for target selection
+aimbotToggle:Keybind({
+    Flag = "TargetKey",
+    Default = Enum.KeyCode.Q,
+    Mode = "Toggle",
+    Callback = function()
+        toggleTarget()
+    end
+})
+
+AimbotSection:Dropdown({
+    Name = "Check Select",
+    Items = {"Check Wall", "Check Alive", "Check Team", "Check Friend"},
+    Flag = "CheckSelect",
+    Default = {},
+    Multi = true,
+    Callback = function(Value)
+        getgenv().matcha.CheckSelect = Value
+    end
+})
+
+-- Dropdown AimCheck (Multi)
+AimbotSection:Dropdown({
+    Name = "Aim Check",
+    Items = {"Check Wall", "Check Alive"},
+    Flag = "AimCheck",
+    Default = {},
+    Multi = true,
+    Callback = function(Value)
+        getgenv().matcha.AimCheck = Value
+    end
+})
+
+-- Toggle Aim Distance Check + Slider
+AimbotSection:Toggle({
+    Name = "Aim Distance Check",
+    Flag = "AimDistanceCheck",
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.AimDistanceCheck = Value
+    end
+})
+AimbotSection:Slider({
+    Name = "Aim Distance",
+    Flag = "AimDistance",
+    Min = 1,
+    Max = 1000,
+    Default = 250,
+    Decimals = 1,
+    Callback = function(Value)
+        getgenv().matcha.AimDistance = Value
+    end
+})
+
+-- Toggle Health Check + Slider
+AimbotSection:Toggle({
+    Name = "Health Check",
+    Flag = "HealthCheck",
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.HealthCheck = Value
+    end
+})
+AimbotSection:Slider({
+    Name = "Health Threshold",
+    Flag = "HealthThreshold",
+    Min = 1,
+    Max = 100,
+    Default = 50,
+    Decimals = 1,
+    Callback = function(Value)
+        getgenv().matcha.HealthThreshold = Value
+    end
+})
+
+-- Toggle Sticky Aim
+AimbotSection:Toggle({
+    Name = "Sticky Aim",
+    Flag = "StickyAim",
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.StickyAim = Value
+    end
+})
+
+-- Toggle ToggleAimbot
+AimbotSection:Toggle({
+    Name = "Toggle Aimbot",
+    Flag = "ToggleAimbot",
+    Default = true,
+    Callback = function(Value)
+        getgenv().matcha.ToggleAimbot = Value
+    end
+})
+
+-- Toggle Notify Select
+AimbotSection:Toggle({
+    Name = "Notify Select Target",
+    Flag = "NotifySelect",
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.NotifySelect = Value
+    end
+})
+
+-- Aimbot Settings Section
+AimbotSettings:Toggle({
+    Name = "Resolver",
+    Flag = "Resolver",
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.Resolver = Value
+    end
+})
+AimbotSettings:Dropdown({
+    Name = "Resolver Method",
+    Items = {"move direction", "lookvector", "combined"},
+    Flag = "ResolverMethod",
+    Default = "move direction",
+    Multi = false,
+    Callback = function(Value)
+        getgenv().matcha.ResolverMethod = Value
+    end
+})
+
+AimbotSettings:Toggle({
+    Name = "Auto Prediction",
+    Flag = "AutoPrediction",
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.AutoPrediction = Value
+    end
+})
+AimbotSettings:Dropdown({
+    Name = "Auto Pred Mode",
+    Items = {"0-225", "Calculation", "AdvanceCalculation", "Blatant", "50-290", "10-190", "10-1000", "5-500", "drax", "110-140", "matcha"},
+    Flag = "AutoPredMode",
+    Default = "0-225",
+    Multi = false,
+    Callback = function(Value)
+        getgenv().matcha.AutoPredMode = Value
+    end
+})
+
+AimbotSettings:Slider({
+    Name = "Prediction X",
+    Flag = "PredictionX",
+    Min = 0,
+    Max = 1,
+    Default = 0.13,
+    Decimals = 0.001,
+    Callback = function(Value)
+        getgenv().matcha.PredictionX = Value
+    end
+})
+AimbotSettings:Slider({
+    Name = "Prediction Y",
+    Flag = "PredictionY",
+    Min = 0,
+    Max = 1,
+    Default = 0.13,
+    Decimals = 0.001,
+    Callback = function(Value)
+        getgenv().matcha.PredictionY = Value
+    end
+})
+
+AimbotSettings:Dropdown({
+    Name = "Hit Part",
+    Items = {"Head", "HumanoidRootPart", "UpperTorso", "LowerTorso", "Torso (R6)"},
+    Flag = "HitPart",
+    Default = "Head",
+    Multi = false,
+    Callback = function(Value)
+        getgenv().matcha.HitPart = Value
+    end
+})
+AimbotSettings:Toggle({
+    Name = "Closest Part",
+    Flag = "ClosestPart",
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.ClosestPart = Value
+    end
+})
+
+AimbotSettings:Slider({
+    Name = "Offset",
+    Flag = "Offset",
+    Min = -10,
+    Max = 10,
+    Default = 0,
+    Decimals = 0.1,
+    Callback = function(Value)
+        getgenv().matcha.Offset = Value
+    end
+})
+AimbotSettings:Slider({
+    Name = "Jump Offset",
+    Flag = "JumpOffset",
+    Min = -10,
+    Max = 10,
+    Default = 0,
+    Decimals = 0.1,
+    Callback = function(Value)
+        getgenv().matcha.JumpOffset = Value
+    end
+})
+
+AimbotSettings:Toggle({
+    Name = "Air Part Enabled",
+    Flag = "AirPartEnabled",
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.AirPartEnabled = Value
+    end
+})
+AimbotSettings:Dropdown({
+    Name = "Air Part",
+    Items = {"Head", "HumanoidRootPart", "UpperTorso", "LowerTorso", "Torso (R6)"},
+    Flag = "AirPart",
+    Default = "Head",
+    Multi = false,
+    Callback = function(Value)
+        getgenv().matcha.AirPart = Value
+    end
+})
+
+AimbotSettings:Slider({
+    Name = "Smooth",
+    Flag = "Smooth",
+    Min = 0,
+    Max = 1,
+    Default = 0.9953595,
+    Decimals = 0.001,
+    Callback = function(Value)
+        getgenv().matcha.Smooth = Value
+    end
+})
+AimbotSettings:Dropdown({
+    Name = "Smooth Method",
+    Items = {"Linear", "Exponential", "Sine", "Quad", "Quart", "Quint", "Bounce", "Elastic", "Back", "Cubic"},
+    Flag = "SmoothMethod",
+    Default = "Linear",
+    Multi = false,
+    Callback = function(Value)
+        getgenv().matcha.SmoothMethod = Value
+    end
+})
+
+TriggerbotSection:Toggle({
+    Name = "Enabled",
+    Flag = "TriggerbotEnabled",
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.TriggerbotEnabled = Value
+    end
+})
+
+TriggerbotSection:Dropdown({
+    Name = "Checks",
+    Items = {"Wall", "Knife", "Alive", "Friend", "Team"},
+    Flag = "TriggerChecks",
+    Default = {},
+    Multi = true,
+    Callback = function(selected)
+        getgenv().matcha.TriggerCheckWall = table.find(selected, "Wall")
+        getgenv().matcha.TriggerCheckKnife = table.find(selected, "Knife")
+        getgenv().matcha.TriggerCheckKO = table.find(selected, "Alive")  -- Assuming Alive means not KO
+        getgenv().matcha.TriggerCheckFriend = table.find(selected, "Friend")
+        getgenv().matcha.TriggerCheckTeam = table.find(selected, "Team")
+        getgenv().matcha.TriggerCheckGrab = false  -- Not in dropdown, default false
+    end
+})
+
+TriggerbotSection:Toggle({
+    Name = "Only Target",
+    Flag = "OnlyTarget",
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.OnlyTarget = Value
+    end
+})
+
+TriggerbotSection:Slider({
+    Name = "Trigger FOV",
+    Flag = "TriggerFOV",
+    Min = 1,
+    Max = 50,
+    Default = 20,
+    Decimals = 1,
+    Callback = function(Value)
+        getgenv().matcha.TriggerFOV = Value
+    end
+})
+
+TriggerbotSection:Slider({
+    Name = "Trigger Delay (ms)",
+    Flag = "TriggerDelay",
+    Min = 1,
+    Max = 1000,
+    Default = 1,
+    Decimals = 1,
+    Callback = function(Value)
+        getgenv().matcha.TriggerDelay = Value
+    end
+})
+
+HitboxSection:Toggle({
+    Name = "Enabled",
+    Flag = "HitboxExpanderEnabled",
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.HitboxExpanderEnabled = Value
+    end
+})
+
+HitboxSection:Slider({
+    Name = "Size",
+    Flag = "HitboxSize",
+    Min = 1,
+    Max = 50,
+    Default = 10,
+    Decimals = 1,
+    Callback = function(Value)
+        getgenv().matcha.HitboxSize = Value
+    end
+})
+
+local Toggle = HitboxSection:Toggle({
+    Name = "Visualize Hitbox",
+    Flag = "VisualizeHitbox",
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.VisualizeHitbox = Value
+    end
+})
+
+Toggle:Colorpicker({
+    Name = "Hitbox Color",
+    Flag = "HitboxColor",
+    Default = Color3.fromRGB(70, 220, 110),
+    Alpha = 0.8,
+    Callback = function(Value)
+        getgenv().matcha.HitboxColor = Value
+    end
+})
+
+Toggle:Colorpicker({
+    Name = "Hitbox Outline Color",
+    Flag = "HitboxOutlineColor",
+    Default = Color3.fromRGB(255, 255, 255),
+    Alpha = 0,
+    Callback = function(Value)
+        getgenv().matcha.HitboxOutlineColor = Value
+    end
+})
+
+HitboxSection:Toggle({
+    Name = "Check Team",
+    Flag = "HitboxCheckTeam",
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.HitboxCheckTeam = Value
+    end
+})
+
+HitboxSection:Toggle({
+    Name = "Target Only",
+    Flag = "HitboxOnlyTarget",
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.HitboxOnlyTarget = Value
+    end
+})
+local rs = game:GetService("RunService")
+local uis = game:GetService("UserInputService")
+local lp = game.Players.LocalPlayer
+local TweenService = game:GetService("TweenService")
+
+-- Danh sách animation
+local animations = {
+	C = "http://www.roblox.com/asset/?id=15609995579",
+	N = "http://www.roblox.com/asset/?id=14352343065",
+}
+
+local currentTrack = nil
+local currentKey = nil
+local renderConnection = nil
+local inputConnection = nil
+
+-- Hàm thiết lập nhân vật
+local function setup(char)
+	local hum = char:WaitForChild("Humanoid", 5)
+	if not hum then return end
+
+	local animator = hum:FindFirstChildOfClass("Animator") or Instance.new("Animator", hum)
+
+	-- Ngắt kết nối cũ
+	if renderConnection then renderConnection:Disconnect() end
+	if inputConnection then inputConnection:Disconnect() end
+
+	-- Dừng animation khi di chuyển
+	renderConnection = rs.RenderStepped:Connect(function()
+		if currentTrack and hum.MoveDirection.Magnitude > 0 then
+			currentTrack:Stop()
+			currentTrack = nil
+			currentKey = nil
+		end
+	end)
+
+	-- Phát animation khi nhấn phím
+	inputConnection = uis.InputBegan:Connect(function(input)
+		local key = input.KeyCode.Name
+		local animId = animations[key]
+		if animId and hum.MoveDirection.Magnitude == 0 then
+			if currentTrack then
+				currentTrack:Stop()
+				currentTrack = nil
+				currentKey = nil
+			end
+			local anim = Instance.new("Animation")
+			anim.AnimationId = animId
+			local track = animator:LoadAnimation(anim)
+			track:Play()
+			currentTrack = track
+			currentKey = key
+		end
+	end)
+end
+
+-- Kiểm tra character hiện tại
+if lp.Character then
+	setup(lp.Character)
+end
+
+-- Khi nhân vật respawn
+lp.CharacterAdded:Connect(function(char)
+	currentTrack = nil
+	currentKey = nil
+	task.wait(0.2)
+	setup(char)
+end)
+
+Library:Notification("Loaded!", "Menu loaded successfully", 5)
