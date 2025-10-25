@@ -18,35 +18,36 @@ local TargResolvePos
 getgenv().Prediction = 0.07
 getgenv().RealPrediction = 0.07
 
--- ⚙️ TargetAimbot trở thành biến toàn cục (getgenv)
-getgenv().TargetAimbot = {
-    Enabled = true, 
-    Keybind = Enum.KeyCode.Q,
-    Autoselect = false,
-    Resolver = true, 
-    ResolverType = "MoveDirection", 
-    JumpOffset = 0.00, 
-    RealJumpOffset = 0.00, 
-    HitParts = {"Head"}, 
-    RealHitPart = "Head", 
-    KoCheck = true, 
-    LookAt = false,
-    ViewAt = false,
-    Tracer = true,
-    TracerColor = Color3.fromRGB(255, 255, 255),
-    Highlight = true,
-    FillingColor = Color3.fromRGB(255, 255, 255),
-    OutliningColor = Color3.fromRGB(255, 255, 255),
-    HitEffect = true,
-    HitEffectType = "Electric", -- Dots, Electric
-    HitEffectColor = Color3.fromRGB(255, 255, 255),
-}
+if not getgenv().TargetAimbot then
+    getgenv().TargetAimbot = {
+        Enabled = true,
+        Keybind = Enum.KeyCode.Q,
+        Autoselect = false,
+        Resolver = true,
+        ResolverType = "MoveDirection",
+        JumpOffset = 0.00,
+        RealJumpOffset = 0.00,
+        HitParts = {"Head"},
+        RealHitPart = "Head",
+        KoCheck = true,
+        LookAt = false,
+        ViewAt = false,
+        Tracer = true,
+        TracerColor = Color3.fromRGB(255, 255, 255),
+        Highlight = true,
+        FillingColor = Color3.fromRGB(255, 255, 255),
+        OutliningColor = Color3.fromRGB(255, 255, 255),
+        HitEffect = true,
+        HitEffectType = "Electric", -- Options: Dots, Electric
+        HitEffectColor = Color3.fromRGB(255, 255, 255),
+    }
+end
 
 
 local UserInputService = game:GetService("UserInputService")
-local mobile = false
+getgenv().mobile = false
 -- 🔍 Kiểm tra nếu là thiết bị mobile hoặc tablet
-if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled and mobile then
+if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled and getgenv().mobile then
     getgenv().keytoclick = TargetAimbot.Keybind
 
     local tool = Instance.new("Tool")
@@ -554,13 +555,26 @@ RunService.Heartbeat:Connect(function()
 end)
 
 RunService.RenderStepped:Connect(function()
-    if TargetAimbot.Enabled and TargetAimbot.Tracer and TargBindEnabled and TargetPlr and TargetPlr.Character and TargetPlr.Character:FindFirstChild(TargetAimbot.RealHitPart) then
+    if getgenv().TargetAimbot.Enabled 
+        and getgenv().TargetAimbot.Tracer 
+        and TargBindEnabled 
+        and TargetPlr 
+        and TargetPlr.Character 
+        and TargetPlr.Character:FindFirstChild(getgenv().TargetAimbot.RealHitPart) then
+        
         local MousePos = UserInputService:GetMouseLocation()
-        local TargetPos = Workspace.CurrentCamera:WorldToViewportPoint(TargetPlr.Character[TargetAimbot.RealHitPart].Position)
-        Tracer.From = Vector2.new(MousePos.X, MousePos.Y)
-        Tracer.To = Vector2.new(TargetPos.X, TargetPos.Y)
-        Tracer.Color = TargetAimbot.TracerColor
-        Tracer.Visible = true
+        local TargetPos, onScreen = Workspace.CurrentCamera:WorldToViewportPoint(
+            TargetPlr.Character[getgenv().TargetAimbot.RealHitPart].Position
+        )
+        
+        if onScreen then
+            Tracer.From = Vector2.new(MousePos.X, MousePos.Y)
+            Tracer.To = Vector2.new(TargetPos.X, TargetPos.Y)
+            Tracer.Color = getgenv().TargetAimbot.TracerColor
+            Tracer.Visible = true
+        else
+            Tracer.Visible = false
+        end
     else
         Tracer.Visible = false
     end
