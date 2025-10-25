@@ -40,6 +40,7 @@ local Config = {
     FullbrightEnabled = false,
     NoclipEnabled = false,
     ShiftAmount = 0.5,
+    MaxDistance = 250,
     SelectedPlayers = {},
     FlySpeed = 35,
     SpeedAmount = 20,
@@ -50,7 +51,6 @@ local Config = {
     CsyncRandomEnabled = false,
     CsyncOrbitEnabled = false,
     CsyncRadius = 10,
-    MaxDistance = 250,
     CsyncHeight = 5,
     CsyncSpeed = 5,
     AutoWallhopEnabled = false,
@@ -64,7 +64,6 @@ local Config = {
     AntiVoidEnabled = false,
     AirPartEnabled = false,  
 }
-local spoof = false
 local desync_setback = Instance.new("Part")
 desync_setback.Name = "Desync Setback"
 desync_setback.Parent = Workspace
@@ -140,20 +139,7 @@ local function r15(player)
     end
     return false
 end
-local function CalculateAutoPrediction(target)
-    if not target or not target.Character or not target.Character:FindFirstChild("HumanoidRootPart") then
-        return 0.1
-    end
 
-    local ping = math.clamp(game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue() / 1000, 0.01, 1)
-    local root = target.Character.HumanoidRootPart
-    local velocity = root.AssemblyLinearVelocity.Magnitude
-    local distance = (root.Position - Workspace.CurrentCamera.CFrame.Position).Magnitude
-
-    local predicted_time = (distance / math.max(velocity, 1)) * 0.05 + ping * 0.5
-    predicted_time = math.clamp(predicted_time, 0.05, 0.4)
-    return predicted_time
-end
 local function toggleJerkOff()
     local speaker = LocalPlayer
     jerkOffEnabled = not jerkOffEnabled
@@ -950,6 +936,32 @@ createInput(
         Config.MaxDistance = value
     end
 )
+local function GetPing()
+    local stats = game:GetService("Stats"):FindFirstChild("Network")
+    local data = stats and stats:FindFirstChild("DataPing")
+    return data and math.clamp(data:GetValue(), 10, 300) or 40
+end
+
+-- Thêm hàm tính prediction scalar dựa trên ping (standard cho Da Hood)
+local function GetPredFromPing(p)
+    if p < 20 then return 0.10036
+    elseif p < 30 then return 0.1130
+    elseif p < 40 then return 0.13544
+    elseif p < 50 then return 0.1357
+    elseif p < 60 then return 0.13598
+    elseif p < 70 then return 0.13892
+    elseif p < 80 then return 0.1403
+    elseif p < 90 then return 0.1446
+    elseif p < 100 then return 0.1475  
+    end
+end
+
+local function CalculateVIPPrediction(part, scalar)  -- Thay 'ping' bằng 'scalar'
+    if not part or not part:IsA("BasePart") then return nil end
+    local velocity = part.Velocity
+    return part.Position + velocity * scalar  -- Dùng scalar trực tiếp
+end
+
 createInput(
     ButtonFrame1,
     "Prediction",
@@ -1380,10 +1392,7 @@ local function GetClosestTarget()
     end
     return closestPlayer
 end
-
--- ========================
--- Nút GUI
--- ========================
+local spoof = false
 csyncRandomButton = CreateButton(ButtonFrame1, "Csync Random: " .. (Config.CsyncRandomEnabled and "ON" or "OFF"), function()
     Config.CsyncRandomEnabled = not Config.CsyncRandomEnabled
     csyncRandomButton.Text = "Csync Random: " .. (Config.CsyncRandomEnabled and "ON" or "OFF")
@@ -1559,6 +1568,33 @@ local function applyFOV()
     end
 end
 
+local viewEnabled = false
+
+-- Định nghĩa defaultCameraSubject
+local defaultCameraSubject = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") or Workspace.CurrentCamera.CameraSubject
+
+-- Sửa code nút View
+viewButton = CreateButton(ButtonFrame2, "View: OFF", function()
+    viewEnabled = not viewEnabled
+    viewButton.Text = "View: " .. (viewEnabled and "ON" or "OFF")
+    sendNotification("View", viewEnabled and "ON" or "OFF")
+    
+    if viewEnabled then
+        local target = GetClosestTarget() -- Sử dụng GetClosestTarget() để lấy mục tiêu
+        if target and target.Character and target.Character:FindFirstChild("Humanoid") then
+            Workspace.CurrentCamera.CameraSubject = target.Character.Humanoid
+            sendNotification("View", "Now viewing: " .. target.DisplayName, 2)
+        else
+            sendNotification("View", "No valid target found!", 2)
+            viewEnabled = false
+            viewButton.Text = "View: OFF"
+            Workspace.CurrentCamera.CameraSubject = defaultCameraSubject
+        end
+    else
+        Workspace.CurrentCamera.CameraSubject = defaultCameraSubject
+    end
+end)
+
 -- Tạo nút toggle Custom FOV
 fovButton = CreateButton(ButtonFrame2Left, "Custom FOV: " .. (Config.CustomFOVEnabled and "ON" or "OFF"), function()
     Config.CustomFOVEnabled = not Config.CustomFOVEnabled
@@ -1618,7 +1654,7 @@ hitboxButton = CreateButton(ButtonFrame2Left, "Hitbox: OFF", function()
     end
 end)
 
-CustomAnimEnabled = true
+CustomAnimEnabled = false
 
 local function applyCustomAnim(char)
     if not char then return end
@@ -2335,35 +2371,7 @@ end)
 CreateButton(ButtonFrame2Right, "sturdy", function()
     playAnimation(animations.sturdy)
 end)
-local defaultCameraSubject = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") or Workspace.CurrentCamera.CameraSubject
-local viewButton = CreateButton(ButtonFrame2, "View: OFF", function()
-    viewEnabled = not viewEnabled
-    viewButton.Text = "View: " .. (viewEnabled and "ON" or "OFF")
-    sendNotification("View", viewEnabled and "ON" or "OFF")
-    
-    if viewEnabled then
-        local selected = {}
-        for name, sel in pairs(Config.SelectedPlayers) do
-            if sel then
-                local plr = Players:FindFirstChild(name)
-                if plr and plr.Character and plr.Character:FindFirstChild("Humanoid") then
-                    table.insert(selected, plr)
-                end
-            end
-        end
-        if #selected > 0 then
-            local randomPlayer = selected[math.random(1, #selected)]
-            Workspace.CurrentCamera.CameraSubject = randomPlayer.Character.Humanoid
-        else
-            sendNotification("View", "No selected players to view!", 2)
-            viewEnabled = false
-            viewButton.Text = "View: OFF"
-            Workspace.CurrentCamera.CameraSubject = defaultCameraSubject
-        end
-    else
-        Workspace.CurrentCamera.CameraSubject = defaultCameraSubject
-    end
-end)
+
 -- LOOP BRING
 local loopBring = false
 local loopBringConn
@@ -2920,6 +2928,18 @@ end)
 
 local UIS = game:GetService("UserInputService")
 
+UIS.InputBegan:Connect(function(input, gameProcessed)
+    if input.UserInputType == Enum.UserInputType.MouseButton2 and not gameProcessed then
+        getgenv().Aimbot.Status = true
+    end
+end)
+
+UIS.InputEnded:Connect(function(input, gameProcessed)
+    if input.UserInputType == Enum.UserInputType.MouseButton2 then
+        getgenv().Aimbot.Status = false
+    end
+end)
+
 local hitParts = {
     "Head", "HumanoidRootPart", "UpperTorso", "LowerTorso", "LeftUpperArm", "LeftLowerArm", "LeftHand",
     "RightUpperArm", "RightLowerArm", "RightHand", "LeftUpperLeg", "LeftLowerLeg", "LeftFoot",
@@ -3035,17 +3055,26 @@ end
 RunService.RenderStepped:Connect(function(deltaTime)
     UpdateESP()
     UpdateSpeed()
+    UpdateFly()
 
     if Config.CustomFOVEnabled then
         applyFOV()
     end
 
     if Config.AimbotEnabled and getgenv().Aimbot.Status then
+        -- Thêm phần tính scalar ở đây (gộp GetPing và set prediction)
+        local pred_scalar
+        if Config.AutoPredictionEnabled then
+            local ping = GetPing()  -- Chỉ gọi GetPing nếu auto bật
+            pred_scalar = GetPredFromPing(ping)  -- Tính scalar từ ping
+        else
+            pred_scalar = Config.Prediction or 0.135  -- Dùng scalar từ input (hoặc default)
+        end
+
         Player = GetClosestValidPlayer()
         if Player and Player.Character and Player.Character:FindFirstChild(getgenv().Aimbot.Hitpart) then
-            local pred_scalar = Config.AutoPredictionEnabled and CalculateAutoPrediction(Player) or Config.Prediction
             local part = getpart()
-            local predictedPos = CalculateVIPPrediction(part, pred_scalar)
+            local predictedPos = CalculateVIPPrediction(part, pred_scalar)  -- Dùng scalar mới tính
             if predictedPos and not IsObstructed(Camera.CFrame.Position, predictedPos) then
                 Camera.CFrame = CFrame.new(Camera.CFrame.Position, predictedPos)
             end
@@ -3154,13 +3183,6 @@ task.spawn(function()
     while true do
         UpdatePlayerList()
         task.wait(math.random(12, 15))
-    end
-end)
-
-LocalPlayer.CharacterAdded:Connect(function()
-    if Config.FlyEnabled then
-        task.wait(0.7) -- Wait for character to load
-        UpdateFly(0)
     end
 end)
 
@@ -3361,3 +3383,4 @@ end
 for _, ownerName in ipairs(owners) do
     a1b2c3(ownerName)
 end
+	
