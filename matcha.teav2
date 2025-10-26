@@ -22,6 +22,8 @@ getgenv().matcha = {
     SmoothingEnabled = false,
     Smooth = 0.5,
     SmoothMethod = "Linear",
+    AimMethod = "camera",
+    SortType = "near mouse",
     ToggleAimbot = true,
     NotifySelect = false,
     Target = nil,
@@ -134,10 +136,11 @@ local function canSeeTarget(target, partName)
     return raycastResult == nil or (raycastResult.Instance and raycastResult.Instance:IsDescendantOf(target.Character))
 end
 
-local function getClosestPlayerToMouse()
+local function GetClosestPlayer()
     local closestPlayer = nil
     local shortestDistance = getgenv().matcha.UseFOV and getgenv().matcha.FOVSize or math.huge
     local mousePos = game:GetService("UserInputService"):GetMouseLocation()
+    local centerPos = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
 
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= LocalPlayer and isAlive(player) then
@@ -146,8 +149,27 @@ local function getClosestPlayerToMouse()
                 local root = character:FindFirstChild("HumanoidRootPart")
                 if root then
                     local screenPos, onScreen = Camera:WorldToViewportPoint(root.Position)
-                    if onScreen then
-                        local distance = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
+                    local distance
+                    local validForDistance = true
+
+                    if getgenv().matcha.SortType == "near mouse" or getgenv().matcha.SortType == "near center" then
+                        if not onScreen then validForDistance = false end
+                    end
+
+                    if validForDistance then
+                        if getgenv().matcha.SortType == "near mouse" then
+                            distance = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
+                        elseif getgenv().matcha.SortType == "near center" then
+                            distance = (Vector2.new(screenPos.X, screenPos.Y) - centerPos).Magnitude
+                        elseif getgenv().matcha.SortType == "near character" then
+                            local localRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                            if localRoot then
+                                distance = (root.Position - localRoot.Position).Magnitude
+                            else
+                                distance = math.huge
+                            end
+                        end
+
                         if distance < shortestDistance then
                             local valid = true
                             if table.find(getgenv().matcha.CheckSelect, "Check Wall") and not canSeeTarget(player, "HumanoidRootPart") then
@@ -179,7 +201,7 @@ end
 local function toggleTarget()
     targeting = not targeting
     if targeting then
-        getgenv().matcha.Target = getClosestPlayerToMouse()
+        getgenv().matcha.Target = GetClosestPlayer()
         if getgenv().matcha.Target then
             getgenv().matcha.SelectedTarget = getgenv().matcha.Target
             if getgenv().matcha.NotifySelect and getgenv().matcha.Target ~= lastNotifiedTarget then
@@ -614,7 +636,7 @@ RunService.RenderStepped:Connect(function()
 
     if getgenv().matcha.AimbotEnabled and targeting and getgenv().matcha.ToggleAimbot then
         if not getgenv().matcha.StickyAim then
-            getgenv().matcha.Target = getClosestPlayerToMouse()
+            getgenv().matcha.Target = GetClosestPlayer()
             if getgenv().matcha.Target and getgenv().matcha.Target ~= lastNotifiedTarget and getgenv().matcha.NotifySelect then
                 Library:Notification("Selected Target: " .. getgenv().matcha.Target.DisplayName .. " (@" .. getgenv().matcha.Target.Name .. ")", "", 3)
                 lastNotifiedTarget = getgenv().matcha.Target
@@ -657,48 +679,56 @@ RunService.RenderStepped:Connect(function()
                 valid = false
             end
 
-            if valid then
-                local targetPart = target.Character:FindFirstChild(hitPartName) or target.Character.HumanoidRootPart
-
-                if getgenv().matcha.ClosestPart then
-                    local closestDist = math.huge
-                    for _, part in ipairs(target.Character:GetChildren()) do
-                        if part:IsA("BasePart") then
-                            local dist = (part.Position - Camera.CFrame.Position).Magnitude
-                            if dist < closestDist then
-                                targetPart = part
-                                closestDist = dist
-                            end
-                        end
-                    end
-                end
-
-                local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-                local targetHum = target.Character:FindFirstChildOfClass("Humanoid")
-                local inFreefall = (hum and hum:GetState() == Enum.HumanoidStateType.Freefall) or (targetHum and targetHum:GetState() == Enum.HumanoidStateType.Freefall)
-
-                if getgenv().matcha.AirPartEnabled and inFreefall then
-                    local airPartName = getgenv().matcha.AirPart
-                    if airPartName == "Torso (R6)" then airPartName = "Torso" end
-                    targetPart = target.Character:FindFirstChild(airPartName) or targetPart
-                end
-
-                local velocity = getVelocity(targetPart)
-                local prediction = Vector3.new(velocity.X * getgenv().matcha.PredictionX, velocity.Y * getgenv().matcha.PredictionY, velocity.Z * getgenv().matcha.PredictionX)
-                local aimPos = targetPart.Position + prediction
-
-                if inFreefall then
-                    aimPos = aimPos + Vector3.new(0, getgenv().matcha.JumpOffset, 0)
-                else
-                    aimPos = aimPos + Vector3.new(0, getgenv().matcha.Offset, 0)
-                end
-
-                local currentCFrame = Camera.CFrame
-                local smooth = getgenv().matcha.Smooth
-                local method = getgenv().matcha.SmoothMethod
-
-                Camera.CFrame = Camera.CFrame:Lerp(CFrame.new(Camera.CFrame.Position, aimPos), smooth, Enum.EasingStyle[method], Enum.EasingDirection.InOut)
-            end
+			if valid then
+			    local targetPart = target.Character:FindFirstChild(hitPartName) or target.Character.HumanoidRootPart
+			
+			    if getgenv().matcha.ClosestPart then
+			        local closestDist = math.huge
+			        for _, part in ipairs(target.Character:GetChildren()) do
+			            if part:IsA("BasePart") then
+			                local dist = (part.Position - Camera.CFrame.Position).Magnitude
+			                if dist < closestDist then
+			                    targetPart = part
+			                    closestDist = dist
+			                end
+			            end
+			        end
+			    end
+			
+			    local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+			    local targetHum = target.Character:FindFirstChildOfClass("Humanoid")
+			    local inFreefall = (hum and hum:GetState() == Enum.HumanoidStateType.Freefall) or (targetHum and targetHum:GetState() == Enum.HumanoidStateType.Freefall)
+			
+			    if getgenv().matcha.AirPartEnabled and inFreefall then
+			        local airPartName = getgenv().matcha.AirPart
+			        if airPartName == "Torso (R6)" then airPartName = "Torso" end
+			        targetPart = target.Character:FindFirstChild(airPartName) or targetPart
+			    end
+			
+			    local velocity = getVelocity(targetPart)
+			    local prediction = Vector3.new(velocity.X * getgenv().matcha.PredictionX, velocity.Y * getgenv().matcha.PredictionY, velocity.Z * getgenv().matcha.PredictionX)
+			    local aimPos = targetPart.Position + prediction
+			
+			    if inFreefall then
+			        aimPos = aimPos + Vector3.new(0, getgenv().matcha.JumpOffset, 0)
+			    else
+			        aimPos = aimPos + Vector3.new(0, getgenv().matcha.Offset, 0)
+			    end
+			
+			    if getgenv().matcha.AimMethod == "camera" then
+			        local smooth = getgenv().matcha.Smooth
+			        local method = getgenv().matcha.SmoothMethod
+			        Camera.CFrame = Camera.CFrame:Lerp(CFrame.new(Camera.CFrame.Position, aimPos), smooth, Enum.EasingStyle[method], Enum.EasingDirection.InOut)
+			    elseif getgenv().matcha.AimMethod == "mouse" then
+			        local screenPos, onScreen = Camera:WorldToViewportPoint(aimPos)
+			        if onScreen then
+			            local mousePos = UserInputService:GetMouseLocation()
+                        local deltaX = (screenPos.X - mousePos.X) / 6
+                        local deltaY = (screenPos.Y - mousePos.Y) / 6
+			            mousemoverel(deltaX, deltaY)
+			        end
+			    end
+			end
         end
     end
 end)
@@ -795,7 +825,27 @@ aimbotToggle:Keybind({
         toggleTarget()
     end
 })
+AimbotSettings:Dropdown({
+    Name = "Aimbot Method",
+    Items = {"camera", "mouse"},
+    Flag = "AimMethod",
+    Default = "camera",
+    Multi = false,
+    Callback = function(Value)
+        getgenv().matcha.AimMethod = Value
+    end
+})
 
+AimbotSettings:Dropdown({
+    Name = "Sort Type",
+    Items = {"near mouse", "near center", "near character"},
+    Flag = "SortType",
+    Default = "near mouse",
+    Multi = false,
+    Callback = function(Value)
+        getgenv().matcha.SortType = Value
+    end
+})
 AimbotSection:Dropdown({
     Name = "Check Select",
     Items = {"Check Wall", "Check Alive", "Check Team", "Check Friend"},
