@@ -4076,6 +4076,7 @@ esp:Initialize()
 -- UI Tabs and Sections
 local aimTab = Interface:Tab("Main")
 local aimlockSettings = aimTab:Section("Aimlock Settings", "left")
+local hitpartSettings = aimTab:Section("hitpart Settings", "right")
 local visualSettings = aimTab:Section("Visual Settings", "right")
 
 aimlockSettings:Toggle({ title = "Aimlock Enabled", default = getgenv().TargetAimbot.Enabled, callback = function(Value)
@@ -4099,7 +4100,7 @@ aimlockSettings:TextBox({ title = "Offset", default = tostring(getgenv().TargetA
 end })
 
 -- Use BoneSelector for HitPart
-aimlockSettings:BoneSelector({ callback = function(Value)
+hitpartSettings:BoneSelector({ callback = function(Value)
     getgenv().TargetAimbot.RealHitPart = Value
 end })
 
