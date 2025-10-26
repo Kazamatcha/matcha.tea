@@ -26,7 +26,7 @@ getgenv().matcha = {
     NotifySelect = false,
     Target = nil,
     SelectedTarget = nil,
-TriggerbotEnabled = false,
+    TriggerbotEnabled = false,
     TriggerFOV = 20,
     OnlyTarget = false,
     TriggerCheckWall = false,
@@ -45,6 +45,24 @@ TriggerbotEnabled = false,
     HitboxOutlineColor = Color3.fromRGB(255, 255, 255),
     HitboxCheckTeam = false,
     HitboxOnlyTarget = false,
+    NoJumpCooldown = false,
+    BunnyHopEnabled = false,
+    BunnyHopSpeed = 50,
+    SpinbotEnabled = false,
+    SpinSpeed = 10,
+    AntiFlingEnabled = false,
+    InfJumpEnabled = false,
+    AntiVoidEnabled = false,
+    AntiCollisionEnabled = false,
+
+    -- FOV Selection vars
+    UseFOV = false,
+    FOVSize = 100,
+    FOVOutline = false,
+    FOVOutlineColor = Color3.fromRGB(0, 0, 0),
+    FOVFilled = false,
+    FOVFilledColor = Color3.fromRGB(255, 255, 255),
+    FOVThickness = 1,
 }
 -- Logic implementation
 local Players = game:GetService("Players")
@@ -56,6 +74,23 @@ local UserInputService = game:GetService("UserInputService")
 local VirtualInputManager = game:GetService("VirtualInputManager")
 local lastNotifiedTarget = nil
 local targeting = false
+
+-- FOV Drawing
+local fovFill = Drawing.new("Circle")
+fovFill.Visible = false
+fovFill.Filled = true
+fovFill.Transparency = 0.5
+fovFill.Color = getgenv().matcha.FOVFilledColor
+fovFill.Thickness = 1
+fovFill.NumSides = 100
+
+local fovOutline = Drawing.new("Circle")
+fovOutline.Visible = false
+fovOutline.Filled = false
+fovOutline.Transparency = 1
+fovOutline.Color = getgenv().matcha.FOVOutlineColor
+fovOutline.Thickness = getgenv().matcha.FOVThickness
+fovOutline.NumSides = 100
 
 local function isAlive(plr)
     if not plr or not plr.Character then return false end
@@ -101,7 +136,7 @@ end
 
 local function getClosestPlayerToMouse()
     local closestPlayer = nil
-    local shortestDistance = math.huge
+    local shortestDistance = getgenv().matcha.UseFOV and getgenv().matcha.FOVSize or math.huge
     local mousePos = game:GetService("UserInputService"):GetMouseLocation()
 
     for _, player in ipairs(Players:GetPlayers()) do
@@ -564,6 +599,19 @@ Players.PlayerAdded:Connect(handlePlayer)
 RunService.RenderStepped:Connect(function()
     updatePredictionValue()
 
+    local mousePos = UserInputService:GetMouseLocation()
+    fovFill.Position = mousePos
+    fovFill.Radius = getgenv().matcha.FOVSize
+    fovFill.Visible = getgenv().matcha.FOVFilled
+    fovFill.Color = getgenv().matcha.FOVFilledColor
+    fovFill.Transparency = 0.5
+
+    fovOutline.Position = mousePos
+    fovOutline.Radius = getgenv().matcha.FOVSize
+    fovOutline.Visible =  getgenv().matcha.FOVOutline
+    fovOutline.Color = getgenv().matcha.FOVOutlineColor
+    fovOutline.Thickness = getgenv().matcha.FOVThickness
+
     if getgenv().matcha.AimbotEnabled and targeting and getgenv().matcha.ToggleAimbot then
         if not getgenv().matcha.StickyAim then
             getgenv().matcha.Target = getClosestPlayerToMouse()
@@ -599,6 +647,14 @@ RunService.RenderStepped:Connect(function()
                 if hum and hum.Health <= getgenv().matcha.HealthThreshold then
                     valid = false
                 end
+            end
+
+            -- Kiểm tra FOV cho aim
+            local targetPart = target.Character:FindFirstChild(hitPartName) or target.Character.HumanoidRootPart
+            local screenPos, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
+            local distanceToMouse = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
+            if getgenv().matcha.UseFOV and distanceToMouse > getgenv().matcha.FOVSize then
+                valid = false
             end
 
             if valid then
@@ -707,21 +763,7 @@ local Window = Library:Window({
     Logo = "77218680285262",
     FadeTime = 0.3,
 })
--- Watermark setup
-local Watermark = Library:Watermark("matcha.tea | FPS | MS")
-local FrameTimer = tick()
-local FrameCounter = 0
-local FPS = 60
-RunService.RenderStepped:Connect(function()
-    FrameCounter += 1
-    if (tick() - FrameTimer) >= 1 then
-        FPS = FrameCounter
-        FrameTimer = tick()
-        FrameCounter = 0
-    end
-    local Ping = math.floor(Stats.Network.ServerStatsItem["Data Ping"]:GetValue())
-    Watermark:Set("matcha.tea | " .. FPS .. " | " .. Ping .. "ms")
-end)
+local Watermark = Library:Watermark("matcha.tea")
 
 local KeybindList = Library:KeybindList()
 local MainPage = Window:Page({Name = "Main", SubPages = true})
@@ -733,6 +775,7 @@ local AimbotSection = CombatTab:Section({Name = "Aimbot", Side = 1})
 local TriggerbotSection = CombatTab:Section({Name = "Triggerbot", Side = 1})
 local AimbotSettings = CombatTab:Section({Name = "Aimbot Settings", Side = 2})
 local HitboxSection = CombatTab:Section({Name = "Hitbox Expander", Side = 1})
+local FOVSection = CombatTab:Section({Name = "FOV Selection", Side = 2})
 -- Toggle Aimbot
 local aimbotToggle = AimbotSection:Toggle({
     Name = "Aimbot Enabled",
@@ -1115,289 +1158,79 @@ HitboxSection:Toggle({
         getgenv().matcha.HitboxOnlyTarget = Value
     end
 })
+
+-- FOV Selection
+FOVSection:Toggle({
+    Name = "Use FOV",
+    Flag = "UseFOV",
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.UseFOV = Value
+    end
+})
+
+FOVSection:Slider({
+    Name = "FOV Size",
+    Flag = "FOVSize",
+    Min = 1,
+    Max = 1000,
+    Default = 100,
+    Decimals = 1,
+    Callback = function(Value)
+        getgenv().matcha.FOVSize = Value
+    end
+})
+
+local fovOutlineToggle = FOVSection:Toggle({
+    Name = "FOV Outline",
+    Flag = "FOVOutline",
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.FOVOutline = Value
+    end
+})
+
+fovOutlineToggle:Colorpicker({
+    Name = "FOV Outline Color",
+    Flag = "FOVOutlineColor",
+    Default = Color3.fromRGB(0, 0, 0),
+    Callback = function(Value)
+        getgenv().matcha.FOVOutlineColor = Value
+    end
+})
+
+local fovFilledToggle = FOVSection:Toggle({
+    Name = "FOV Filled",
+    Flag = "FOVFilled",
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.FOVFilled = Value
+    end
+})
+
+fovFilledToggle:Colorpicker({
+    Name = "FOV Filled Color",
+    Flag = "FOVFilledColor",
+    Default = Color3.fromRGB(255, 255, 255),
+    Alpha = 0.5,
+    Callback = function(Value)
+        getgenv().matcha.FOVFilledColor = Value
+    end
+})
+
+FOVSection:Slider({
+    Name = "FOV Thickness",
+    Flag = "FOVThickness",
+    Min = 1,
+    Max = 10,
+    Default = 1,
+    Decimals = 1,
+    Callback = function(Value)
+        getgenv().matcha.FOVThickness = Value
+    end
+})
+
 local MovementSelection = CharacterSubPage:Section({Name = "Movement", Side = 1})
-
--- Nút bật tắt Fly với key, slider FlySpeed 1-150, dropdown method (logic đầy đủ, hỗ trợ PC/Mobile đặc biệt cho CFrame)
-MovementSelection:Toggle({
-    Name = "Fly",
-    Flag = "FlyEnabled",
-    Default = false,
-    Callback = function(Value)
-        FlyFunction(Value)
-    end
-}):Keybind({
-    Flag = "FlyKey",
-    Default = Enum.KeyCode.F,
-    Mode = "Toggle",
-    Callback = function()
-        Library.Flags["FlyEnabled"] = not Library.Flags["FlyEnabled"]
-        FlyFunction(Library.Flags["FlyEnabled"])
-    end
-})
-
-MovementSelection:Slider({
-    Name = "Fly Speed",
-    Flag = "FlySpeed",
-    Min = 1,
-    Max = 150,
-    Default = 20,
-    Decimals = 1,
-    Callback = function(Value)
-        getgenv().matcha.FlySpeed = Value
-    end
-})
-
-MovementSelection:Dropdown({
-    Name = "Fly Method",
-    Flag = "FlyMethod",
-    Items = {"CFrame", "Velocity", "Pivotto", "TranslateBy", "ApplyImpulse", "LinearVelocity", "BodyVelocity", "BodyPosition", "AlignPosition", "VectorForce", "BodyForce"},
-    Default = "CFrame",
-    Multi = false,
-    Callback = function(Value)
-        getgenv().matcha.FlyMethod = Value
-    end
-})
-
--- Logic Fly đầy đủ (hỗ trợ PC/Mobile, đặc biệt CFrame; tham khảo và full từ script cũ)
-local function FlyFunction(Enabled)
-    if Enabled then
-        game:GetService("RunService"):BindToRenderStep("Fly", Enum.RenderPriority.Character.Value, function(DeltaTime)
-            local char = game.Players.LocalPlayer.Character
-            if not char or not char:FindFirstChild("HumanoidRootPart") then return end
-            local hrp = char.HumanoidRootPart
-            local hum = char:FindFirstChildOfClass("Humanoid")
-            local cam = workspace.CurrentCamera
-            local method = getgenv().matcha.FlyMethod:lower()
-            local speed = getgenv().matcha.FlySpeed
-            local moveDir = hum.MoveDirection
-            local vertical = 0
-            if game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.Space) then vertical = speed / 8 end
-            if game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.LeftControl) then vertical = -speed / 8 end
-
-            local worldMove = cam.CFrame:VectorToWorldSpace(Vector3.new(moveDir.X, 0, moveDir.Z).Unit * speed)
-            local movePos = worldMove + Vector3.new(0, vertical, 0)
-
-            if method == "cframe" then
-                if game:GetService("UserInputService").TouchEnabled then  -- Mobile logic
-                    hrp.CFrame = hrp.CFrame + moveDir * DeltaTime * speed * 10
-                    hrp.CFrame = hrp.CFrame + Vector3.new(0, vertical * DeltaTime * 10, 0)
-                    hrp.Velocity = hrp.Velocity * Vector3.new(1, 0, 1) + Vector3.new(0, 1.9, 0)
-                else  -- PC logic
-                    hrp.CFrame = hrp.CFrame + moveDir * DeltaTime * speed * 10
-                    hrp.CFrame = hrp.CFrame + Vector3.new(0, vertical * DeltaTime * 10, 0)
-                    hrp.Velocity = hrp.Velocity * Vector3.new(1, 0, 1) + Vector3.new(0, 1.9, 0)
-                end
-                hrp.AssemblyLinearVelocity = Vector3.zero
-                hrp.AssemblyAngularVelocity = Vector3.zero
-            elseif method == "velocity" then
-                hrp.Velocity = movePos
-                hrp.AssemblyLinearVelocity = movePos
-                hrp.RotVelocity = Vector3.zero
-                hrp.AssemblyAngularVelocity = Vector3.zero
-            elseif method == "pivotto" then
-                char:PivotTo(CFrame.new(char:GetPivot().Position + movePos * DeltaTime) * char:GetPivot().Rotation)
-                hrp.Velocity = Vector3.zero
-                hrp.AssemblyLinearVelocity = Vector3.zero
-                hrp.RotVelocity = Vector3.zero
-                hrp.AssemblyAngularVelocity = Vector3.zero
-            elseif method == "translateby" then
-                char:TranslateBy(movePos * DeltaTime)
-                hrp.Velocity = Vector3.zero
-                hrp.AssemblyLinearVelocity = Vector3.zero
-                hrp.RotVelocity = Vector3.zero
-                hrp.AssemblyAngularVelocity = Vector3.zero
-            elseif method == "applyimpulse" then
-                hrp:ApplyImpulse(movePos * 12.65)
-                hrp.Velocity = Vector3.zero
-                hrp.AssemblyLinearVelocity = Vector3.zero
-                hrp.RotVelocity = Vector3.zero
-                hrp.AssemblyAngularVelocity = Vector3.zero
-            elseif method == "linearvelocity" then
-                local lv = hrp:FindFirstChild("FlyLinearVelocity") or Instance.new("LinearVelocity", hrp)
-                lv.Name = "FlyLinearVelocity"
-                lv.VectorVelocity = movePos
-                lv.Attachment0 = hrp:FindFirstChild("RootAttachment") or Instance.new("Attachment", hrp)
-                hrp.Velocity = Vector3.zero
-                hrp.AssemblyLinearVelocity = Vector3.zero
-                hrp.RotVelocity = Vector3.zero
-                hrp.AssemblyAngularVelocity = Vector3.zero
-            elseif method == "bodyvelocity" then
-                local bv = hrp:FindFirstChild("FlyBodyVelocity") or Instance.new("BodyVelocity", hrp)
-                bv.Name = "FlyBodyVelocity"
-                bv.Velocity = movePos
-                bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-                hrp.Velocity = Vector3.zero
-                hrp.AssemblyLinearVelocity = Vector3.zero
-                hrp.RotVelocity = Vector3.zero
-                hrp.AssemblyAngularVelocity = Vector3.zero
-            elseif method == "bodyposition" then
-                local bp = hrp:FindFirstChild("FlyBodyPosition") or Instance.new("BodyPosition", hrp)
-                bp.Name = "FlyBodyPosition"
-                bp.Position = hrp.Position + movePos * 0.95
-                bp.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-                hrp.Velocity = Vector3.zero
-                hrp.AssemblyLinearVelocity = Vector3.zero
-                hrp.RotVelocity = Vector3.zero
-                hrp.AssemblyAngularVelocity = Vector3.zero
-            elseif method == "alignposition" then
-                local ap = hrp:FindFirstChild("FlyAlignPosition") or Instance.new("AlignPosition", hrp)
-                ap.Name = "FlyAlignPosition"
-                ap.Position = hrp.Position + movePos
-                ap.MaxForce = movePos.Magnitude * 1200
-                ap.Attachment0 = hrp:FindFirstChild("RootAttachment") or Instance.new("Attachment", hrp)
-                hrp.Velocity = Vector3.zero
-                hrp.AssemblyLinearVelocity = Vector3.zero
-                hrp.RotVelocity = Vector3.zero
-                hrp.AssemblyAngularVelocity = Vector3.zero
-            elseif method == "vectorforce" then
-                local vf = hrp:FindFirstChild("FlyVectorForce") or Instance.new("VectorForce", hrp)
-                vf.Name = "FlyVectorForce"
-                vf.Force = movePos * 1200
-                vf.Attachment0 = hrp:FindFirstChild("RootAttachment") or Instance.new("Attachment", hrp)
-                hrp.Velocity = Vector3.zero
-                hrp.AssemblyLinearVelocity = Vector3.zero
-                hrp.RotVelocity = Vector3.zero
-                hrp.AssemblyAngularVelocity = Vector3.zero
-            elseif method == "bodyforce" then
-                local bf = hrp:FindFirstChild("FlyBodyForce") or Instance.new("BodyForce", hrp)
-                bf.Name = "FlyBodyForce"
-                bf.Force = movePos * 1200
-                hrp.Velocity = Vector3.zero
-                hrp.AssemblyLinearVelocity = Vector3.zero
-                hrp.RotVelocity = Vector3.zero
-                hrp.AssemblyAngularVelocity = Vector3.zero
-            end
-        end)
-    else
-        game:GetService("RunService"):UnbindFromRenderStep("Fly")
-        local char = game.Players.LocalPlayer.Character
-        if char then
-            local hrp = char:FindFirstChild("HumanoidRootPart")
-            if hrp then
-                for _, inst in ipairs({"FlyLinearVelocity", "FlyBodyVelocity", "FlyBodyPosition", "FlyAlignPosition", "FlyVectorForce", "FlyBodyForce"}) do
-                    local obj = hrp:FindFirstChild(inst)
-                    if obj then obj:Destroy() end
-                end
-            end
-        end
-    end
-end
-
--- Nút bật tắt Speed với key, slider 1-1000, dropdown type (Velocity/CFrame)
-MovementSelection:Toggle({
-    Name = "Speed",
-    Flag = "SpeedEnabled",
-    Default = false,
-    Callback = function(Value)
-        getgenv().matcha.CFSpeedEnabled = Value
-        if Value then SpeedFunction() end
-    end
-}):Keybind({
-    Flag = "SpeedKey",
-    Default = Enum.KeyCode.LeftShift,
-    Mode = "Hold",
-    Callback = function()
-        getgenv().matcha.CFSpeedEnabled = not getgenv().matcha.CFSpeedEnabled
-        if getgenv().matcha.CFSpeedEnabled then SpeedFunction() end
-    end
-})
-
-MovementSelection:Slider({
-    Name = "Speed Amount",
-    Flag = "SpeedAmount",
-    Min = 1,
-    Max = 1000,
-    Default = 50,
-    Decimals = 1,
-    Callback = function(Value)
-        getgenv().matcha.CFSpeed = Value
-    end
-})
-
-MovementSelection:Dropdown({
-    Name = "Speed Type",
-    Flag = "SpeedType",
-    Items = {"Velocity", "CFrame"},
-    Default = "Velocity",
-    Multi = false,
-    Callback = function(Value)
-        getgenv().matcha.SpeedType = Value
-    end
-})
-
--- Logic Speed đầy đủ (tham khảo và full từ script cũ)
-local function SpeedFunction()
-    game:GetService("RunService"):BindToRenderStep("Speed", Enum.RenderPriority.Character.Value, function(DeltaTime)
-        local char = game.Players.LocalPlayer.Character
-        if not char or not char:FindFirstChild("HumanoidRootPart") then return end
-        local hrp = char.HumanoidRootPart
-        local hum = char:FindFirstChildOfClass("Humanoid")
-        local speed = getgenv().matcha.CFSpeed
-        local type = getgenv().matcha.SpeedType:lower()
-        local moveDir = hum.MoveDirection * speed
-
-        if type == "velocity" then
-            hrp.Velocity = Vector3.new(moveDir.X, hrp.Velocity.Y, moveDir.Z)
-            hrp.AssemblyLinearVelocity = Vector3.new(moveDir.X, hrp.AssemblyLinearVelocity.Y, moveDir.Z)
-        elseif type == "cframe" then
-            hrp.CFrame = hrp.CFrame + moveDir * DeltaTime
-        end
-    end)
-end
-
--- Nút bật tắt Boost Character với key, 2 slider WalkSpeed/JumpPower (logic chống reset đầy đủ)
-MovementSelection:Toggle({
-    Name = "Boost Character",
-    Flag = "BoostEnabled",
-    Default = false,
-    Callback = function(Value)
-        getgenv().matcha.WalkJumpEnabled = Value
-        local hum = game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-        if hum then
-            if Value then
-                hum.WalkSpeed = getgenv().matcha.WalkSpeedAmount
-                hum.JumpPower = getgenv().matcha.JumpPowerAmount
-                hum:GetPropertyChangedSignal("WalkSpeed"):Connect(function() hum.WalkSpeed = getgenv().matcha.WalkSpeedAmount end)
-                hum:GetPropertyChangedSignal("JumpPower"):Connect(function() hum.JumpPower = getgenv().matcha.JumpPowerAmount end)
-            else
-                hum.WalkSpeed = 16  -- Default game
-                hum.JumpPower = 50  -- Default game
-            end
-        end
-    end
-}):Keybind({
-    Flag = "BoostKey",
-    Default = Enum.KeyCode.B,
-    Mode = "Toggle",
-    Callback = function()
-        Library.Flags["BoostEnabled"] = not Library.Flags["BoostEnabled"]
-        getgenv().matcha.WalkJumpEnabled = Library.Flags["BoostEnabled"]
-    end
-})
-
-MovementSelection:Slider({
-    Name = "WalkSpeed",
-    Flag = "WalkSpeedAmount",
-    Min = 1,
-    Max = 1000,
-    Default = 16,
-    Decimals = 1,
-    Callback = function(Value)
-        getgenv().matcha.WalkSpeedAmount = Value
-    end
-})
-
-MovementSelection:Slider({
-    Name = "JumpPower",
-    Flag = "JumpPowerAmount",
-    Min = 1,
-    Max = 1000,
-    Default = 50,
-    Decimals = 1,
-    Callback = function(Value)
-        getgenv().matcha.JumpPowerAmount = Value
-    end
-})
 
 -- Nút bật tắt BunnyHop với key, slider 1-200 (hỗ trợ mobile đầy đủ)
 MovementSelection:Toggle({
@@ -1421,7 +1254,6 @@ MovementSelection:Slider({
     end
 })
 
--- Logic BunnyHop đầy đủ (tham khảo và full từ script cũ, hỗ trợ mobile)
 game:GetService("RunService").RenderStepped:Connect(function()
     if getgenv().matcha.BunnyHopEnabled then
         local char = game.Players.LocalPlayer.Character
@@ -1482,28 +1314,6 @@ MovementSelection:Toggle({
     end
 })
 local MiscSelection = CharacterSubPage:Section({Name = "Misc", Side = 2})
-
--- Nút bật tắt Noclip (logic đầy đủ)
-MiscSelection:Toggle({
-    Name = "Noclip",
-    Flag = "NoclipEnabled",
-    Default = false,
-    Callback = function(Value)
-        getgenv().matcha.NoclipEnabled = Value
-        if Value then
-            game:GetService("RunService"):BindToRenderStep("Noclip", Enum.RenderPriority.Character.Value, function()
-                local char = game.Players.LocalPlayer.Character
-                if char then
-                    for _, part in ipairs(char:GetDescendants()) do
-                        if part:IsA("BasePart") then part.CanCollide = false end
-                    end
-                end
-            end)
-        else
-            game:GetService("RunService"):UnbindFromRenderStep("Noclip")
-        end
-    end
-})
 
 MiscSelection:Toggle({
     Name = "Anti Collision",
