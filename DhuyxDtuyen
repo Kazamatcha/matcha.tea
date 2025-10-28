@@ -1006,11 +1006,11 @@ autoPredictionButton = CreateButton(ButtonFrame1, "Auto Prediction: OFF", functi
     sendNotification("Auto Prediction", Config.AutoPredictionEnabled and "ON" or "OFF")
 end)
 
-autoFirstPersonButton = CreateButton(ButtonFrame1, "Auto First Person: OFF", function()
+--[[autoFirstPersonButton = CreateButton(ButtonFrame1, "Auto First Person: OFF", function()
     Config.AutoFirstPerson = not Config.AutoFirstPerson
     autoFirstPersonButton.Text = "Auto First Person: " .. (Config.AutoFirstPerson and "ON" or "OFF")
     sendNotification("Auto First Person", Config.AutoFirstPerson and "ON" or "OFF")
-end)
+end)]]
 
 local hitpartOptions = {"Head", "HumanoidRootPart", "UpperTorso"}  -- Danh sách part
 local hitpartIndex = 1
@@ -3082,7 +3082,7 @@ RunService.RenderStepped:Connect(function(deltaTime)
     if Config.CustomFOVEnabled then
         applyFOV()
     end
-    local isAiming = Config.AimbotEnabled and Player ~= nil
+    --[[local isAiming = Config.AimbotEnabled and Player ~= nil
     if Config.AutoFirstPerson then
         if isAiming and not wasAiming then
             oldMinZoom = LocalPlayer.CameraMinZoomDistance
@@ -3094,7 +3094,7 @@ RunService.RenderStepped:Connect(function(deltaTime)
             LocalPlayer.CameraMaxZoomDistance = oldMaxZoom
         end
     end
-    wasAiming = isAiming
+    wasAiming = isAiming]]
 
 
     if Config.AimbotEnabled and getgenv().Aimbot.Status then
