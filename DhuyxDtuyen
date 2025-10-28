@@ -36,6 +36,7 @@ local Config = {
     ESPEnabled = false,
     CframeSpeedEnabled = false,
     FlyEnabled = false,
+    Offset = 0,
     AimbotEnabled = false,
     FullbrightEnabled = false,
     NoclipEnabled = false,
@@ -215,9 +216,23 @@ local function toggleJerkOff()
 end
 
 local function createInput(parent, name, defaultValue, placeholderText, onChangeCallback)
+    local container = Instance.new("Frame")
+    container.Size = UDim2.new(1, -10, 0, 40)
+    container.BackgroundTransparency = 1
+    container.Parent = parent
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, 0, 0, 15)
+    label.BackgroundTransparency = 1
+    label.Text = name
+    label.TextColor3 = Color3.fromRGB(58, 95, 125)
+    label.TextSize = 12
+    label.Font = Enum.Font.Gotham
+    label.Parent = container
+
     local inputBox = Instance.new("TextBox")
-    inputBox.Name = name
-    inputBox.Size = UDim2.new(1, -10, 0, 25)
+    inputBox.Size = UDim2.new(1, 0, 0, 25)
+    inputBox.Position = UDim2.new(0, 0, 0, 15)
     inputBox.BackgroundColor3 = Color3.fromRGB(234, 248, 251)
     inputBox.BackgroundTransparency = 0.2
     inputBox.TextColor3 = Color3.fromRGB(58, 95, 125)
@@ -226,25 +241,24 @@ local function createInput(parent, name, defaultValue, placeholderText, onChange
     inputBox.Text = tostring(defaultValue)
     inputBox.PlaceholderText = placeholderText
     inputBox.ClearTextOnFocus = false
-    inputBox.Parent = parent
+    inputBox.Parent = container
 
     local corner = Instance.new("UICorner", inputBox)
     corner.CornerRadius = UDim.new(0, 6)
 
-    inputBox:GetPropertyChangedSignal("Text"):Connect(function()
+    inputBox.FocusLost:Connect(function()
         local num = tonumber(inputBox.Text)
-        if num and num > 0 then
+        if num then
             onChangeCallback(num)
-            game:GetService("StarterGui"):SetCore("SendNotification", {
-                Title = name,
-                Text = name .. " = " .. num,
-                Duration = 5
-            })
+            StarterGui:SetCore("SendNotification", {Title = name, Text = name .. " = " .. num, Duration = 5})
+        else
+            inputBox.Text = tostring(defaultValue)
         end
     end)
 
-    return inputBox
+    return container
 end
+
 
 local function CreateButton(parent, name, callback)
     local buttonFrame = Instance.new("Frame")
@@ -926,6 +940,16 @@ aimbotButton = CreateButton(ButtonFrame1, "Aimlock: OFF", function()
     aimbotButton.Text = "Aimlock: " .. (Config.AimbotEnabled and "ON" or "OFF")
     sendNotification("AIMLOCK", Config.AimbotEnabled and "ON" or "OFF")
 end)
+
+createInput(
+    ButtonFrame1,
+    "Offset",
+    Config.Offset,
+    "Enter Offset (e.g. 1)",
+    function(value)
+        Config.Offset = value
+    end
+)
 
 createInput(
     ButtonFrame1,
@@ -3062,7 +3086,8 @@ RunService.RenderStepped:Connect(function(deltaTime)
         Player = GetClosestValidPlayer()
         if Player and Player.Character and Player.Character:FindFirstChild(getgenv().Aimbot.Hitpart) then
             local part = getpart()
-            local predictedPos = CalculateVIPPrediction(part, pred_scalar)  -- Dùng scalar mới tính
+            local predictedPos = CalculateVIPPrediction(part, pred_scalar) + Vector3.new(0, Config.Offset, 0)
+  -- Dùng scalar mới tính
             if predictedPos and not IsObstructed(Camera.CFrame.Position, predictedPos) then
                 Camera.CFrame = CFrame.new(Camera.CFrame.Position, predictedPos)
             end
