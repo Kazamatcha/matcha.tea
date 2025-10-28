@@ -3082,12 +3082,12 @@ RunService.RenderStepped:Connect(function(deltaTime)
     if Config.CustomFOVEnabled then
         applyFOV()
     end
-    local isAiming = Config.AimbotEnabled and     Player ~= nil
+    local isAiming = Config.AimbotEnabled and Player ~= nil
     if Config.AutoFirstPerson then
         if isAiming and not wasAiming then
             oldMinZoom = LocalPlayer.CameraMinZoomDistance
             oldMaxZoom = LocalPlayer.CameraMaxZoomDistance
-        LocalPlayer.CameraMinZoomDistance = 0.5
+            LocalPlayer.CameraMinZoomDistance = 0.5
             LocalPlayer.CameraMaxZoomDistance = 0.5
     elseif not isAiming and wasAiming then
             LocalPlayer.CameraMinZoomDistance = oldMinZoom
