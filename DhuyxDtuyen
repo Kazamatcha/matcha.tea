@@ -37,6 +37,7 @@ local Config = {
     CframeSpeedEnabled = false,
     FlyEnabled = false,
     Offset = 0,
+    AutoFirstPerson = false,
     AimbotEnabled = false,
     FullbrightEnabled = false,
     NoclipEnabled = false,
@@ -65,6 +66,9 @@ local Config = {
     AntiVoidEnabled = false,
     AirPartEnabled = false,  
 }
+local oldMinZoom, oldMaxZoom
+local wasAiming = false
+
 local desync_setback = Instance.new("Part")
 desync_setback.Name = "Desync Setback"
 desync_setback.Parent = Workspace
@@ -1000,6 +1004,12 @@ autoPredictionButton = CreateButton(ButtonFrame1, "Auto Prediction: OFF", functi
     Config.AutoPredictionEnabled = not Config.AutoPredictionEnabled
     autoPredictionButton.Text = "Auto Prediction: " .. (Config.AutoPredictionEnabled and "ON" or "OFF")
     sendNotification("Auto Prediction", Config.AutoPredictionEnabled and "ON" or "OFF")
+end)
+
+autoFirstPersonButton = CreateButton(ButtonFrame1, "Auto First Person: OFF", function()
+    Config.AutoFirstPerson = not Config.AutoFirstPerson
+    autoFirstPersonButton.Text = "Auto First Person: " .. (Config.AutoFirstPerson and "ON" or "OFF")
+    sendNotification("Auto First Person", Config.AutoFirstPerson and "ON" or "OFF")
 end)
 
 local hitpartOptions = {"Head", "HumanoidRootPart", "UpperTorso"}  -- Danh sách part
@@ -3072,6 +3082,20 @@ RunService.RenderStepped:Connect(function(deltaTime)
     if Config.CustomFOVEnabled then
         applyFOV()
     end
+    local isAiming = Config.AimbotEnabled and     Player ~= nil
+    if Config.AutoFirstPerson then
+        if isAiming and not wasAiming then
+            oldMinZoom = LocalPlayer.CameraMinZoomDistance
+            oldMaxZoom = LocalPlayer.CameraMaxZoomDistance
+        LocalPlayer.CameraMinZoomDistance = 0.5
+            LocalPlayer.CameraMaxZoomDistance = 0.5
+    elseif not isAiming and wasAiming then
+            LocalPlayer.CameraMinZoomDistance = oldMinZoom
+            LocalPlayer.CameraMaxZoomDistance = oldMaxZoom
+        end
+    end
+    wasAiming = isAiming
+
 
     if Config.AimbotEnabled and getgenv().Aimbot.Status then
         -- Thêm phần tính scalar ở đây (gộp GetPing và set prediction)
@@ -3211,7 +3235,12 @@ local FOV_RADIUS = 200
 -- Hàm lấy player gần chuột nhất trong FOV
 local function GetClosestValidPlayer()
     local closest, shortestDist = nil, math.huge
-    local mousePos = UserInputService:GetMouseLocation()
+    local mousePos
+    if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled then
+        mousePos = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+    else
+        mousePos = UserInputService:GetMouseLocation()
+    end
 
     for _, plr in ipairs(Players:GetPlayers()) do
         if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
