@@ -1,6 +1,8 @@
 getgenv().matcha = {
-    AimbotEnabled = false,
+    AimEnabled = false,
     StickyAim = false,
+    HitChance = 100,
+    AimEnabled = false,
     CheckSelect = {},
     AimCheck = {},
     AimDistanceCheck = false,
@@ -24,7 +26,8 @@ getgenv().matcha = {
     SmoothMethod = "Linear",
     AimMethod = "camera",
     SortType = "near mouse",
-    ToggleAimbot = true,
+    ToggleAimbot = false,
+    SmoothMouse = 7,
     NotifySelect = false,
     Target = nil,
     SelectedTarget = nil,
@@ -66,6 +69,8 @@ getgenv().matcha = {
     FOVFilledColor = Color3.fromRGB(255, 255, 255),
     FOVThickness = 1,
 }
+local silentTarget = nil
+local silentAimPosition = nil
 -- Logic implementation
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
@@ -218,40 +223,6 @@ local function toggleTarget()
     end
 end
 
-local function getVelocity(targetPart)
-    local velocity
-    if getgenv().matcha.Resolver then
-        if getgenv().matcha.ResolverMethod == "move direction" then
-            local humanoid = targetPart.Parent:FindFirstChild("Humanoid")
-            if humanoid then
-                velocity = humanoid.MoveDirection * humanoid.WalkSpeed
-            end
-        elseif getgenv().matcha.ResolverMethod == "lookvector" then
-            velocity = targetPart.CFrame.LookVector * getgenv().matcha.PredictionX * 1.0
-        elseif getgenv().matcha.ResolverMethod == "combined" then
-            local target = getgenv().matcha.Target
-            if target and target.Character then
-                local part = target.Character:FindFirstChild(getgenv().matcha.HitPart)
-                if part then
-                    part.Velocity = Vector3.new(part.Velocity.X, 0, part.Velocity.Z)
-                    part.AssemblyLinearVelocity = Vector3.new(part.Velocity.X, 0, part.Velocity.Z)
-                    local hrp = target.Character:FindFirstChild("HumanoidRootPart")
-                    if hrp and hrp.Velocity.Magnitude > 30 then
-                        part.Velocity = Vector3.zero
-                        part.AssemblyLinearVelocity = Vector3.zero
-                    end
-                end
-            end
-            velocity = targetPart.Velocity
-        else
-            velocity = targetPart.Velocity
-        end
-    else
-        velocity = targetPart.Velocity
-    end
-    return velocity or Vector3.zero
-end
-
 local function CalculateAutoPrediction(target)
     if not target or not target.Character or not target.Character:FindFirstChild("HumanoidRootPart") then
         return 0.1
@@ -259,11 +230,11 @@ local function CalculateAutoPrediction(target)
 
     local ping = math.clamp(Stats.Network.ServerStatsItem["Data Ping"]:GetValue() / 1000, 0.01, 1)
     local root = target.Character.HumanoidRootPart
-    local velocity = root.AssemblyLinearVelocity.Magnitude
     local distance = (root.Position - Camera.CFrame.Position).Magnitude
 
-    local predicted_time = (distance / math.max(velocity, 1)) * 0.05 + ping * 0.5
+    local predicted_time = (distance / 100) * 0.05 + ping * 0.5
     predicted_time = math.clamp(predicted_time, 0.05, 0.4)
+
     return predicted_time
 end
 
@@ -619,8 +590,10 @@ end
 Players.PlayerAdded:Connect(handlePlayer)
 
 RunService.RenderStepped:Connect(function()
+    -- === CẬP NHẬT PREDICTION (AUTO) ===
     updatePredictionValue()
 
+    -- === CẬP NHẬT FOV ===
     local mousePos = UserInputService:GetMouseLocation()
     fovFill.Position = mousePos
     fovFill.Radius = getgenv().matcha.FOVSize
@@ -630,105 +603,152 @@ RunService.RenderStepped:Connect(function()
 
     fovOutline.Position = mousePos
     fovOutline.Radius = getgenv().matcha.FOVSize
-    fovOutline.Visible =  getgenv().matcha.FOVOutline
+    fovOutline.Visible = getgenv().matcha.FOVOutline
     fovOutline.Color = getgenv().matcha.FOVOutlineColor
     fovOutline.Thickness = getgenv().matcha.FOVThickness
 
-    if getgenv().matcha.AimbotEnabled and targeting and getgenv().matcha.ToggleAimbot then
-        if not getgenv().matcha.StickyAim then
-            getgenv().matcha.Target = GetClosestPlayer()
-            if getgenv().matcha.Target and getgenv().matcha.Target ~= lastNotifiedTarget and getgenv().matcha.NotifySelect then
-                Library:Notification("Selected Target: " .. getgenv().matcha.Target.DisplayName .. " (@" .. getgenv().matcha.Target.Name .. ")", "", 3)
-                lastNotifiedTarget = getgenv().matcha.Target
-            end
-            getgenv().matcha.SelectedTarget = getgenv().matcha.Target
+    -- === CHỈ CHẠY KHI AIM BẬT ===
+    if not getgenv().matcha.AimEnabled then
+        silentTarget = nil
+        silentAimPosition = nil
+        return
+    end
+
+    -- === CẬP NHẬT TARGET (NON-STICKY) ===
+    if not getgenv().matcha.StickyAim then
+        getgenv().matcha.Target = GetClosestPlayer()
+        if getgenv().matcha.Target and getgenv().matcha.Target ~= lastNotifiedTarget and getgenv().matcha.NotifySelect then
+            Library:Notification("Selected Target: " .. getgenv().matcha.Target.DisplayName .. " (@" .. getgenv().matcha.Target.Name .. ")", "", 3)
+            lastNotifiedTarget = getgenv().matcha.Target
         end
+        getgenv().matcha.SelectedTarget = getgenv().matcha.Target
+    end
 
-        local target = getgenv().matcha.SelectedTarget
-        if target and target.Character then
-            local valid = true
-            local hitPartName = getgenv().matcha.HitPart
-            if hitPartName == "Torso (R6)" then hitPartName = "Torso" end
+    local target = getgenv().matcha.SelectedTarget
+    if not target or not target.Character then
+        silentTarget = nil
+        silentAimPosition = nil
+        return
+    end
 
-            if table.find(getgenv().matcha.AimCheck, "Check Wall") and not canSeeTarget(target, hitPartName) then
-                valid = false
-            end
-            if table.find(getgenv().matcha.AimCheck, "Check Alive") and not isAlive(target) then
-                valid = false
-            end
+    -- === VALIDATION CHUNG (Aimbot + Silent Aim) ===
+    local hitPartName = getgenv().matcha.HitPart
+    if hitPartName == "Torso (R6)" then hitPartName = "Torso" end
 
-            if getgenv().matcha.AimDistanceCheck then
-                local dist = (target.Character.HumanoidRootPart.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
-                if dist > getgenv().matcha.AimDistance then
-                    valid = false
+    local valid = true
+    if table.find(getgenv().matcha.AimCheck, "Check Wall") and not canSeeTarget(target, hitPartName) then valid = false end
+    if table.find(getgenv().matcha.AimCheck, "Check Alive") and not isAlive(target) then valid = false end
+    if getgenv().matcha.AimDistanceCheck then
+        local dist = (target.Character.HumanoidRootPart.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
+        if dist > getgenv().matcha.AimDistance then valid = false end
+    end
+    if getgenv().matcha.HealthCheck then
+        local hum = target.Character:FindFirstChildOfClass("Humanoid")
+        if hum and hum.Health <= getgenv().matcha.HealthThreshold then valid = false end
+    end
+
+    -- FOV Check
+    local rootPart = target.Character:FindFirstChild("HumanoidRootPart")
+    if rootPart and getgenv().matcha.UseFOV then
+        local screenPos, onScreen = Camera:WorldToViewportPoint(rootPart.Position)
+        if onScreen then
+            local distToMouse = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
+            if distToMouse > getgenv().matcha.FOVSize then valid = false end
+        else
+            valid = false
+        end
+    end
+
+    if not valid then
+        silentTarget = nil
+        silentAimPosition = nil
+        return
+    end
+
+    -- === LẤY TARGET PART (Closest Part + Air Part) ===
+    local targetPart = target.Character:FindFirstChild(hitPartName) or target.Character.HumanoidRootPart
+
+    if getgenv().matcha.ClosestPart then
+        local closestDist = math.huge
+        for _, part in ipairs(target.Character:GetChildren()) do
+            if part:IsA("BasePart") then
+                local dist = (part.Position - Camera.CFrame.Position).Magnitude
+                if dist < closestDist then
+                    targetPart = part
+                    closestDist = dist
                 end
             end
+        end
+    end
 
-            if getgenv().matcha.HealthCheck then
-                local hum = target.Character:FindFirstChildOfClass("Humanoid")
-                if hum and hum.Health <= getgenv().matcha.HealthThreshold then
-                    valid = false
-                end
+    local targetHum = target.Character:FindFirstChildOfClass("Humanoid")
+    local inFreefall = targetHum and targetHum:GetState() == Enum.HumanoidStateType.Freefall
+
+    if getgenv().matcha.AirPartEnabled and inFreefall then
+        local airPartName = getgenv().matcha.AirPart
+        if airPartName == "Torso (R6)" then airPartName = "Torso" end
+        targetPart = target.Character:FindFirstChild(airPartName) or targetPart
+    end
+
+    -- === VELOCITY + RESOLVER (TÍCH HỢP TRỰC TIẾP) ===
+    local velocity = targetPart.AssemblyLinearVelocity
+
+    if getgenv().matcha.Resolver then
+        local humanoid = targetPart.Parent:FindFirstChild("Humanoid")
+        local hrp = target.Character:FindFirstChild("HumanoidRootPart")
+
+        if getgenv().matcha.ResolverMethod == "move direction" and humanoid then
+            velocity = humanoid.MoveDirection * humanoid.WalkSpeed
+        elseif getgenv().matcha.ResolverMethod == "lookvector" then
+            velocity = targetPart.CFrame.LookVector * getgenv().matcha.PredictionX * 100
+        elseif getgenv().matcha.ResolverMethod == "combined" and hrp then
+            local groundVel = Vector3.new(targetPart.Velocity.X, 0, targetPart.Velocity.Z)
+            targetPart.Velocity = groundVel
+            targetPart.AssemblyLinearVelocity = groundVel
+            if hrp.Velocity.Magnitude > 30 then
+                targetPart.Velocity = Vector3.zero
+                targetPart.AssemblyLinearVelocity = Vector3.zero
+            end
+            velocity = targetPart.Velocity
+        end
+    end
+
+    -- === TÍNH TOÁN VỊ TRÍ AIM CUỐI (DÙNG CHUNG CHO AIMBOT + SILENT) ===
+    local predictionOffset = velocity * getgenv().matcha.PredictionX
+    local basePosition = targetPart.Position + Vector3.new(0,
+        inFreefall and getgenv().matcha.JumpOffset or getgenv().matcha.Offset,
+        0
+    )
+    local aimPosition = basePosition + predictionOffset
+
+    -- === LƯU CHO SILENT AIM ===
+    silentTarget = target
+    silentAimPosition = aimPosition
+
+    -- === AIMBOT (CAMERA / MOUSE) ===
+    if targeting and getgenv().matcha.ToggleAimbot then
+        if getgenv().matcha.AimMethod == "camera" then
+            local goalCFrame = CFrame.new(Camera.CFrame.Position, aimPosition)
+
+            if getgenv().matcha.SmoothingEnabled then
+                Camera.CFrame = Camera.CFrame:Lerp(
+                    goalCFrame,
+                    getgenv().matcha.Smooth,
+                    Enum.EasingStyle[getgenv().matcha.SmoothMethod],
+                    Enum.EasingDirection.InOut
+                )
+            else
+                Camera.CFrame = goalCFrame
             end
 
-            -- Kiểm tra FOV cho aim
-            local targetPart = target.Character:FindFirstChild(hitPartName) or target.Character.HumanoidRootPart
-            local screenPos, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
-            local distanceToMouse = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
-            if getgenv().matcha.UseFOV and distanceToMouse > getgenv().matcha.FOVSize then
-                valid = false
+        elseif getgenv().matcha.AimMethod == "mouse" then
+            local screenPos, onScreen = Camera:WorldToViewportPoint(aimPosition)
+            if onScreen then
+                local smoothVal = getgenv().matcha.SmoothingEnabled and getgenv().matcha.SmoothMouse or 7
+                local deltaX = (screenPos.X - mousePos.X) / smoothVal
+                local deltaY = (screenPos.Y - mousePos.Y) / smoothVal
+                mousemoverel(deltaX, deltaY)
             end
-
-			if valid then
-			    local targetPart = target.Character:FindFirstChild(hitPartName) or target.Character.HumanoidRootPart
-			
-			    if getgenv().matcha.ClosestPart then
-			        local closestDist = math.huge
-			        for _, part in ipairs(target.Character:GetChildren()) do
-			            if part:IsA("BasePart") then
-			                local dist = (part.Position - Camera.CFrame.Position).Magnitude
-			                if dist < closestDist then
-			                    targetPart = part
-			                    closestDist = dist
-			                end
-			            end
-			        end
-			    end
-			
-			    local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-			    local targetHum = target.Character:FindFirstChildOfClass("Humanoid")
-			    local inFreefall = (hum and hum:GetState() == Enum.HumanoidStateType.Freefall) or (targetHum and targetHum:GetState() == Enum.HumanoidStateType.Freefall)
-			
-			    if getgenv().matcha.AirPartEnabled and inFreefall then
-			        local airPartName = getgenv().matcha.AirPart
-			        if airPartName == "Torso (R6)" then airPartName = "Torso" end
-			        targetPart = target.Character:FindFirstChild(airPartName) or targetPart
-			    end
-			
-			    local velocity = getVelocity(targetPart)
-			    local prediction = Vector3.new(velocity.X * getgenv().matcha.PredictionX, velocity.Y * getgenv().matcha.PredictionY, velocity.Z * getgenv().matcha.PredictionX)
-			    local aimPos = targetPart.Position + prediction
-			
-			    if inFreefall then
-			        aimPos = aimPos + Vector3.new(0, getgenv().matcha.JumpOffset, 0)
-			    else
-			        aimPos = aimPos + Vector3.new(0, getgenv().matcha.Offset, 0)
-			    end
-			
-			    if getgenv().matcha.AimMethod == "camera" then
-			        local smooth = getgenv().matcha.Smooth
-			        local method = getgenv().matcha.SmoothMethod
-			        Camera.CFrame = Camera.CFrame:Lerp(CFrame.new(Camera.CFrame.Position, aimPos), smooth, Enum.EasingStyle[method], Enum.EasingDirection.InOut)
-			    elseif getgenv().matcha.AimMethod == "mouse" then
-			        local screenPos, onScreen = Camera:WorldToViewportPoint(aimPos)
-			        if onScreen then
-			            local mousePos = UserInputService:GetMouseLocation()
-                        local deltaX = (screenPos.X - mousePos.X) / 6
-                        local deltaY = (screenPos.Y - mousePos.Y) / 6
-			            mousemoverel(deltaX, deltaY)
-			        end
-			    end
-			end
         end
     end
 end)
@@ -808,11 +828,11 @@ local HitboxSection = CombatTab:Section({Name = "Hitbox Expander", Side = 1})
 local FOVSection = CombatTab:Section({Name = "FOV Selection", Side = 2})
 -- Toggle Aimbot
 local aimbotToggle = AimbotSection:Toggle({
-    Name = "Aimbot Enabled",
-    Flag = "AimbotEnabled",
+    Name = "Aim Enabled",
+    Flag = "AimEnabled",
     Default = false,
     Callback = function(Value)
-        getgenv().matcha.AimbotEnabled = Value
+        getgenv().matcha.AimEnabled = Value
     end
 })
 
@@ -925,9 +945,29 @@ AimbotSection:Toggle({
 AimbotSection:Toggle({
     Name = "Toggle Aimbot",
     Flag = "ToggleAimbot",
-    Default = true,
+    Default = false,
     Callback = function(Value)
         getgenv().matcha.ToggleAimbot = Value
+    end
+})
+local silentToggle = AimbotSection:Toggle({
+    Name = "Silent Aim",
+    Flag = "SilentAimEnabled",
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.SilentAimEnabled = Value
+    end
+})
+
+AimbotSection:Slider({
+    Name = "HitChance (%)",
+    Flag = "HitChance",
+    Min = 1,
+    Max = 100,
+    Default = 100,
+    Decimals = 1,
+    Callback = function(Value)
+        getgenv().matcha.HitChance = Value
     end
 })
 
@@ -980,26 +1020,33 @@ AimbotSettings:Dropdown({
     end
 })
 
-AimbotSettings:Slider({
+AimbotSettings:Textbox({
     Name = "Prediction X",
     Flag = "PredictionX",
-    Min = 0,
-    Max = 1,
-    Default = 0.13,
-    Decimals = 0.001,
+    Default = "0.13",
+    Placeholder = "0.000 - 1.000",
     Callback = function(Value)
-        getgenv().matcha.PredictionX = Value
+        local num = tonumber(Value)
+        if num and num >= 0 and num <= 1 then
+            getgenv().matcha.PredictionX = num
+        else
+            getgenv().matcha.PredictionX = 0.13  -- Reset nếu sai
+        end
     end
 })
-AimbotSettings:Slider({
+
+AimbotSettings:Textbox({
     Name = "Prediction Y",
     Flag = "PredictionY",
-    Min = 0,
-    Max = 1,
-    Default = 0.13,
-    Decimals = 0.001,
+    Default = "0.13",
+    Placeholder = "0.000 - 1.000",
     Callback = function(Value)
-        getgenv().matcha.PredictionY = Value
+        local num = tonumber(Value)
+        if num and num >= 0 and num <= 1 then
+            getgenv().matcha.PredictionY = num
+        else
+            getgenv().matcha.PredictionY = 0.13  -- Reset nếu sai
+        end
     end
 })
 
@@ -1061,6 +1108,15 @@ AimbotSettings:Dropdown({
     end
 })
 
+AimbotSettings:Toggle({
+    Name = "Smoothing",
+    Flag = "SmoothingEnabled",
+    Default = true,  -- Mặc định BẬT
+    Callback = function(Value)
+        getgenv().matcha.SmoothingEnabled = Value
+    end
+})
+
 AimbotSettings:Slider({
     Name = "Smooth",
     Flag = "Smooth",
@@ -1070,6 +1126,17 @@ AimbotSettings:Slider({
     Decimals = 0.001,
     Callback = function(Value)
         getgenv().matcha.Smooth = Value
+    end
+})
+AimbotSettings:Slider({
+    Name = "Smooth Mouse",
+    Flag = "SmoothMouse",
+    Min = 1,      -- 1 = instant (laggy)
+    Max = 20,     -- 20 = siêu mượt (chậm)
+    Default = 7,  -- ✅ Giá trị Lux dùng
+    Decimals = 1,
+    Callback = function(Value)
+        getgenv().matcha.SmoothMouse = Value
     end
 })
 AimbotSettings:Dropdown({
@@ -1460,6 +1527,27 @@ MiscSelection:Slider({
     end
 })
 
+pcall(function()
+    local oldIndex
+    local success = pcall(function()
+        oldIndex = hookmetamethod(game, "__index", function(self, key)
+            if not checkcaller() and self:IsA("Mouse") and (key == "Hit" or key == "Target") then
+                if getgenv().matcha.AimEnabled and getgenv().matcha.SilentAimEnabled and 
+                   silentTarget and silentAimPosition and math.random(1, 100) <= getgenv().matcha.HitChance then
+
+                    if key == "Hit" then
+                        return CFrame.new(silentAimPosition)
+                    elseif key == "Target" then
+                        return silentTarget.Character:FindFirstChild(getgenv().matcha.HitPart) or silentTarget.Character.HumanoidRootPart
+                    end
+                end
+            end
+            return oldIndex(self, key)
+        end)
+    end)
+    if not success then warn("[matcha] Silent Aim hook failed") end
+end)
+
 local rs = game:GetService("RunService")
 local uis = game:GetService("UserInputService")
 local lp = game.Players.LocalPlayer
@@ -1529,4 +1617,4 @@ lp.CharacterAdded:Connect(function(char)
 	setup(char)
 end)
 
-Library:Notification("Loaded!", "Menu loaded successfully", 5)
+Library:Notification("matcha.tea", "Thank you for using matcha.tea", 5)
