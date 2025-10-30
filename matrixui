@@ -3334,7 +3334,10 @@ getgenv().TargetAimbot = {
     Enabled = true, 
     Autoselect = false,
     Resolver = true, 
-    ResolverType = "MoveDirection", 
+    ClosestPart = false,
+    AirPartEnabled = false,
+    AirPart = "Head",
+    ResolverType = "MoveDirection",  -- Đổi thành dropdown nếu cần
     JumpOffset = 0.00, 
     RealJumpOffset = 0.00, 
     HitParts = {"Head"}, 
@@ -3766,48 +3769,94 @@ local function CalculateAutoPrediction(target)
 end
 
 local function AimRedirect()
-    if not (TargetAimbot.Enabled and TargBindEnabled and TargetPlr and TargetPlr.Character and TargetPlr.Character:FindFirstChild(TargetAimbot.RealHitPart)) then
-        return
-    end
-    -- Check if local player and target are alive
-    if (getgenv().TargetAimbot.CheckAlive and not isAlive(LocalPlayer)) or (getgenv().TargetAimbot.CheckAlive and not isAlive(TargetPlr)) then
-        return
-    end
-    -- Check if target is behind a wall
-    if getgenv().TargetAimbot.CheckWall and not canSeeTarget(TargetPlr, getgenv().TargetAimbot.RealHitPart) then
+    -- === KIỂM TRA CƠ BẢN ===
+    if not (getgenv().TargetAimbot.Enabled and TargBindEnabled and TargetPlr and TargetPlr.Character) then
         return
     end
 
-    local cam = Workspace.CurrentCamera
-    local rootPart = TargetPlr.Character[TargetAimbot.RealHitPart]
-    local targetVelocity = rootPart.AssemblyLinearVelocity
+    local target = TargetPlr
+    local cam = workspace.CurrentCamera
+    local hitPartName = getgenv().TargetAimbot.RealHitPart
+    local character = target.Character
 
-    -- Tính toán prediction tự động
-    local predictionTime = CalculateAutoPrediction(TargetPlr)
-    local predictedPosition = rootPart.Position + (targetVelocity * predictionTime)
+    -- === VALIDATION ===
+    if getgenv().TargetAimbot.CheckAlive and not isAlive(target) then return end
+    if getgenv().TargetAimbot.CheckWall and not canSeeTarget(target, hitPartName) then return end
 
-    -- Nếu có jump offset, áp dụng thêm
-    predictedPosition += Vector3.new(0, getgenv().TargetAimbot.JumpOffset, 0)
+    -- === LẤY TARGET PART ===
+    local targetPart = character:FindFirstChild(hitPartName) or character.HumanoidRootPart
 
-    -- ⚡ Đặt camera và hướng aim với smoothing
-    local newCF = CFrame.lookAt(cam.CFrame.Position, predictedPosition)
+    -- Closest Part (nếu bật)
+    if getgenv().TargetAimbot.ClosestPart then
+        local closestDist = math.huge
+        for _, part in ipairs(character:GetChildren()) do
+            if part:IsA("BasePart") then
+                local dist = (part.Position - cam.CFrame.Position).Magnitude
+                if dist < closestDist then
+                    targetPart = part
+                    closestDist = dist
+                end
+            end
+        end
+    end
+
+    -- AirPart + JumpOffset
+    local hum = character:FindFirstChildOfClass("Humanoid")
+    local inAir = hum and hum:GetState() == Enum.HumanoidStateType.Freefall
+
+    if getgenv().TargetAimbot.AirPartEnabled and inAir then
+        local airPart = getgenv().TargetAimbot.AirPart or hitPartName
+        targetPart = character:FindFirstChild(airPart) or targetPart
+    end
+
+    -- === RESOLVER ===
+    local velocity = targetPart.AssemblyLinearVelocity
+
+    if getgenv().TargetAimbot.Resolver then
+        local hrp = character:FindFirstChild("HumanoidRootPart")
+        if getgenv().TargetAimbot.ResolverType == "MoveDirection" and hum then
+            velocity = hum.MoveDirection * hum.WalkSpeed
+        elseif getgenv().TargetAimbot.ResolverType == "LookVector" then
+            velocity = targetPart.CFrame.LookVector * getgenv().Prediction * 100
+        elseif getgenv().TargetAimbot.ResolverType == "Combined" and hrp then
+            local groundVel = Vector3.new(velocity.X, 0, velocity.Z)
+            if hrp.Velocity.Magnitude > 30 then
+                velocity = Vector3.zero
+            else
+                velocity = groundVel
+            end
+        end
+    end
+
+    -- === PREDICTION + OFFSET ===
+    local predX = getgenv().Prediction or 0.07
+    local predY = getgenv().RealPrediction or predX
+
+    local predictedPos = targetPart.Position
+        + Vector3.new(velocity.X * predX, velocity.Y * predY, velocity.Z * predX)
+        + Vector3.new(0, inAir and getgenv().TargetAimbot.JumpOffset or 0, 0)
+
+    -- === CAMERA SMOOTHING (matcha.tea style) ===
+    local goalCFrame = CFrame.new(cam.CFrame.Position, predictedPos)
+
     if getgenv().TargetAimbot.Smoothing then
-        cam.CFrame = cam.CFrame:Lerp(newCF, getgenv().TargetAimbot.SmoothingFactor)
+        cam.CFrame = cam.CFrame:Lerp(goalCFrame, getgenv().TargetAimbot.SmoothingFactor)
     else
-        cam.CFrame = newCF
+        cam.CFrame = goalCFrame
     end
 
-    -- Nếu muốn quay nhân vật theo hướng aim với smoothing:
-    if TargetAimbot.LookAt and LocalPlayer.Character and LocalPlayer.Character.PrimaryPart then
-        local charNewCF = CFrame.lookAt(LocalPlayer.Character.PrimaryPart.Position, predictedPosition)
+    -- === LOOKAT CHARACTER (nếu bật) ===
+    if getgenv().TargetAimbot.LookAt and LocalPlayer.Character and LocalPlayer.Character.PrimaryPart then
+        local charGoal = CFrame.new(LocalPlayer.Character.PrimaryPart.Position, predictedPos)
         if getgenv().TargetAimbot.Smoothing then
-            LocalPlayer.Character:SetPrimaryPartCFrame(LocalPlayer.Character.PrimaryPart.CFrame:Lerp(charNewCF, getgenv().TargetAimbot.SmoothingFactor))
+            LocalPlayer.Character:SetPrimaryPartCFrame(
+                LocalPlayer.Character.PrimaryPart.CFrame:Lerp(charGoal, getgenv().TargetAimbot.SmoothingFactor)
+            )
         else
-            LocalPlayer.Character:SetPrimaryPartCFrame(charNewCF)
+            LocalPlayer.Character:SetPrimaryPartCFrame(charGoal)
         end
     end
 end
-
 RunService.Heartbeat:Connect(function()
     if TargetAimbot.Enabled and TargBindEnabled and TargetPlr then
         TargResolvePos = Resolver(TargetPlr, TargetAimbot)
@@ -4093,6 +4142,25 @@ end })
 aimlockSettings:Toggle({ title = "Resolver", default = getgenv().TargetAimbot.Resolver, callback = function(Value)
     getgenv().TargetAimbot.Resolver = Value
 end })
+
+aimlockSettings:Toggle({ 
+    title = "Closest Part", 
+    default = false, 
+    callback = function(v) getgenv().TargetAimbot.ClosestPart = v end 
+})
+
+aimlockSettings:Toggle({ 
+    title = "Air Part", 
+    default = false, 
+    callback = function(v) getgenv().TargetAimbot.AirPartEnabled = v end 
+})
+
+aimlockSettings:Dropdown({ 
+    title = "Air HitPart", 
+    values = {"Head", "HumanoidRootPart", "UpperTorso"}, 
+    default = "Head", 
+    callback = function(v) getgenv().TargetAimbot.AirPart = v end 
+})
 
 aimlockSettings:TextBox({ title = "Offset", default = tostring(getgenv().TargetAimbot.Offset), callback = function(Value)
     getgenv().TargetAimbot.JumpOffset = tonumber(Value) or 0
@@ -4546,15 +4614,15 @@ local settingsTab = Interface:Tab("UI Settings")
 
 local loading_config = false
 local config = {
-    path = "drax/configs/da_hood/",
+    path = "matcha/configs/matcha.tea/",
     file = "",
     config_name = ""
 }
 function config:get_list()
     local config_list = {}
 
-    if #listfiles("drax/configs/da_hood") > 0 then
-        for i, v in next, listfiles("drax/configs/da_hood") do
+    if #listfiles("matcha/configs/matcha.tea") > 0 then
+        for i, v in next, listfiles("matcha/configs/matcha.tea") do
             local ext = '.'..v:split('.')[#v:split('.')];
             if ext == '.txt' then
                 table.insert(config_list, v:split('\\')[#v:split('\\')]:sub(1,-#ext-1))
