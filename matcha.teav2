@@ -810,7 +810,7 @@ end)
 local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/Kazamatcha/matcha.tea/refs/heads/main/library"))()
 
 local Window = Library:Window({
-    Logo = "77218680285262",
+    Logo = "122719141368198",
     FadeTime = 0.3,
 })
 local Watermark = Library:Watermark("matcha.tea")
@@ -1548,15 +1548,16 @@ pcall(function()
     if not success then warn("[matcha] Silent Aim hook failed") end
 end)
 
-local rs = game:GetService("RunService")
+--[[local rs = game:GetService("RunService")
 local uis = game:GetService("UserInputService")
 local lp = game.Players.LocalPlayer
 local TweenService = game:GetService("TweenService")
 
 -- Danh sách animation
 local animations = {
-	C = "http://www.roblox.com/asset/?id=15609995579",
+	M = "http://www.roblox.com/asset/?id=15609995579",
 	N = "http://www.roblox.com/asset/?id=14352343065",
+	K = "rbxassetid://115730920794562",
 }
 
 local currentTrack = nil
@@ -1615,6 +1616,6 @@ lp.CharacterAdded:Connect(function(char)
 	currentKey = nil
 	task.wait(0.2)
 	setup(char)
-end)
+end)]]
 
 Library:Notification("matcha.tea", "Thank you for using matcha.tea", 5)
