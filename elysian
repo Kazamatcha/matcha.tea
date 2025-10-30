@@ -94,89 +94,7 @@ desync_setback.CanCollide = false
 desync_setback.Anchored = true
 desync_setback.Transparency = 1
 
-local Azure_TargetStats = Instance.new("ScreenGui")
-local Background = Instance.new("Frame")
-local Picture = Instance.new("ImageLabel")
-local Top = Instance.new("Frame")
-local UIGradient = Instance.new("UIGradient")
-local UIGradient_2 = Instance.new("UIGradient")
-local HealthBarBackground = Instance.new("Frame")
-local UIGradient_3 = Instance.new("UIGradient")
-local HealthBar = Instance.new("Frame")
-local UIGradient_4 = Instance.new("UIGradient")
-local NameOfTarget = Instance.new("TextLabel")
 
-Azure_TargetStats.Name = "Azure_TargetStats"
-Azure_TargetStats.Parent = game.CoreGui
-Azure_TargetStats.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-
-Background.Name = "Background"
-Background.Parent = Azure_TargetStats
-Background.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-Background.BorderSizePixel = 0
-Background.Position = UDim2.new(0.388957828, 0, 0.700122297, 0)
-Background.Size = UDim2.new(0, 358, 0, 71)
-Background.Visible = false
-
-Picture.Name = "Picture"
-Picture.Parent = Background
-Picture.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-Picture.BorderSizePixel = 0
-Picture.Position = UDim2.new(0.0279329624, 0, 0.0704225376, 0)
-Picture.Size = UDim2.new(0, 59, 0, 59)
-Picture.Transparency = 1
-Picture.Image = "rbxasset://textures/ui/GuiImagePlaceholder.png"
-
-Top.Name = "Top"
-Top.Parent = Background
-Top.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-Top.BorderSizePixel = 0
-Top.Position = UDim2.new(0, 0, -0.101449274, 0)
-Top.Size = UDim2.new(0, 358, 0, 7)
-
-UIGradient.Color = ColorSequence.new{ColorSequenceKeypoint.new(0.00, Color3.fromRGB(184, 159, 227)), ColorSequenceKeypoint.new(1.00, Color3.fromRGB(102, 88, 156))}
-UIGradient.Rotation = 90
-UIGradient.Parent = Top
-
-UIGradient_2.Color = ColorSequence.new{ColorSequenceKeypoint.new(0.00, Color3.fromRGB(52, 52, 52)), ColorSequenceKeypoint.new(1.00, Color3.fromRGB(0, 0, 0))}
-UIGradient_2.Rotation = 90
-UIGradient_2.Parent = Background
-
-HealthBarBackground.Name = "HealthBarBackground"
-HealthBarBackground.Parent = Background
-HealthBarBackground.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-HealthBarBackground.BorderSizePixel = 0
-HealthBarBackground.Position = UDim2.new(0.215083793, 0, 0.348234326, 0)
-HealthBarBackground.Size = UDim2.new(0, 270, 0, 19)
-HealthBarBackground.Transparency = 1
-
-UIGradient_3.Color = ColorSequence.new{ColorSequenceKeypoint.new(0.00, Color3.fromRGB(58, 58, 58)), ColorSequenceKeypoint.new(1.00, Color3.fromRGB(30, 30, 30))}
-UIGradient_3.Rotation = 90
-UIGradient_3.Parent = HealthBarBackground
-
-HealthBar.Name = "HealthBar"
-HealthBar.Parent = HealthBarBackground
-HealthBar.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-HealthBar.BorderSizePixel = 0
-HealthBar.Position = UDim2.new(-0.00336122862, 0, 0.164894029, 0)
-HealthBar.Size = UDim2.new(0, 130, 0, 19)
-
-UIGradient_4.Color = ColorSequence.new{ColorSequenceKeypoint.new(0.00, Color3.fromRGB(184, 159, 227)), ColorSequenceKeypoint.new(1.00, Color3.fromRGB(102, 88, 156))}
-UIGradient_4.Rotation = 90
-UIGradient_4.Parent = HealthBar
-
-NameOfTarget.Name = "NameOfTarget"
-NameOfTarget.Parent = Background
-NameOfTarget.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-NameOfTarget.BackgroundTransparency = 1.000
-NameOfTarget.Position = UDim2.new(0.220670387, 0, 0.0704225376, 0)
-NameOfTarget.Size = UDim2.new(0, 268, 0, 19)
-NameOfTarget.Font = Enum.Font.Code
-NameOfTarget.TextColor3 = Color3.fromRGB(255, 255, 255)
-NameOfTarget.TextScaled = true
-NameOfTarget.TextSize = 14.000
-NameOfTarget.TextStrokeTransparency = 0.000
-NameOfTarget.TextWrapped = true
 
 local function GetEvent()
     for _, v in pairs(game.ReplicatedStorage:GetChildren()) do
@@ -766,5 +684,43 @@ runService.RenderStepped:Connect(function()
                 camera.CFrame = Main
             end
         end
+    end
+end)
+
+
+local TargetStatsGui = Instance.new("ScreenGui")
+TargetStatsGui.Name = "Elysian_TargetStats"
+TargetStatsGui.Parent = CoreGui
+TargetStatsGui.ResetOnSpawn = false
+
+local StatsFrame = Instance.new("Frame", TargetStatsGui)
+StatsFrame.AnchorPoint = Vector2.new(0.5, 1)
+StatsFrame.Position = UDim2.new(0.5, 0, 0.95, 0)
+StatsFrame.Size = UDim2.new(0, 300, 0, 60)
+StatsFrame.BackgroundTransparency = 0.6
+StatsFrame.BackgroundColor3 = Color3.fromRGB(20,20,20)
+StatsFrame.Visible = false
+local StatsText = Instance.new("TextLabel", StatsFrame)
+StatsText.Size = UDim2.new(1, -12, 1, -12)
+StatsText.Position = UDim2.new(0,6,0,6)
+StatsText.BackgroundTransparency = 1
+StatsText.TextColor3 = Color3.fromRGB(255,255,255)
+StatsText.Font = Enum.Font.Code
+StatsText.TextSize = 14
+StatsText.TextWrapped = true
+StatsText.Text = ""
+
+-- update stats display
+RunService.Heartbeat:Connect(function()
+    if getgenv().Elysian['TargetStats'] and Plr and Plr.Character and isValidTarget(Plr) then
+        local hum = Plr.Character:FindFirstChildOfClass("Humanoid")
+        if hum then
+            StatsText.Text = "Target: "..tostring(Plr.Name).." | Health: "..math.floor(hum.Health).."/"..math.floor(hum.MaxHealth)
+            StatsFrame.Visible = true
+        else
+            StatsFrame.Visible = false
+        end
+    else
+        StatsFrame.Visible = false
     end
 end)
