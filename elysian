@@ -408,95 +408,124 @@ end
 
 local strafeAngle = 0
 
+
+-- ===== UI: CreateButton (draggable, saves positions) =====
 local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "Elysian_UI"
 ScreenGui.Parent = CoreGui
 ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
-local function SavePositions(positions)
-    local json = HttpService:JSONEncode(positions)
-    writefile("button_positions.json", json)
+local savedPositions = {}
+local posFileName = "elysian_button_positions.json"
+
+local function isfile_safe(name)
+    local ok, res = pcall(function() return isfile(name) end)
+    return ok and res
 end
 
-local function LoadPositions()
-    if isfile("button_positions.json") then
-        local json = readfile("button_positions.json")
-        return HttpService:JSONDecode(json)
+local function writefile_safe(name, content)
+    pcall(function() writefile(name, content) end)
+end
+
+local function readfile_safe(name)
+    local ok, res = pcall(function() return readfile(name) end)
+    if ok then return res end
+    return nil
+end
+
+-- load saved if exists
+local function LoadSavedPositions()
+    if isfile_safe(posFileName) then
+        local raw = readfile_safe(posFileName)
+        if raw then
+            local ok, dec = pcall(function() return HttpService:JSONDecode(raw) end)
+            if ok and type(dec) == "table" then savedPositions = dec end
+        end
     end
-    return {}
 end
+LoadSavedPositions()
 
-local savedPositions = LoadPositions()
+local function SavePositions()
+    pcall(function()
+        local json = HttpService:JSONEncode(savedPositions)
+        writefile_safe(posFileName, json)
+    end)
+end
 
 local function CreateButton(name, defaultPosition, callback)
     local Button = Instance.new("TextButton")
-    Button.Size = UDim2.new(0, 100, 0, 50)
-    Button.Position = savedPositions[name] and UDim2.new(0, savedPositions[name].X, 0, savedPositions[name].Y) or defaultPosition
+    Button.Name = "ElysianBtn_" .. name
+    Button.Size = UDim2.new(0, 110, 0, 44)
+    if savedPositions[name] then
+        Button.Position = UDim2.new(0, savedPositions[name].X, 0, savedPositions[name].Y)
+    else
+        Button.Position = defaultPosition or UDim2.new(0, 10, 0, 10)
+    end
+    Button.AnchorPoint = Vector2.new(0, 0)
+    Button.BackgroundColor3 = Color3.fromRGB(30,30,30)
+    Button.BorderSizePixel = 0
     Button.Text = name
     Button.Parent = ScreenGui
-    Button.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    Button.BorderSizePixel = 0
     Button.Font = Enum.Font.Code
-    Button.TextColor3 = Color3.new(0, 0, 0)
-    Button.TextSize = 16
+    Button.TextColor3 = Color3.fromRGB(255,255,255)
+    Button.TextSize = 14
     Button.AutoButtonColor = false
+    Button.ZIndex = 10
 
-    local Corner = Instance.new("UICorner")
-    Corner.CornerRadius = UDim.new(0, 8)
-    Corner.Parent = Button
+    local Corner = Instance.new("UICorner", Button)
+    Corner.CornerRadius = UDim.new(0,8)
 
     local Shadow = Instance.new("Frame")
+    Shadow.Name = "Shadow"
     Shadow.Size = UDim2.new(1, 6, 1, 6)
     Shadow.Position = UDim2.new(0, -3, 0, -3)
-    Shadow.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+    Shadow.BackgroundColor3 = Color3.fromRGB(255,0,0)
     Shadow.BackgroundTransparency = 0.7
-    Shadow.ZIndex = -1
+    Shadow.ZIndex = 9
     Shadow.Parent = Button
-
-    local ShadowCorner = Instance.new("UICorner")
-    ShadowCorner.CornerRadius = UDim.new(0, 8)
-    ShadowCorner.Parent = Shadow
+    local ShadowCorner = Instance.new("UICorner", Shadow)
+    ShadowCorner.CornerRadius = UDim.new(0,8)
 
     local isActive = false
-
-    local function updateButtonState()
-        local targetColor = isActive and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
-        local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-        local tween = game:GetService("TweenService"):Create(Shadow, tweenInfo, {BackgroundColor3 = targetColor})
-        tween:Play()
+    local function updateButtonVisual()
+        local targetColor = isActive and Color3.fromRGB(0,200,120) or Color3.fromRGB(180,60,60)
+        pcall(function()
+            TweenService:Create(Shadow, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundColor3 = targetColor}):Play()
+        end)
     end
 
     Button.MouseButton1Click:Connect(function()
         isActive = not isActive
-        updateButtonState()
-        callback(isActive)
+        updateButtonVisual()
+        pcall(callback, isActive)
     end)
 
+    -- drag logic
     local dragStart, startPos
-
     Button.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             dragStart = input.Position
             startPos = Button.Position
             input.Changed:Connect(function()
                 if input.UserInputState == Enum.UserInputState.End then
                     dragStart = nil
-                    savedPositions[name] = {X = Button.Position.X.Offset, Y = Button.Position.Y.Offset}
-                    SavePositions(savedPositions)
+                    startPos = nil
+                    -- save
+                    savedPositions[name] = { X = Button.Position.X.Offset, Y = Button.Position.Y.Offset }
+                    SavePositions()
                 end
             end)
         end
     end)
-
     Button.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement then
-            if dragStart then
-                local delta = input.Position - dragStart
-                Button.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-            end
+        if (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement) and dragStart then
+            local delta = input.Position - dragStart
+            Button.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
         end
     end)
-    
+
+    -- return a getter for isActive
     return Button, function() return isActive end
 end
 
