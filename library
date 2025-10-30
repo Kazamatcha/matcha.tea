@@ -1,12 +1,9 @@
 --[[
     scoot ui library
     made by samet
+    remade by anhchangm52
     
-    https://discord.gg/VhvTd5HV8d
-    ^^ join for custom commissions
-
     example/documentation is at the bottom
-    date: 19.07.2025
 ]]
 
 if Library then
@@ -84,9 +81,9 @@ local Library do
         FadeSpeed = 0.2,
 
         Folders = {
-            Directory = "scoot",
-            Configs = "scoot/Configs",
-            Assets = "scoot/Assets",
+            Directory = "matcha",
+            Configs = "matcha/Configs",
+            Assets = "matcha/Assets",
         },
 
         Images = {
@@ -4624,75 +4621,88 @@ local Library do
     end
 
     -- Library components
-    Library.Watermark = function(self, Name)
-        local Watermark = { }
-
-        local Items = { } do 
-            Items["Watermark"] = Instances:Create("Frame", {
-                Parent = Library.Holder.Instance,
-                Name = "\0",
-                AnchorPoint = Vector2New(0.5, 1),
-                Position = UDim2New(0.5, 0, 1, -12),
-                BorderColor3 = FromRGB(12, 12, 12),
-                BorderSizePixel = 2,
-                AutomaticSize = Enum.AutomaticSize.XY,
-                BackgroundColor3 = FromRGB(14, 17, 15)
-            })  Items["Watermark"]:AddToTheme({BackgroundColor3 = "Background", BorderColor3 = "Border"})
-
-            Items["Watermark"]:MakeDraggable()
-
-            Instances:Create("UIStroke", {
-                Parent = Items["Watermark"].Instance,
-                Name = "\0",
-                Color = FromRGB(42, 49, 45),
-                LineJoinMode = Enum.LineJoinMode.Miter,
-                ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-            }):AddToTheme({Color = "Outline"})
-
-            Instances:Create("UIPadding", {
-                Parent = Items["Watermark"].Instance,
-                Name = "\0",
-                PaddingTop = UDimNew(0, 5),
-                PaddingBottom = UDimNew(0, 7),
-                PaddingRight = UDimNew(0, 5),
-                PaddingLeft = UDimNew(0, 5)
-            })
-
-            Items["Text"] = Instances:Create("TextLabel", {
-                Parent = Items["Watermark"].Instance,
-                Name = "\0",
-                FontFace = Library.Font,
-                TextColor3 = FromRGB(235, 235, 235),
-                BorderColor3 = FromRGB(0, 0, 0),
-                Text = Name,
-                Position = UDim2New(0, 0, 0, 2),
-                BackgroundTransparency = 1,
-                TextXAlignment = Enum.TextXAlignment.Left,
-                BorderSizePixel = 0,
-                AutomaticSize = Enum.AutomaticSize.XY,
-                TextSize = 9,
-                BackgroundColor3 = FromRGB(255, 255, 255)
-            })  Items["Text"]:AddToTheme({TextColor3 = "Text"})
-
-            Items["Text"]:TextBorder()
-
-            Items["Liner"] = Instances:Create("Frame", {
-                Parent = Items["Watermark"].Instance,
-                Name = "\0",
-                Position = UDim2New(0, -5, 0, -5),
-                BorderColor3 = FromRGB(0, 0, 0),
-                Size = UDim2New(1, 10, 0, 1),
-                BorderSizePixel = 0,
-                BackgroundColor3 = FromRGB(202, 243, 255)
-            })  Items["Liner"]:AddToTheme({BackgroundColor3 = "Accent"})
-        end
-
-        function Watermark:SetVisibility(Bool)
-            Items["Watermark"].Instance.Visible = Bool
-        end
-
-        return Watermark
-    end
+	Library.Watermark = function(self, Name)
+	    local Watermark = { }
+	
+	    local Items = { } do 
+	        Items["Watermark"] = Instances:Create("Frame", {
+	            Parent = Library.Holder.Instance,
+	            Name = "\0",
+	            AnchorPoint = Vector2New(0.5, 1),
+	            Position = UDim2New(0.5, 0, 1, -12),
+	            BorderColor3 = FromRGB(12, 12, 12),
+	            BorderSizePixel = 2,
+	            AutomaticSize = Enum.AutomaticSize.XY,
+	            BackgroundColor3 = FromRGB(14, 17, 15)
+	        })  Items["Watermark"]:AddToTheme({BackgroundColor3 = "Background", BorderColor3 = "Border"})
+	
+	        Items["Watermark"]:MakeDraggable()
+	
+	        Instances:Create("UIStroke", {
+	            Parent = Items["Watermark"].Instance,
+	            Name = "\0",
+	            Color = FromRGB(42, 49, 45),
+	            LineJoinMode = Enum.LineJoinMode.Miter,
+	            ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	        }):AddToTheme({Color = "Outline"})
+	
+	        Instances:Create("UIPadding", {
+	            Parent = Items["Watermark"].Instance,
+	            Name = "\0",
+	            PaddingTop = UDimNew(0, 5),
+	            PaddingBottom = UDimNew(0, 7),
+	            PaddingRight = UDimNew(0, 5),
+	            PaddingLeft = UDimNew(0, 5)
+	        })
+	
+	        Items["Text"] = Instances:Create("TextLabel", {
+	            Parent = Items["Watermark"].Instance,
+	            Name = "\0",
+	            FontFace = Library.Font,
+	            TextColor3 = FromRGB(235, 235, 235),
+	            BorderColor3 = FromRGB(0, 0, 0),
+	            Text = Name .. " | 0 fps | 0 ms", -- Initial text with placeholder values
+	            Position = UDim2New(0, 0, 0, 2),
+	            BackgroundTransparency = 1,
+	            TextXAlignment = Enum.TextXAlignment.Left,
+	            BorderSizePixel = 0,
+	            AutomaticSize = Enum.AutomaticSize.XY,
+	            TextSize = 9,
+	            BackgroundColor3 = FromRGB(255, 255, 255)
+	        })  Items["Text"]:AddToTheme({TextColor3 = "Text"})
+	
+	        Items["Text"]:TextBorder()
+	
+	        Items["Liner"] = Instances:Create("Frame", {
+	            Parent = Items["Watermark"].Instance,
+	            Name = "\0",
+	            Position = UDim2New(0, -5, 0, -5),
+	            BorderColor3 = FromRGB(0, 0, 0),
+	            Size = UDim2New(1, 10, 0, 1),
+	            BorderSizePixel = 0,
+	            BackgroundColor3 = FromRGB(202, 243, 255)
+	        })  Items["Liner"]:AddToTheme({BackgroundColor3 = "Accent"})
+	    end
+	
+	    -- Function to update FPS and MS values
+	    local function UpdateWatermark()
+	        local fps = math.floor(1 / game:GetService("RunService").RenderStepped:Wait()) -- Basic FPS calculation
+	        local ms = math.random(10, 50) -- Placeholder for MS (ping); replace with actual ping logic
+	        Items["Text"].Instance.Text = string.format("%s | %d fps | %d ms", Name, fps, ms)
+	    end
+	
+	    -- Update watermark every second
+	    local RunService = game:GetService("RunService")
+	    RunService.Heartbeat:Connect(function()
+	        UpdateWatermark()
+	    end)
+	
+	    function Watermark:SetVisibility(Bool)
+	        Items["Watermark"].Instance.Visible = Bool
+	    end
+	
+	    return Watermark
+	end
 
     Library.KeybindList = function(self)
         local KeybindList = { }
@@ -6129,93 +6139,111 @@ local Library do
                 end
             end
 
-            local SettingsSubPage = SettingsPage:SubPage({Name = "Settings", Columns = 2}) do 
-                local SettingsSection = SettingsSubPage:Section({Name = "Settings", Side = 1}) do
-                    SettingsSection:Toggle({
-                        Name = "Watermark",
-                        Flag = "Watermark",
-                        Default = true,
-                        Callback = function(Value)
-                            Watermark:SetVisibility(Value)
-                        end
-                    })
-
-                    SettingsSection:Toggle({
-                        Name = "Keybind list",
-                        Flag = "Keybind list",
-                        Default = true,
-                        Callback = function(Value)
-                            KeybindList:SetVisibility(Value)
-                        end
-                    })
-
-                    SettingsSection:Slider({
-                        Name = "Fade time",
-                        Flag = "FadeTime",
-                        Default = Library.FadeSpeed,
-                        Min = 0,
-                        Max = 1,
-                        Decimals = 0.01,
-                        Callback = function(Value)
-                            Library.FadeSpeed = Value
-                        end
-                    })
-
-                    SettingsSection:Slider({
-                        Name = "Tween time",
-                        Flag = "TweenTime",
-                        Default = Library.Tween.Time,
-                        Min = 0,
-                        Max = 1,
-                        Decimals = 0.01,
-                        Callback = function(Value)
-                            Library.Tween.Time = Value
-                        end
-                    })
-
-                    SettingsSection:Dropdown({
-                        Name = "Tween style",
-                        Flag = "Tween style",
-                        Items = { "Linear", "Quad", "Quart", "Back", "Bounce", "Circular", "Cubic", "Elastic", "Exponential", "Sine", "Quint" },
-                        Default = "Cubic",
-                        Callback = function(Value)
-                            Library.Tween.Style = Enum.EasingStyle[Value]
-                        end
-                    })
-
-                    SettingsSection:Dropdown({
-                        Name = "Tween direction",
-                        Flag = "Tween direction",
-                        Items = { "In", "Out", "InOut" },
-                        Default = "Out",
-                        Callback = function(Value)
-                            Library.Tween.Direction = Enum.EasingDirection[Value]
-                        end
-                    })
-
-                    SettingsSection:Button():Add("Unload", function()
-                        Library:Unload()
-                    end)
-
-                    SettingsSection:Label("UI Keybind"):Keybind({
-                        Name = "Menu keybind",
-                        Flag = "UIKeybind",
-                        Default = Library.MenuKeybind,
-                        Mode = "Toggle",
-                        Callback = function()
-                            Library.MenuKeybind = Library.Flags["UIKeybind"].Key
-                        end
-                    })
-                end
-            end
+			local SettingsSubPage = SettingsPage:SubPage({Name = "Settings", Columns = 2}) do 
+			    local SettingsSection = SettingsSubPage:Section({Name = "Settings", Side = 1}) do
+			        SettingsSection:Toggle({
+			            Name = "Watermark",
+			            Flag = "Watermark",
+			            Default = true,
+			            Callback = function(Value)
+			                Watermark:SetVisibility(Value)
+			            end
+			        })
+			
+			        SettingsSection:Toggle({
+			            Name = "Keybind list",
+			            Flag = "Keybind list",
+			            Default = true,
+			            Callback = function(Value)
+			                KeybindList:SetVisibility(Value)
+			            end
+			        })
+			
+			        SettingsSection:Slider({
+			            Name = "Fade time",
+			            Flag = "FadeTime",
+			            Default = Library.FadeSpeed,
+			            Min = 0,
+			            Max = 1,
+			            Decimals = 0.01,
+			            Callback = function(Value)
+			                Library.FadeSpeed = Value
+			            end
+			        })
+			
+			        SettingsSection:Slider({
+			            Name = "Tween time",
+			            Flag = "TweenTime",
+			            Default = Library.Tween.Time,
+			            Min = 0,
+			            Max = 1,
+			            Decimals = 0.01,
+			            Callback = function(Value)
+			                Library.Tween.Time = Value
+			            end
+			        })
+			
+			        SettingsSection:Dropdown({
+			            Name = "Tween style",
+			            Flag = "Tween style",
+			            Items = { "Linear", "Quad", "Quart", "Back", "Bounce", "Circular", "Cubic", "Elastic", "Exponential", "Sine", "Quint" },
+			            Default = "Cubic",
+			            Callback = function(Value)
+			                Library.Tween.Style = Enum.EasingStyle[Value]
+			            end
+			        })
+			
+			        SettingsSection:Dropdown({
+			            Name = "Tween direction",
+			            Flag = "Tween direction",
+			            Items = { "In", "Out", "InOut" },
+			            Default = "Out",
+			            Callback = function(Value)
+			                Library.Tween.Direction = Enum.EasingDirection[Value]
+			            end
+			        })
+			
+			        SettingsSection:Button():Add("Unload", function()
+			            Library:Unload()
+			        end)
+			
+			        -- Added Rejoin Button
+			        SettingsSection:Button():Add("Rejoin", function()
+			            local TeleportService = game:GetService("TeleportService")
+			            local Players = game:GetService("Players")
+			            local LocalPlayer = Players.LocalPlayer
+			            if LocalPlayer then
+			                TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
+			            end
+			        end)
+			
+			        -- Added Serverhop Button
+			        SettingsSection:Button():Add("Serverhop", function()
+			            local TeleportService = game:GetService("TeleportService")
+			            local Players = game:GetService("Players")
+			            local LocalPlayer = Players.LocalPlayer
+			            if LocalPlayer then
+			                TeleportService:Teleport(game.PlaceId, LocalPlayer)
+			            end
+			        end)
+			
+			        SettingsSection:Label("UI Keybind"):Keybind({
+			            Name = "Menu keybind",
+			            Flag = "UIKeybind",
+			            Default = Library.MenuKeybind,
+			            Mode = "Toggle",
+			            Callback = function()
+			                Library.MenuKeybind = Library.Flags["UIKeybind"].Key
+			            end
+			        })
+			    end
+			end
         end
         
         return SettingsPage
     end
 end
 
-getgenv().Library = Library
-return Library
 --[[local Window = Library:Window({
     Logo = "77218680285262",
     FadeTime = 0.3,
@@ -6539,3 +6567,6 @@ do
 end
 
 Library:Notification("Loaded!", "Menu took "..string.format("%.4f", os.clock() - LoadTick).." seconds to load", 5)]]
+
+getgenv().Library = Library
+return Library
