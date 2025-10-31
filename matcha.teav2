@@ -824,6 +824,8 @@ local function createMatchaToggle()
     local screenGui = Instance.new("ScreenGui")
     screenGui.Name = "MatchaToggleGui"
     screenGui.Parent = CoreGui
+    screenGui.DisplayOrder = 10000
+    screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Global
     screenGui.ResetOnSpawn = false
 
     local button = Instance.new("TextButton")
