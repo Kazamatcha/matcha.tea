@@ -958,19 +958,13 @@ local silentToggle = AimbotSection:Toggle({
 AimbotSelection:Dropdown({
     Name = "Silent Aim Method",
     Flag = "SilentAimMethod",
-    Options = {
-        "Raycast",
-        "FindPartOnRayWithIgnoreList",
-        "FindPartOnRayWithWhitelist",
-        "FindPartOnRay",
-        "ScreenPointToRay",
-        "ViewportPointToRay"
-    },
+    Items = { "Raycast", "FindPartOnRayWithIgnoreList", "FindPartOnRayWithWhitelist", "FindPartOnRay", "ScreenPointToRay", "ViewportPointToRay" },
     Default = "Raycast",
     Callback = function(Value)
         getgenv().matcha.SilentAimMethod = Value
     end
 })
+
 
 AimbotSection:Slider({
     Name = "HitChance (%)",
