@@ -71,7 +71,6 @@ getgenv().matcha = {
     AimDistanceCheck = false,
     AimDistance = 250,
     HealthCheck = false,
-    SilentAimMethod = "Raycast",
     HealthThreshold = 50,
     Resolver = false,
     ResolverMethod = "move direction",
@@ -136,7 +135,8 @@ getgenv().matcha = {
     FOVFilledColor = Color3.fromRGB(255, 255, 255),
     FOVThickness = 1,
 }
-
+local silentTarget = nil
+local silentAimPosition = nil
 -- Logic implementation
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
@@ -701,6 +701,11 @@ RunService.RenderStepped:Connect(function()
     end
 
     local target = getgenv().matcha.SelectedTarget
+    if not target or not target.Character then
+        silentTarget = nil
+        silentAimPosition = nil
+        return
+    end
 
     -- === VALIDATION CHUNG (Aimbot + Silent Aim) ===
     local hitPartName = getgenv().matcha.HitPart
@@ -728,6 +733,11 @@ RunService.RenderStepped:Connect(function()
         else
             valid = false
         end
+    end
+    if not valid then
+        silentTarget = nil
+        silentAimPosition = nil
+        return
     end
 
     -- === LẤY TARGET PART (Closest Part + Air Part) ===
@@ -785,7 +795,8 @@ RunService.RenderStepped:Connect(function()
         0
     )
     local aimPosition = basePosition + predictionOffset
-
+    silentTarget = target
+    silentAimPosition = aimPosition
     -- === AIMBOT (CAMERA / MOUSE) ===
     if targeting and getgenv().matcha.ToggleAimbot then
         if getgenv().matcha.AimMethod == "camera" then
@@ -1094,31 +1105,6 @@ local silentToggle = AimbotSection:Toggle({
     end
 })
 
-AimbotSection:Toggle({
-	Name = "Bullet TP",
-	Flag = "BulletTP",
-	Default = false,
-	Callback = function(Value)
-		getgenv().matcha.BulletTP = Value
-	end
-})
-AimbotSection:Dropdown({
-	Name = "Silent Aim Method",
-	Flag = "SilentAimMethod",
-	Items = {
-		"Raycast",
-		"FindPartOnRayWithIgnoreList",
-		"FindPartOnRayWithWhitelist",
-		"FindPartOnRay",
-		"ScreenPointToRay",
-		"ViewportPointToRay"
-	},
-	Default = "Raycast",
-	Multi = false,
-	Callback = function(Value)
-		getgenv().matcha.SilentAimMethod = Value
-	end
-})
 AimbotSection:Slider({
     Name = "HitChance (%)",
     Flag = "HitChance",
@@ -1777,217 +1763,708 @@ MiscSelection:Slider({
         getgenv().matcha.SpinSpeed = Value
     end
 })
--- [1] Kiểm tra executor có hỗ trợ hookmetamethod
-local function isHookSupported()
-    local success = pcall(function()
-        hookmetamethod(game, "__namecall", function() end)
-    end)
-    return success
-end
 
 local WorldSubPage = ClientPage:SubPage({Name = "World"})
 local Lighting = WorldSubPage:Section({Name = "Lighting", Side = 1})
+local Misc = WorldSubPage:Section({Name = "Misc", Side = 2})
 local WorldFx = WorldSubPage:Section({Name = "World Fx", Side = 2})
+local LightingService = game:GetService("Lighting")
 
--- [2] ExpectedArguments & ValidateArguments
-local ExpectedArguments = {
-    Raycast = { ArgCountRequired = 3, Args = { "Vector3", "Vector3", "RaycastParams" } },
-    FindPartOnRayWithIgnoreList = { ArgCountRequired = 2, Args = { "Ray", "table", "boolean?", "boolean?" } },
-    FindPartOnRayWithWhitelist = { ArgCountRequired = 2, Args = { "Ray", "table", "boolean?" } },
-    FindPartOnRay = { ArgCountRequired = 2, Args = { "Ray", "Instance?", "boolean?", "boolean?" } },
-    ScreenPointToRay = { ArgCountRequired = 2, Args = { "number", "number" } },
-    ViewportPointToRay = { ArgCountRequired = 2, Args = { "number", "number" } }
-}
+local originalAmbient = LightingService.Ambient
+local originalOutdoorAmbient = LightingService.OutdoorAmbient
+local originalFogColor = LightingService.FogColor
+local originalFogStart = LightingService.FogStart
+local originalFogEnd = LightingService.FogEnd
+local originalBrightness = LightingService.Brightness
+local originalClockTime = LightingService.ClockTime
+local originalGlobalShadows = LightingService.GlobalShadows
+local originalEnvironmentDiffuseScale = LightingService.EnvironmentDiffuseScale
+local originalEnvironmentSpecularScale = LightingService.EnvironmentSpecularScale
+local originalExposureCompensation = LightingService.ExposureCompensation
+local originalColorShiftBottom = LightingService.ColorShift_Bottom
+local originalColorShiftTop = LightingService.ColorShift_Top
+local originalGeographicLatitude = LightingService.GeographicLatitude
+local originalShadowSoftness = LightingService.ShadowSoftness
 
-local function ValidateArguments(args, expected)
-    if #args < expected.ArgCountRequired then return false end
-    for i, expectedType in ipairs(expected.Args) do
-        if i > #args then break end
-        local arg = args[i]
-        local argType = typeof(arg)
-        if expectedType:find("?") then
-            expectedType = expectedType:gsub("%?", "")
-            if arg ~= nil and argType ~= expectedType then return false end
+local nebulaThemeColor = Color3.fromRGB(173, 216, 230)
+
+local Visuals = {}
+local Skyboxes = {}
+
+function Visuals:NewSky(Data)
+    local Name = Data.Name
+    Skyboxes[Name] = {
+        SkyboxBk = Data.SkyboxBk,
+        SkyboxDn = Data.SkyboxDn,
+        SkyboxFt = Data.SkyboxFt,
+        SkyboxLf = Data.SkyboxLf,
+        SkyboxRt = Data.SkyboxRt,
+        SkyboxUp = Data.SkyboxUp,
+        MoonTextureId = Data.Moon or "rbxasset://sky/moon.jpg",
+        SunTextureId = Data.Sun or "rbxasset://sky/sun.jpg"
+    }
+end
+
+function Visuals:SwitchSkybox(Name)
+    local OldSky = LightingService:FindFirstChildOfClass("Sky")
+    if OldSky then OldSky:Destroy() end
+
+    local Sky = Instance.new("Sky", LightingService)
+    for Index, Value in pairs(Skyboxes[Name]) do
+        Sky[Index] = Value
+    end
+end
+
+if LightingService:FindFirstChildOfClass("Sky") then
+    local OldSky = LightingService:FindFirstChildOfClass("Sky")
+    Visuals:NewSky({
+        Name = "Game's Default Sky",
+        SkyboxBk = OldSky.SkyboxBk,
+        SkyboxDn = OldSky.SkyboxDn,
+        SkyboxFt = OldSky.SkyboxFt,
+        SkyboxLf = OldSky.SkyboxLf,
+        SkyboxRt = OldSky.SkyboxRt,
+        SkyboxUp = OldSky.SkyboxUp
+    })
+end
+
+Visuals:NewSky({
+    Name = "Sunset",
+    SkyboxBk = "rbxassetid://600830446",
+    SkyboxDn = "rbxassetid://600831635",
+    SkyboxFt = "rbxassetid://600832720",
+    SkyboxLf = "rbxassetid://600886090",
+    SkyboxRt = "rbxassetid://600833862",
+    SkyboxUp = "rbxassetid://600835177"
+})
+
+Visuals:NewSky({
+    Name = "Arctic",
+    SkyboxBk = "http://www.roblox.com/asset/?id=225469390",
+    SkyboxDn = "http://www.roblox.com/asset/?id=225469395",
+    SkyboxFt = "http://www.roblox.com/asset/?id=225469403",
+    SkyboxLf = "http://www.roblox.com/asset/?id=225469450",
+    SkyboxRt = "http://www.roblox.com/asset/?id=225469471",
+    SkyboxUp = "http://www.roblox.com/asset/?id=225469481"
+})
+
+Visuals:NewSky({
+    Name = "Space",
+    SkyboxBk = "http://www.roblox.com/asset/?id=166509999",
+    SkyboxDn = "http://www.roblox.com/asset/?id=166510057",
+    SkyboxFt = "http://www.roblox.com/asset/?id=166510116",
+    SkyboxLf = "http://www.roblox.com/asset/?id=166510092",
+    SkyboxRt = "http://www.roblox.com/asset/?id=166510131",
+    SkyboxUp = "http://www.roblox.com/asset/?id=166510114"
+})
+
+Visuals:NewSky({
+    Name = "Roblox Default",
+    SkyboxBk = "rbxasset://textures/sky/sky512_bk.tex",
+    SkyboxDn = "rbxasset://textures/sky/sky512_dn.tex",
+    SkyboxFt = "rbxasset://textures/sky/sky512_ft.tex",
+    SkyboxLf = "rbxasset://textures/sky/sky512_lf.tex",
+    SkyboxRt = "rbxasset://textures/sky/sky512_rt.tex",
+    SkyboxUp = "rbxasset://textures/sky/sky512_up.tex"
+})
+
+Visuals:NewSky({
+    Name = "Red Night", 
+    SkyboxBk = "http://www.roblox.com/Asset/?ID=401664839";
+    SkyboxDn = "http://www.roblox.com/Asset/?ID=401664862";
+    SkyboxFt = "http://www.roblox.com/Asset/?ID=401664960";
+    SkyboxLf = "http://www.roblox.com/Asset/?ID=401664881";
+    SkyboxRt = "http://www.roblox.com/Asset/?ID=401664901";
+    SkyboxUp = "http://www.roblox.com/Asset/?ID=401664936";
+})
+
+Visuals:NewSky({
+    Name = "Deep Space", 
+    SkyboxBk = "http://www.roblox.com/asset/?id=149397692";
+    SkyboxDn = "http://www.roblox.com/asset/?id=149397686";
+    SkyboxFt = "http://www.roblox.com/asset/?id=149397697";
+    SkyboxLf = "http://www.roblox.com/asset/?id=149397684";
+    SkyboxRt = "http://www.roblox.com/asset/?id=149397688";
+    SkyboxUp = "http://www.roblox.com/asset/?id=149397702";
+})
+
+Visuals:NewSky({
+    Name = "Pink Skies", 
+    SkyboxBk = "http://www.roblox.com/asset/?id=151165214";
+    SkyboxDn = "http://www.roblox.com/asset/?id=151165197";
+    SkyboxFt = "http://www.roblox.com/asset/?id=151165224";
+    SkyboxLf = "http://www.roblox.com/asset/?id=151165191";
+    SkyboxRt = "http://www.roblox.com/asset/?id=151165206";
+    SkyboxUp = "http://www.roblox.com/asset/?id=151165227";
+})
+
+Visuals:NewSky({
+    Name = "Purple Sunset", 
+    SkyboxBk = "rbxassetid://264908339";
+    SkyboxDn = "rbxassetid://264907909";
+    SkyboxFt = "rbxassetid://264909420";
+    SkyboxLf = "rbxassetid://264909758";
+    SkyboxRt = "rbxassetid://264908886";
+    SkyboxUp = "rbxassetid://264907379";
+})
+
+Visuals:NewSky({
+    Name = "Blue Night", 
+    SkyboxBk = "http://www.roblox.com/Asset/?ID=12064107";
+    SkyboxDn = "http://www.roblox.com/Asset/?ID=12064152";
+    SkyboxFt = "http://www.roblox.com/Asset/?ID=12064121";
+    SkyboxLf = "http://www.roblox.com/Asset/?ID=12063984";
+    SkyboxRt = "http://www.roblox.com/Asset/?ID=12064115";
+    SkyboxUp = "http://www.roblox.com/Asset/?ID=12064131";
+})
+
+Visuals:NewSky({
+    Name = "Blossom Daylight", 
+    SkyboxBk = "http://www.roblox.com/asset/?id=271042516";
+    SkyboxDn = "http://www.roblox.com/asset/?id=271077243";
+    SkyboxFt = "http://www.roblox.com/asset/?id=271042556";
+    SkyboxLf = "http://www.roblox.com/asset/?id=271042310";
+    SkyboxRt = "http://www.roblox.com/asset/?id=271042467";
+    SkyboxUp = "http://www.roblox.com/asset/?id=271077958";
+})
+
+Visuals:NewSky({
+    Name = "Blue Nebula", 
+    SkyboxBk = "http://www.roblox.com/asset?id=135207744";
+    SkyboxDn = "http://www.roblox.com/asset?id=135207662";
+    SkyboxFt = "http://www.roblox.com/asset?id=135207770";
+    SkyboxLf = "http://www.roblox.com/asset?id=135207615";
+    SkyboxRt = "http://www.roblox.com/asset?id=135207695";
+    SkyboxUp = "http://www.roblox.com/asset?id=135207794";
+})
+
+Visuals:NewSky({
+    Name = "Blue Planet", 
+    SkyboxBk = "rbxassetid://218955819";
+    SkyboxDn = "rbxassetid://218953419";
+    SkyboxFt = "rbxassetid://218954524";
+    SkyboxLf = "rbxassetid://218958493";
+    SkyboxRt = "rbxassetid://218957134";
+    SkyboxUp = "rbxassetid://218950090";
+})
+
+Visuals:NewSky({
+    Name = "Deep Space", 
+    SkyboxBk = "http://www.roblox.com/asset/?id=159248188";
+    SkyboxDn = "http://www.roblox.com/asset/?id=159248183";
+    SkyboxFt = "http://www.roblox.com/asset/?id=159248187";
+    SkyboxLf = "http://www.roblox.com/asset/?id=159248173";
+    SkyboxRt = "http://www.roblox.com/asset/?id=159248192";
+    SkyboxUp = "http://www.roblox.com/asset/?id=159248176";
+})
+
+Visuals:NewSky({
+    Name = "Summer",
+    SkyboxBk = "rbxassetid://16648590964",
+    SkyboxDn = "rbxassetid://16648617436",
+    SkyboxFt = "rbxassetid://16648595424",
+    SkyboxLf = "rbxassetid://16648566370",
+    SkyboxRt = "rbxassetid://16648577071",
+    SkyboxUp = "rbxassetid://16648598180"
+})
+
+Visuals:NewSky({
+    Name = "Galaxy",
+    SkyboxBk = "rbxassetid://15983968922",
+    SkyboxDn = "rbxassetid://15983966825",
+    SkyboxFt = "rbxassetid://15983965025",
+    SkyboxLf = "rbxassetid://15983967420",
+    SkyboxRt = "rbxassetid://15983966246",
+    SkyboxUp = "rbxassetid://15983964246"
+})
+
+Visuals:NewSky({
+    Name = "Stylized",
+    SkyboxBk = "rbxassetid://18351376859",
+    SkyboxDn = "rbxassetid://18351374919",
+    SkyboxFt = "rbxassetid://18351376800",
+    SkyboxLf = "rbxassetid://18351376469",
+    SkyboxRt = "rbxassetid://18351376457",
+    SkyboxUp = "rbxassetid://18351377189"
+})
+
+Visuals:NewSky({
+    Name = "Minecraft",
+    SkyboxBk = "rbxassetid://8735166756",
+    SkyboxDn = "http://www.roblox.com/asset/?id=8735166707",
+    SkyboxFt = "http://www.roblox.com/asset/?id=8735231668",
+    SkyboxLf = "http://www.roblox.com/asset/?id=8735166755",
+    SkyboxRt = "http://www.roblox.com/asset/?id=8735166751",
+    SkyboxUp = "http://www.roblox.com/asset/?id=8735166729"
+})
+
+Visuals:NewSky({
+    Name = "Sunset",
+    SkyboxBk = "http://www.roblox.com/asset/?id=151165214",
+    SkyboxDn = "http://www.roblox.com/asset/?id=151165197",
+    SkyboxFt = "http://www.roblox.com/asset/?id=151165224",
+    SkyboxLf = "http://www.roblox.com/asset/?id=151165191",
+    SkyboxRt = "http://www.roblox.com/asset/?id=151165206",
+    SkyboxUp = "http://www.roblox.com/asset/?id=151165227"
+})
+
+Visuals:NewSky({
+    Name = "Cloudy Rain",
+    SkyboxBk = "http://www.roblox.com/asset/?id=4498828382",
+    SkyboxDn = "http://www.roblox.com/asset/?id=4498828812",
+    SkyboxFt = "http://www.roblox.com/asset/?id=4498829917",
+    SkyboxLf = "http://www.roblox.com/asset/?id=4498830911",
+    SkyboxRt = "http://www.roblox.com/asset/?id=4498830417",
+    SkyboxUp = "http://www.roblox.com/asset/?id=4498831746"
+})
+
+Visuals:NewSky({
+    Name = "Black Cloudy Rain",
+    SkyboxBk = "http://www.roblox.com/asset/?id=149679669",
+    SkyboxDn = "http://www.roblox.com/asset/?id=149681979",
+    SkyboxFt = "http://www.roblox.com/asset/?id=149679690",
+    SkyboxLf = "http://www.roblox.com/asset/?id=149679709",
+    SkyboxRt = "http://www.roblox.com/asset/?id=149679722",
+    SkyboxUp = "http://www.roblox.com/asset/?id=149680199"
+})
+
+local SkyboxNames = {}
+for Name, _ in pairs(Skyboxes) do
+    table.insert(SkyboxNames, Name)
+end
+
+local ambientToggle = Lighting:Toggle({
+    Name = "Custom Ambient",
+    Flag = "CustomAmbient",
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.CustomAmbient = Value
+        if Value then
+            LightingService.Ambient = getgenv().matcha.AmbientColor
         else
-            if argType ~= expectedType then return false end
+            LightingService.Ambient = originalAmbient
         end
     end
-    return true
-end
+})
 
-local function getPredictionValue()
-    if not getgenv().matcha.AutoPrediction then
-        return getgenv().matcha.PredictionX
+ambientToggle:Colorpicker({
+    Name = "Ambient Color",
+    Flag = "AmbientColor",
+    Default = originalAmbient,
+    Callback = function(Value)
+        getgenv().matcha.AmbientColor = Value
+        if getgenv().matcha.CustomAmbient then
+            LightingService.Ambient = Value
+        end
     end
-    local ping = game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue() / 1000
-    local pred = ping * 10  -- Base theo ping (ví dụ 0.1s ping → 1.0 pred)
-    pred = math.clamp(pred, 0.1, 0.25)  -- Giới hạn để tránh overpred
-    return pred
-end
+})
 
-if isHookSupported() then
-    local oldNamecall
-    oldNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
-        local Method = getnamecallmethod()
-        local Args = {...}
+local outdoorAmbientToggle = Lighting:Toggle({
+    Name = "Custom Outdoor Ambient",
+    Flag = "CustomOutdoorAmbient",
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.CustomOutdoorAmbient = Value
+        if Value then
+            LightingService.OutdoorAmbient = getgenv().matcha.OutdoorAmbientColor
+        else
+            LightingService.OutdoorAmbient = originalOutdoorAmbient
+        end
+    end
+})
 
-        if not checkcaller() then
-            local chance = math.random(1, 100) <= getgenv().matcha.HitChance
+outdoorAmbientToggle:Colorpicker({
+    Name = "Outdoor Ambient Color",
+    Flag = "OutdoorAmbientColor",
+    Default = originalOutdoorAmbient,
+    Callback = function(Value)
+        getgenv().matcha.OutdoorAmbientColor = Value
+        if getgenv().matcha.CustomOutdoorAmbient then
+            LightingService.OutdoorAmbient = Value
+        end
+    end
+})
 
-            if getgenv().matcha.AimEnabled and getgenv().matcha.SilentAimEnabled and chance then
-                local target = getgenv().matcha.SelectedTarget
-                if not target or not isAlive(target) then return oldNamecall(self, ...) end  -- Check Alive đầy đủ
+local fogToggle = Lighting:Toggle({
+    Name = "Custom Fog",
+    Flag = "CustomFog",
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.CustomFog = Value
+        if Value then
+            LightingService.FogColor = getgenv().matcha.FogColor
+            LightingService.FogStart = getgenv().matcha.FogStart
+            LightingService.FogEnd = getgenv().matcha.FogEnd
+        else
+            LightingService.FogColor = originalFogColor
+            LightingService.FogStart = originalFogStart
+            LightingService.FogEnd = originalFogEnd
+        end
+    end
+})
 
-                local hitPartName = getgenv().matcha.HitPart
-                if hitPartName == "Torso (R6)" then hitPartName = "Torso" end
-                local hitPart = target.Character:FindFirstChild(hitPartName) or target.Character.HumanoidRootPart
-                if not hitPart then return oldNamecall(self, ...) end
+fogToggle:Colorpicker({
+    Name = "Fog Color",
+    Flag = "FogColor",
+    Default = originalFogColor,
+    Callback = function(Value)
+        getgenv().matcha.FogColor = Value
+        if getgenv().matcha.CustomFog then
+            LightingService.FogColor = Value
+        end
+    end
+})
 
-                -- === LẤY TARGET PART (Closest Part + Air Part) - TỪ RUNSERVICE ===
-                if getgenv().matcha.ClosestPart then
-                    local closestDist = math.huge
-                    for _, part in ipairs(target.Character:GetChildren()) do
-                        if part:IsA("BasePart") then
-                            local dist = (part.Position - Camera.CFrame.Position).Magnitude
-                            if dist < closestDist then
-                                hitPart = part
-                                closestDist = dist
-                            end
-                        end
-                    end
-                end
+Lighting:Slider({
+    Name = "Fog Start",
+    Flag = "FogStart",
+    Min = 0,
+    Max = 1000,
+    Default = originalFogStart,
+    Decimals = 1,
+    Callback = function(Value)
+        getgenv().matcha.FogStart = Value
+        if getgenv().matcha.CustomFog then
+            LightingService.FogStart = Value
+        end
+    end
+})
 
-                local targetHum = target.Character:FindFirstChildOfClass("Humanoid")
-                local inFreefall = targetHum and targetHum:GetState() == Enum.HumanoidStateType.Freefall
+Lighting:Slider({
+    Name = "Fog End",
+    Flag = "FogEnd",
+    Min = 0,
+    Max = 1000,
+    Default = originalFogEnd,
+    Decimals = 1,
+    Callback = function(Value)
+        getgenv().matcha.FogEnd = Value
+        if getgenv().matcha.CustomFog then
+            LightingService.FogEnd = Value
+        end
+    end
+})
 
-                if getgenv().matcha.AirPartEnabled and inFreefall then
-                    local airPartName = getgenv().matcha.AirPart
-                    if airPartName == "Torso (R6)" then airPartName = "Torso" end
-                    hitPart = target.Character:FindFirstChild(airPartName) or hitPart
-                end
+local brightnessToggle = Lighting:Toggle({
+    Name = "Custom Brightness",
+    Flag = "CustomBrightness",
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.CustomBrightness = Value
+        if Value then
+            LightingService.Brightness = getgenv().matcha.BrightnessValue
+        else
+            LightingService.Brightness = originalBrightness
+        end
+    end
+})
 
-                -- === RESOLVER + VELOCITY - TỪ RUNSERVICE ===
-                local velocity = hitPart.AssemblyLinearVelocity
-                if getgenv().matcha.Resolver then
-                    local humanoid = hitPart.Parent:FindFirstChild("Humanoid")
-                    local hrp = target.Character:FindFirstChild("HumanoidRootPart")
-                    if getgenv().matcha.ResolverMethod == "move direction" and humanoid then
-                        velocity = humanoid.MoveDirection * humanoid.WalkSpeed
-                    elseif getgenv().matcha.ResolverMethod == "lookvector" then
-                        velocity = hitPart.CFrame.LookVector * getPredictionValue() * 100
-                    elseif getgenv().matcha.ResolverMethod == "combined" and hrp then
-                        local groundVel = Vector3.new(velocity.X, 0, velocity.Z)
-                        hitPart.Velocity = groundVel
-                        hitPart.AssemblyLinearVelocity = groundVel
-                        if hrp.Velocity.Magnitude > 30 then
-                            hitPart.Velocity = Vector3.zero
-                            hitPart.AssemblyLinearVelocity = Vector3.zero
-                        end
-                        velocity = hitPart.Velocity
-                    end
-                end
+Lighting:Slider({
+    Name = "Brightness",
+    Flag = "BrightnessValue",
+    Min = 0,
+    Max = 10,
+    Default = originalBrightness,
+    Decimals = 0.1,
+    Callback = function(Value)
+        getgenv().matcha.BrightnessValue = Value
+        if getgenv().matcha.CustomBrightness then
+            LightingService.Brightness = Value
+        end
+    end
+})
 
-                -- === AUTO PREDICTION + PREX / PREY ===
-                local predValue = getPredictionValue()
-                local prediction = Vector3.new(velocity.X * predValue, velocity.Y * getgenv().matcha.PredictionY, velocity.Z * predValue)
+local clockTimeToggle = Lighting:Toggle({
+    Name = "Custom Clock Time",
+    Flag = "CustomClockTime",
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.CustomClockTime = Value
+        if Value then
+            LightingService.ClockTime = getgenv().matcha.ClockTimeValue
+        else
+            LightingService.ClockTime = originalClockTime
+        end
+    end
+})
 
-                -- === TÍNH FINALPOS VỚI OFFSET / JUMPOFFSET - TỪ RUNSERVICE ===
-                local basePosition = hitPart.Position + Vector3.new(0, inFreefall and getgenv().matcha.JumpOffset or getgenv().matcha.Offset, 0)
-                local finalPos = basePosition + prediction
+Lighting:Slider({
+    Name = "Clock Time",
+    Flag = "ClockTimeValue",
+    Min = 0,
+    Max = 24,
+    Default = originalClockTime,
+    Decimals = 0.1,
+    Callback = function(Value)
+        getgenv().matcha.ClockTimeValue = Value
+        if getgenv().matcha.CustomClockTime then
+            LightingService.ClockTime = Value
+        end
+    end
+})
 
-                -- === FOV CHECK DỰA TRÊN SortType ===
-                local fovPosition = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-                if getgenv().matcha.SortType == "near mouse" then
-                    fovPosition = UserInputService:GetMouseLocation()
-                elseif getgenv().matcha.SortType == "near character" then
-                    fovPosition = UserInputService.TouchEnabled and fovPosition or UserInputService:GetMouseLocation()
-                end
+Lighting:Toggle({
+    Name = "Global Shadows",
+    Flag = "GlobalShadows",
+    Default = originalGlobalShadows,
+    Callback = function(Value)
+        LightingService.GlobalShadows = Value
+    end
+})
 
-                local screenPos, onScreen = Camera:WorldToViewportPoint(hitPart.Position)
-                if getgenv().matcha.UseFOV and onScreen then
-                    local dist = (Vector2.new(screenPos.X, screenPos.Y) - fovPosition).Magnitude
-                    if dist > getgenv().matcha.FOVSize then
-                        return oldNamecall(self, ...)
-                    end
-                end
+local environmentDiffuseToggle = Lighting:Toggle({
+    Name = "Custom Environment Diffuse",
+    Flag = "CustomEnvironmentDiffuse",
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.CustomEnvironmentDiffuse = Value
+        if Value then
+            LightingService.EnvironmentDiffuseScale = getgenv().matcha.EnvironmentDiffuseValue
+        else
+            LightingService.EnvironmentDiffuseScale = originalEnvironmentDiffuseScale
+        end
+    end
+})
 
-                -- === WALL CHECK ===
-                if table.find(getgenv().matcha.AimCheck, "Check Wall") then
-                    local rayParams = RaycastParams.new()
-                    rayParams.FilterDescendantsInstances = {LocalPlayer.Character}
-                    rayParams.FilterType = Enum.RaycastFilterType.Blacklist
-                    local result = workspace:Raycast(Camera.CFrame.Position, (finalPos - Camera.CFrame.Position).Unit * 500, rayParams)
-                    if result and not result.Instance:IsDescendantOf(target.Character) then
-                        return oldNamecall(self, ...)
-                    end
-                end
+Lighting:Slider({
+    Name = "Environment Diffuse Scale",
+    Flag = "EnvironmentDiffuseValue",
+    Min = 0,
+    Max = 1,
+    Default = originalEnvironmentDiffuseScale,
+    Decimals = 0.01,
+    Callback = function(Value)
+        getgenv().matcha.EnvironmentDiffuseValue = Value
+        if getgenv().matcha.CustomEnvironmentDiffuse then
+            LightingService.EnvironmentDiffuseScale = Value
+        end
+    end
+})
 
-                -- === MODIFY RAY ===
-                local function modifyRay(origin)
-                    local start = origin
-                    if getgenv().matcha.BulletTP then
-                        start = (hitPart.CFrame * CFrame.new(0, 0, -1)).Position
-                    end
-                    return start, (finalPos - start).Unit * getgenv().matcha.MultiplyUnitBy
-                end
+local environmentSpecularToggle = Lighting:Toggle({
+    Name = "Custom Environment Specular",
+    Flag = "CustomEnvironmentSpecular",
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.CustomEnvironmentSpecular = Value
+        if Value then
+            LightingService.EnvironmentSpecularScale = getgenv().matcha.EnvironmentSpecularValue
+        else
+            LightingService.EnvironmentSpecularScale = originalEnvironmentSpecularScale
+        end
+    end
+})
 
-                -- === RAYCAST ===
-                if Method == "Raycast" and getgenv().matcha.SilentAimMethod == "Raycast" then
-                    if ValidateArguments(Args, ExpectedArguments.Raycast) then
-                        local origin, direction = modifyRay(Args[1])
-                        return oldNamecall(self, origin, direction, Args[3])
-                    end
+Lighting:Slider({
+    Name = "Environment Specular Scale",
+    Flag = "EnvironmentSpecularValue",
+    Min = 0,
+    Max = 1,
+    Default = originalEnvironmentSpecularScale,
+    Decimals = 0.01,
+    Callback = function(Value)
+        getgenv().matcha.EnvironmentSpecularValue = Value
+        if getgenv().matcha.CustomEnvironmentSpecular then
+            LightingService.EnvironmentSpecularScale = Value
+        end
+    end
+})
 
-                -- === FINDPARTONRAYWITHIGNORELIST ===
-                elseif Method == "FindPartOnRayWithIgnoreList" and getgenv().matcha.SilentAimMethod == "FindPartOnRayWithIgnoreList" then
-                    if ValidateArguments(Args, ExpectedArguments.FindPartOnRayWithIgnoreList) then
-                        local origin, direction = modifyRay(Args[1].Origin)
-                        Args[1] = Ray.new(origin, direction)
-                        return oldNamecall(self, unpack(Args))
-                    end
+local exposureToggle = Lighting:Toggle({
+    Name = "Custom Exposure",
+    Flag = "CustomExposure",
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.CustomExposure = Value
+        if Value then
+            LightingService.ExposureCompensation = getgenv().matcha.ExposureValue
+        else
+            LightingService.ExposureCompensation = originalExposureCompensation
+        end
+    end
+})
 
-                -- === CÁC METHOD KHÁC (tương tự) ===
-                elseif Method == "FindPartOnRayWithWhitelist" and getgenv().matcha.SilentAimMethod == "FindPartOnRayWithWhitelist" then
-                    if ValidateArguments(Args, ExpectedArguments.FindPartOnRayWithWhitelist) then
-                        local origin, direction = modifyRay(Args[1].Origin)
-                        Args[1] = Ray.new(origin, direction)
-                        return oldNamecall(self, unpack(Args))
-                    end
+Lighting:Slider({
+    Name = "Exposure Compensation",
+    Flag = "ExposureValue",
+    Min = -3,
+    Max = 3,
+    Default = originalExposureCompensation,
+    Decimals = 0.1,
+    Callback = function(Value)
+        getgenv().matcha.ExposureValue = Value
+        if getgenv().matcha.CustomExposure then
+            LightingService.ExposureCompensation = Value
+        end
+    end
+})
 
-                elseif (Method == "FindPartOnRay" or Method == "findPartOnRay") and getgenv().matcha.SilentAimMethod:lower() == Method:lower() then
-                    if ValidateArguments(Args, ExpectedArguments.FindPartOnRay) then
-                        local origin, direction = modifyRay(Args[1].Origin)
-                        Args[1] = Ray.new(origin, direction)
-                        return oldNamecall(self, unpack(Args))
-                    end
+local colorShiftBottomToggle = Lighting:Toggle({
+    Name = "Custom Color Shift Bottom",
+    Flag = "CustomColorShiftBottom",
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.CustomColorShiftBottom = Value
+        if Value then
+            LightingService.ColorShift_Bottom = getgenv().matcha.ColorShiftBottomColor
+        else
+            LightingService.ColorShift_Bottom = originalColorShiftBottom
+        end
+    end
+})
 
-                elseif Method == "ScreenPointToRay" and getgenv().matcha.SilentAimMethod == "ScreenPointToRay" then
-                    if ValidateArguments(Args, ExpectedArguments.ScreenPointToRay) then
-                        local origin = Camera.CFrame.Position
-                        if getgenv().matcha.BulletTP then
-                            origin = (hitPart.CFrame * CFrame.new(0, 0, -1)).Position
-                        end
-                        return Ray.new(origin, (finalPos - origin).Unit * getgenv().matcha.MultiplyUnitBy)
-                    end
+colorShiftBottomToggle:Colorpicker({
+    Name = "Color Shift Bottom Color",
+    Flag = "ColorShiftBottomColor",
+    Default = originalColorShiftBottom,
+    Callback = function(Value)
+        getgenv().matcha.ColorShiftBottomColor = Value
+        if getgenv().matcha.CustomColorShiftBottom then
+            LightingService.ColorShift_Bottom = Value
+        end
+    end
+})
 
-                elseif Method == "ViewportPointToRay" and getgenv().matcha.SilentAimMethod == "ViewportPointToRay" then
-                    if ValidateArguments(Args, ExpectedArguments.ViewportPointToRay) then
-                        local origin = Camera.CFrame.Position
-                        if getgenv().matcha.BulletTP then
-                            origin = (hitPart.CFrame * CFrame.new(0, 0, -1)).Position
-                        end
-                        return Ray.new(origin, (finalPos - origin).Unit * getgenv().matcha.MultiplyUnitBy)
-                    end
-                end
+local colorShiftTopToggle = Lighting:Toggle({
+    Name = "Custom Color Shift Top",
+    Flag = "CustomColorShiftTop",
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.CustomColorShiftTop = Value
+        if Value then
+            LightingService.ColorShift_Top = getgenv().matcha.ColorShiftTopColor
+        else
+            LightingService.ColorShift_Top = originalColorShiftTop
+        end
+    end
+})
+
+colorShiftTopToggle:Colorpicker({
+    Name = "Color Shift Top Color",
+    Flag = "ColorShiftTopColor",
+    Default = originalColorShiftTop,
+    Callback = function(Value)
+        getgenv().matcha.ColorShiftTopColor = Value
+        if getgenv().matcha.CustomColorShiftTop then
+            LightingService.ColorShift_Top = Value
+        end
+    end
+})
+
+local geographicLatitudeToggle = Lighting:Toggle({
+    Name = "Custom Geographic Latitude",
+    Flag = "CustomGeographicLatitude",
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.CustomGeographicLatitude = Value
+        if Value then
+            LightingService.GeographicLatitude = getgenv().matcha.GeographicLatitudeValue
+        else
+            LightingService.GeographicLatitude = originalGeographicLatitude
+        end
+    end
+})
+
+Lighting:Slider({
+    Name = "Geographic Latitude",
+    Flag = "GeographicLatitudeValue",
+    Min = -90,
+    Max = 90,
+    Default = originalGeographicLatitude,
+    Decimals = 0.1,
+    Callback = function(Value)
+        getgenv().matcha.GeographicLatitudeValue = Value
+        if getgenv().matcha.CustomGeographicLatitude then
+            LightingService.GeographicLatitude = Value
+        end
+    end
+})
+
+Lighting:Dropdown({
+    Name = "Shadow Mode",
+    Items = {"Hard", "Medium", "Soft"},
+    Flag = "ShadowMode",
+    Default = "Medium",
+    Multi = false,
+    Callback = function(Value)
+        local softness = 0
+        if Value == "Hard" then
+            softness = 0
+        elseif Value == "Medium" then
+            softness = 0.5
+        elseif Value == "Soft" then
+            softness = 1
+        end
+        LightingService.ShadowSoftness = softness
+    end
+})
+
+local nebulaToggle = Misc:Toggle({
+    Name = "Nebula Theme",
+    Flag = "NebulaTheme",
+    Default = false,
+    Callback = function(state)
+        getgenv().matcha.nebulaEnabled = state
+        if state then
+            local b = Instance.new("BloomEffect", LightingService) b.Intensity, b.Size, b.Threshold, b.Name = 0.7, 24, 1, "NebulaBloom"
+            local c = Instance.new("ColorCorrectionEffect", LightingService) c.Saturation, c.Contrast, c.TintColor, c.Name = 0.5, 0.2, nebulaThemeColor, "NebulaColorCorrection"
+            local a = Instance.new("Atmosphere", LightingService) a.Density, a.Offset, a.Glare, a.Haze, a.Color, a.Decay, a.Name = 0.4, 0.25, 1, 2, nebulaThemeColor, Color3.fromRGB(25, 25, 112), "NebulaAtmosphere"
+            LightingService.Ambient, LightingService.OutdoorAmbient = nebulaThemeColor, nebulaThemeColor
+            LightingService.FogStart, LightingService.FogEnd = 100, 500
+            LightingService.FogColor = nebulaThemeColor
+        else
+            for _, v in pairs({"NebulaBloom", "NebulaColorCorrection", "NebulaAtmosphere"}) do
+                local obj = LightingService:FindFirstChild(v) if obj then obj:Destroy() end
             end
+            LightingService.Ambient, LightingService.OutdoorAmbient = originalAmbient, originalOutdoorAmbient
+            LightingService.FogStart, LightingService.FogEnd = originalFogStart, originalFogEnd
+            LightingService.FogColor = originalFogColor
         end
+    end
+})
 
-        return oldNamecall(self, ...)
-    end))
-else
-    warn("[matcha] Executor không hỗ trợ hookmetamethod → Silent Aim bị vô hiệu hóa")
-end
+nebulaToggle:Colorpicker({
+    Name = "Nebula Color",
+    Flag = "NebulaColor",
+    Default = Color3.fromRGB(173, 216, 230),
+    Callback = function(c)
+        nebulaThemeColor = c
+        if getgenv().matcha.nebulaEnabled then
+            local nc = LightingService:FindFirstChild("NebulaColorCorrection") if nc then nc.TintColor = c end
+            local na = LightingService:FindFirstChild("NebulaAtmosphere") if na then na.Color = c end
+            LightingService.Ambient, LightingService.OutdoorAmbient = c, c
+            LightingService.FogColor = c
+        end
+    end
+})
 
+local skyboxToggle = Misc:Toggle({
+    Name = "Custom Skybox",
+    Flag = "CustomSkybox",
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.CustomSkybox = Value
+        if Value then
+            Visuals:SwitchSkybox(getgenv().matcha.SelectedSkybox or "Game's Default Sky")
+        else
+            Visuals:SwitchSkybox("Game's Default Sky")
+        end
+    end
+})
+
+Misc:Dropdown({
+    Name = "Skybox",
+    Items = SkyboxNames,
+    Flag = "SelectedSkybox",
+    Default = "Game's Default Sky",
+    Multi = false,
+    Callback = function(Value)
+        getgenv().matcha.SelectedSkybox = Value
+        if getgenv().matcha.CustomSkybox then
+            Visuals:SwitchSkybox(Value)
+        end
+    end
+})
 --[[local rs = game:GetService("RunService")
 local uis = game:GetService("UserInputService")
 local lp = game.Players.LocalPlayer
@@ -2057,5 +2534,26 @@ lp.CharacterAdded:Connect(function(char)
 	task.wait(0.2)
 	setup(char)
 end)]]
+
+pcall(function()
+    local oldIndex
+    local success = pcall(function()
+        oldIndex = hookmetamethod(game, "__index", function(self, key)
+            if not checkcaller() and self:IsA("Mouse") and (key == "Hit" or key == "Target") then
+                if getgenv().matcha.AimEnabled and getgenv().matcha.SilentAimEnabled and 
+                   silentTarget and silentAimPosition and math.random(1, 100) <= getgenv().matcha.HitChance then
+
+                    if key == "Hit" then
+                        return CFrame.new(silentAimPosition)
+                    elseif key == "Target" then
+                        return silentTarget.Character:FindFirstChild(getgenv().matcha.HitPart) or silentTarget.Character.HumanoidRootPart
+                    end
+                end
+            end
+            return oldIndex(self, key)
+        end)
+    end)
+    if not success then warn("[matcha] Silent Aim hook failed") end
+end)
 
 Library:Notification("matcha.tea", "Thank you for using matcha.tea", 5)
