@@ -811,10 +811,13 @@ local Window = Library:Window({
     Logo = "122719141368198",
     FadeTime = 0.3,
 })
--- [TOGGLE GUI BUTTON - matcha theme]
-local CoreGui = game:GetService("CoreGui")
 
-local function createToggleButton()
+-- [MATCHA TOGGLE BUTTON - VIỀN NÚT SÁNG + GLOW HIỆU ỨNG]
+local CoreGui = game:GetService("CoreGui")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+
+local function createMatchaToggle()
     local existing = CoreGui:FindFirstChild("MatchaToggleGui")
     if existing then existing:Destroy() end
 
@@ -829,46 +832,57 @@ local function createToggleButton()
     button.BackgroundColor3 = Color3.fromRGB(30, 34, 30)
     button.Text = "matcha"
     button.Font = Enum.Font.GothamBold
-    button.TextSize = 16
+    button.TextSize = 18
     button.TextColor3 = Color3.fromRGB(169, 242, 112)
     button.BorderSizePixel = 0
+    button.AutoButtonColor = false
     button.Parent = screenGui
 
     local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 8)
+    corner.CornerRadius = UDim.new(0, 10)
     corner.Parent = button
 
-    local outline = Instance.new("UIStroke")
-    outline.Color = Color3.fromRGB(169, 242, 112)
-    outline.Thickness = 2
-    outline.Parent = button
+    -- 🌿 Outline cho VIỀN NÚT (không phải chữ)
+    local stroke = Instance.new("UIStroke")
+    stroke.Thickness = 2.5
+    stroke.Color = Color3.fromRGB(169, 242, 112)
+    stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    stroke.Parent = button
 
-    -- Dragging
-    local dragging, dragStart, startPos
+    -- KÉO MƯỢT
+    local dragging, dragInput, dragStart, startPos
+    local function updateDrag(input)
+        local delta = input.Position - dragStart
+        local target = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        TweenService:Create(button, TweenInfo.new(0.16, Enum.EasingStyle.Sine), {Position = target}):Play()
+    end
+
     button.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            Window:SetOpen(not Window.IsOpen) -- Toggle UI
+            Window:SetOpen(not Window.IsOpen)
             dragging = true
             dragStart = input.Position
             startPos = button.Position
+
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then dragging = false end
+            end)
         end
     end)
 
     button.InputChanged:Connect(function(input)
-        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-            local delta = input.Position - dragStart
-            button.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            dragInput = input
         end
     end)
 
-    button.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = false
-        end
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then updateDrag(input) end
     end)
 end
 
-createToggleButton()
+createMatchaToggle()
+
 local Watermark = Library:Watermark("matcha.tea")
 
 local KeybindList = Library:KeybindList()
