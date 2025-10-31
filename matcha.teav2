@@ -42,6 +42,9 @@ getgenv().matcha = {
     TriggerCheckTeam = false,
     TriggerCheckFriend = false,
     TriggerDelay = 1,
+    Enabledboost = false,
+    WalkSpeed = 16,
+    JumpPower = 50,
 
     -- Hitbox Expander vars
     HitboxExpanderEnabled = false,
@@ -808,6 +811,64 @@ local Window = Library:Window({
     Logo = "122719141368198",
     FadeTime = 0.3,
 })
+-- [TOGGLE GUI BUTTON - matcha theme]
+local CoreGui = game:GetService("CoreGui")
+
+local function createToggleButton()
+    local existing = CoreGui:FindFirstChild("MatchaToggleGui")
+    if existing then existing:Destroy() end
+
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "MatchaToggleGui"
+    screenGui.Parent = CoreGui
+    screenGui.ResetOnSpawn = false
+
+    local button = Instance.new("TextButton")
+    button.Size = UDim2.new(0, 100, 0, 60)
+    button.Position = UDim2.new(1, -110, 0, 80)
+    button.BackgroundColor3 = Color3.fromRGB(30, 34, 30)
+    button.Text = "matcha"
+    button.Font = Enum.Font.GothamBold
+    button.TextSize = 16
+    button.TextColor3 = Color3.fromRGB(169, 242, 112)
+    button.BorderSizePixel = 0
+    button.Parent = screenGui
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 8)
+    corner.Parent = button
+
+    local outline = Instance.new("UIStroke")
+    outline.Color = Color3.fromRGB(169, 242, 112)
+    outline.Thickness = 2
+    outline.Parent = button
+
+    -- Dragging
+    local dragging, dragStart, startPos
+    button.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            Window:SetOpen(not Window.IsOpen) -- Toggle UI
+            dragging = true
+            dragStart = input.Position
+            startPos = button.Position
+        end
+    end)
+
+    button.InputChanged:Connect(function(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            local delta = input.Position - dragStart
+            button.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+
+    button.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+        end
+    end)
+end
+
+createToggleButton()
 local Watermark = Library:Watermark("matcha.tea")
 
 local KeybindList = Library:KeybindList()
@@ -1368,6 +1429,97 @@ FOVSection:Slider({
 })
 
 local MovementSelection = CharacterSubPage:Section({Name = "Movement", Side = 1})
+
+-- Lấy giá trị gốc từ game khi nhân vật spawn
+local function updateDefaultValues()
+    local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    local hum = char:WaitForChild("Humanoid", 5)
+    if hum then
+        getgenv().matcha.WalkSpeed = hum.WalkSpeed
+        getgenv().matcha.JumpPower = hum.JumpPower
+    end
+end
+
+LocalPlayer.CharacterAdded:Connect(updateDefaultValues)
+if LocalPlayer.Character then
+    task.spawn(updateDefaultValues)
+end
+
+-- Toggle + Keybind (chỉ cần 1 nút)
+local speedToggle = MovementSelection:Toggle({
+    Name = "Speed / Jump",
+    Flag = "SpeedJumpEnabled",
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.Enabledboost = Value
+    end
+})
+
+-- Keybind tự động toggle khi nhấn
+speedToggle:Keybind({
+    Flag = "SpeedJumpKeybind",
+    Default = Enum.KeyCode.T,
+    Mode = "Toggle",
+    Callback = function(value)
+        getgenv().matcha.Enabledboost = not getgenv().matcha.Enabledboost
+    end
+})
+
+-- Textbox WalkSpeed
+MovementSelection:Textbox({
+    Name = "WalkSpeed",
+    Flag = "WalkSpeedValue",
+    Default = "16",
+    Placeholder = "Enter WalkSpeed",
+    Callback = function(Value)
+        local num = tonumber(Value)
+        if num and num > 0 then
+            getgenv().matcha.WalkSpeed = num
+        end
+    end
+})
+
+-- Textbox JumpPower
+MovementSelection:Textbox({
+    Name = "JumpPower",
+    Flag = "JumpPowerValue",
+    Default = "50",
+    Placeholder = "Enter JumpPower",
+    Callback = function(Value)
+        local num = tonumber(Value)
+        if num and num >= 0 then
+            getgenv().matcha.JumpPower = num
+        end
+    end
+})
+
+-- === LOGIC CHẠY TỐC ĐỘ / NHẢY ===
+local RunService = game:GetService("RunService")
+local defaultWalkSpeed = 16
+local defaultJumpPower = 50
+
+-- Lấy giá trị gốc khi spawn
+LocalPlayer.CharacterAdded:Connect(function(char)
+    local hum = char:WaitForChild("Humanoid")
+    defaultWalkSpeed = hum.WalkSpeed
+    defaultJumpPower = hum.JumpPower
+end)
+
+-- Cập nhật tốc độ liên tục
+RunService.Heartbeat:Connect(function()
+    local char = LocalPlayer.Character
+    if not char then return end
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if not hum then return end
+
+    if getgenv().matcha.Enabledboost then
+        hum.WalkSpeed = getgenv().matcha.WalkSpeed
+        hum.JumpPower = getgenv().matcha.JumpPower
+    else
+        hum.WalkSpeed = defaultWalkSpeed
+        hum.JumpPower = defaultJumpPower
+    end
+end)
 
 -- Nút bật tắt BunnyHop với key, slider 1-200 (hỗ trợ mobile đầy đủ)
 MovementSelection:Toggle({
