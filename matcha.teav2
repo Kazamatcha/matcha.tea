@@ -8,6 +8,7 @@ getgenv().matcha = {
     AimDistanceCheck = false,
     AimDistance = 250,
     HealthCheck = false,
+    SilentAimMethod = "Raycast",
     HealthThreshold = 50,
     Resolver = false,
     ResolverMethod = "move direction",
@@ -624,13 +625,6 @@ RunService.RenderStepped:Connect(function()
     fovOutline.Color = getgenv().matcha.FOVOutlineColor
     fovOutline.Thickness = getgenv().matcha.FOVThickness
 
-    -- === CHỈ CHẠY KHI AIM BẬT ===
-    if not getgenv().matcha.AimEnabled then
-        silentTarget = nil
-        silentAimPosition = nil
-        return
-    end
-
     -- === CẬP NHẬT TARGET (NON-STICKY) ===
     if not getgenv().matcha.StickyAim then
         getgenv().matcha.Target = GetClosestPlayer()
@@ -642,11 +636,6 @@ RunService.RenderStepped:Connect(function()
     end
 
     local target = getgenv().matcha.SelectedTarget
-    if not target or not target.Character then
-        silentTarget = nil
-        silentAimPosition = nil
-        return
-    end
 
     -- === VALIDATION CHUNG (Aimbot + Silent Aim) ===
     local hitPartName = getgenv().matcha.HitPart
@@ -669,17 +658,11 @@ RunService.RenderStepped:Connect(function()
     if rootPart and getgenv().matcha.UseFOV then
         local screenPos, onScreen = Camera:WorldToViewportPoint(rootPart.Position)
         if onScreen then
-            local distToMouse = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
-            if distToMouse > getgenv().matcha.FOVSize then valid = false end
+            local distToFOVCenter = (Vector2.new(screenPos.X, screenPos.Y) - fovPosition).Magnitude
+            if distToFOVCenter > getgenv().matcha.FOVSize then valid = false end
         else
             valid = false
         end
-    end
-
-    if not valid then
-        silentTarget = nil
-        silentAimPosition = nil
-        return
     end
 
     -- === LẤY TARGET PART (Closest Part + Air Part) ===
@@ -737,10 +720,6 @@ RunService.RenderStepped:Connect(function()
         0
     )
     local aimPosition = basePosition + predictionOffset
-
-    -- === LƯU CHO SILENT AIM ===
-    silentTarget = target
-    silentAimPosition = aimPosition
 
     -- === AIMBOT (CAMERA / MOUSE) ===
     if targeting and getgenv().matcha.ToggleAimbot then
@@ -973,6 +952,23 @@ local silentToggle = AimbotSection:Toggle({
     Default = false,
     Callback = function(Value)
         getgenv().matcha.SilentAimEnabled = Value
+    end
+})
+
+AimbotSelection:Dropdown({
+    Name = "Silent Aim Method",
+    Flag = "SilentAimMethod",
+    Options = {
+        "Raycast",
+        "FindPartOnRayWithIgnoreList",
+        "FindPartOnRayWithWhitelist",
+        "FindPartOnRay",
+        "ScreenPointToRay",
+        "ViewportPointToRay"
+    },
+    Default = "Raycast",
+    Callback = function(Value)
+        getgenv().matcha.SilentAimMethod = Value
     end
 })
 
@@ -1543,27 +1539,292 @@ MiscSelection:Slider({
         getgenv().matcha.SpinSpeed = Value
     end
 })
-
-pcall(function()
-    local oldIndex
+-- [1] Kiểm tra executor có hỗ trợ hookmetamethod
+local function isHookSupported()
     local success = pcall(function()
-        oldIndex = hookmetamethod(game, "__index", function(self, key)
-            if not checkcaller() and self:IsA("Mouse") and (key == "Hit" or key == "Target") then
-                if getgenv().matcha.AimEnabled and getgenv().matcha.SilentAimEnabled and 
-                   silentTarget and silentAimPosition and math.random(1, 100) <= getgenv().matcha.HitChance then
+        hookmetamethod(game, "__namecall", function() end)
+    end)
+    return success
+end
 
-                    if key == "Hit" then
-                        return CFrame.new(silentAimPosition)
-                    elseif key == "Target" then
-                        return silentTarget.Character:FindFirstChild(getgenv().matcha.HitPart) or silentTarget.Character.HumanoidRootPart
+-- [2] ExpectedArguments & ValidateArguments
+local ExpectedArguments = {
+    Raycast = { ArgCountRequired = 3, Args = { "Vector3", "Vector3", "RaycastParams" } },
+    FindPartOnRayWithIgnoreList = { ArgCountRequired = 2, Args = { "Ray", "table", "boolean?", "boolean?" } },
+    FindPartOnRayWithWhitelist = { ArgCountRequired = 2, Args = { "Ray", "table", "boolean?" } },
+    FindPartOnRay = { ArgCountRequired = 2, Args = { "Ray", "Instance?", "boolean?", "boolean?" } },
+    ScreenPointToRay = { ArgCountRequired = 2, Args = { "number", "number" } },
+    ViewportPointToRay = { ArgCountRequired = 2, Args = { "number", "number" } }
+}
+
+local function ValidateArguments(args, expected)
+    if #args < expected.ArgCountRequired then return false end
+    for i, expectedType in ipairs(expected.Args) do
+        if i > #args then break end
+        local arg = args[i]
+        local argType = typeof(arg)
+        if expectedType:find("?") then
+            expectedType = expectedType:gsub("%?", "")
+            if arg ~= nil and argType ~= expectedType then return false end
+        else
+            if argType ~= expectedType then return false end
+        end
+    end
+    return true
+end
+
+local function getPredictionValue()
+    if not getgenv().matcha.AutoPrediction then
+        return getgenv().matcha.PredictionX
+    end
+    local ping = game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue() / 1000
+    local pred = ping * 10  -- Base theo ping (ví dụ 0.1s ping → 1.0 pred)
+    pred = math.clamp(pred, 0.1, 0.25)  -- Giới hạn để tránh overpred
+    return pred
+end
+-- [SILENT AIM] - HOOK __namecall - HOẠT ĐỘNG 100% MỌI GÓC NHÌN + AUTOPRED + NEAR CENTER
+if isHookSupported() then
+    local oldNamecall
+    oldNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
+        local Method = getnamecallmethod()
+        local Args = {...}
+
+        if not checkcaller() then
+            local chance = math.random(1, 100) <= getgenv().matcha.HitChance
+
+            if getgenv().matcha.AimEnabled and getgenv().matcha.SilentAimEnabled and chance then
+                local target = getgenv().matcha.SelectedTarget
+                if not target or not isAlive(target) then return oldNamecall(self, ...) end
+
+                local hitPartName = getgenv().matcha.HitPart
+                if hitPartName == "Torso (R6)" then hitPartName = "Torso" end
+                local hitPart = target.Character:FindFirstChild(hitPartName) or target.Character.HumanoidRootPart
+                if not hitPart then return oldNamecall(self, ...) end
+
+                -- === RESOLVER ===
+                local velocity = hitPart.AssemblyLinearVelocity
+                if getgenv().matcha.Resolver then
+                    local hum = target.Character:FindFirstChildOfClass("Humanoid")
+                    if getgenv().matcha.ResolverMethod == "move direction" and hum then
+                        velocity = hum.MoveDirection * hum.WalkSpeed
+                    elseif getgenv().matcha.ResolverMethod == "lookvector" then
+                        velocity = hitPart.CFrame.LookVector * getPredictionValue() * 100
+                    end
+                end
+
+                -- === AUTO PREDICTION ===
+                local predValue = getPredictionValue()
+                local finalPos = hitPart.Position + (velocity * predValue)
+
+                -- === FOV CHECK DỰA TRÊN SortType (NEAR CENTER HOÀN HẢO) ===
+                local fovPosition = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+                if getgenv().matcha.SortType == "near mouse" then
+                    fovPosition = UserInputService:GetMouseLocation()
+                elseif getgenv().matcha.SortType == "near character" then
+                    fovPosition = UserInputService.TouchEnabled and fovPosition or UserInputService:GetMouseLocation()
+                end
+
+                local screenPos, onScreen = Camera:WorldToViewportPoint(hitPart.Position)
+                if getgenv().matcha.UseFOV and onScreen then
+                    local dist = (Vector2.new(screenPos.X, screenPos.Y) - fovPosition).Magnitude
+                    if dist > getgenv().matcha.FOVSize then
+                        return oldNamecall(self, ...)
+                    end
+                end
+
+                -- === WALL CHECK ===
+                if table.find(getgenv().matcha.AimCheck, "Check Wall") then
+                    local rayParams = RaycastParams.new()
+                    rayParams.FilterDescendantsInstances = {LocalPlayer.Character}
+                    rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+                    local result = workspace:Raycast(Camera.CFrame.Position, (finalPos - Camera.CFrame.Position) * 500, rayParams)
+                    if result and not result.Instance:IsDescendantOf(target.Character) then
+                        return oldNamecall(self, ...)
+                    end
+                end
+
+                -- === MODIFY RAY ===
+                local function modifyRay(origin)
+                    local start = origin
+                    if getgenv().matcha.BulletTP then
+                        start = (hitPart.CFrame * CFrame.new(0, 0, -1)).Position
+                    end
+                    return start, (finalPos - start).Unit * getgenv().matcha.MultiplyUnitBy
+                end
+
+
+            end
+        end
+
+        return oldNamecall(self, ...)
+    end))
+else
+    warn("[matcha] Executor not support hookmetamethod")
+end
+
+if isHookSupported() then
+    local oldNamecall
+    oldNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
+        local Method = getnamecallmethod()
+        local Args = {...}
+
+        if not checkcaller() then
+            local chance = math.random(1, 100) <= getgenv().matcha.HitChance
+
+            if getgenv().matcha.AimEnabled and getgenv().matcha.SilentAimEnabled and chance then
+                local target = getgenv().matcha.SelectedTarget
+                if not target or not isAlive(target) then return oldNamecall(self, ...) end  -- Check Alive đầy đủ
+
+                local hitPartName = getgenv().matcha.HitPart
+                if hitPartName == "Torso (R6)" then hitPartName = "Torso" end
+                local hitPart = target.Character:FindFirstChild(hitPartName) or target.Character.HumanoidRootPart
+                if not hitPart then return oldNamecall(self, ...) end
+
+                -- === LẤY TARGET PART (Closest Part + Air Part) - TỪ RUNSERVICE ===
+                if getgenv().matcha.ClosestPart then
+                    local closestDist = math.huge
+                    for _, part in ipairs(target.Character:GetChildren()) do
+                        if part:IsA("BasePart") then
+                            local dist = (part.Position - Camera.CFrame.Position).Magnitude
+                            if dist < closestDist then
+                                hitPart = part
+                                closestDist = dist
+                            end
+                        end
+                    end
+                end
+
+                local targetHum = target.Character:FindFirstChildOfClass("Humanoid")
+                local inFreefall = targetHum and targetHum:GetState() == Enum.HumanoidStateType.Freefall
+
+                if getgenv().matcha.AirPartEnabled and inFreefall then
+                    local airPartName = getgenv().matcha.AirPart
+                    if airPartName == "Torso (R6)" then airPartName = "Torso" end
+                    hitPart = target.Character:FindFirstChild(airPartName) or hitPart
+                end
+
+                -- === RESOLVER + VELOCITY - TỪ RUNSERVICE ===
+                local velocity = hitPart.AssemblyLinearVelocity
+                if getgenv().matcha.Resolver then
+                    local humanoid = hitPart.Parent:FindFirstChild("Humanoid")
+                    local hrp = target.Character:FindFirstChild("HumanoidRootPart")
+                    if getgenv().matcha.ResolverMethod == "move direction" and humanoid then
+                        velocity = humanoid.MoveDirection * humanoid.WalkSpeed
+                    elseif getgenv().matcha.ResolverMethod == "lookvector" then
+                        velocity = hitPart.CFrame.LookVector * getPredictionValue() * 100
+                    elseif getgenv().matcha.ResolverMethod == "combined" and hrp then
+                        local groundVel = Vector3.new(velocity.X, 0, velocity.Z)
+                        hitPart.Velocity = groundVel
+                        hitPart.AssemblyLinearVelocity = groundVel
+                        if hrp.Velocity.Magnitude > 30 then
+                            hitPart.Velocity = Vector3.zero
+                            hitPart.AssemblyLinearVelocity = Vector3.zero
+                        end
+                        velocity = hitPart.Velocity
+                    end
+                end
+
+                -- === AUTO PREDICTION + PREX / PREY ===
+                local predValue = getPredictionValue()
+                local prediction = Vector3.new(velocity.X * predValue, velocity.Y * getgenv().matcha.PredictionY, velocity.Z * predValue)
+
+                -- === TÍNH FINALPOS VỚI OFFSET / JUMPOFFSET - TỪ RUNSERVICE ===
+                local basePosition = hitPart.Position + Vector3.new(0, inFreefall and getgenv().matcha.JumpOffset or getgenv().matcha.Offset, 0)
+                local finalPos = basePosition + prediction
+
+                -- === FOV CHECK DỰA TRÊN SortType ===
+                local fovPosition = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+                if getgenv().matcha.SortType == "near mouse" then
+                    fovPosition = UserInputService:GetMouseLocation()
+                elseif getgenv().matcha.SortType == "near character" then
+                    fovPosition = UserInputService.TouchEnabled and fovPosition or UserInputService:GetMouseLocation()
+                end
+
+                local screenPos, onScreen = Camera:WorldToViewportPoint(hitPart.Position)
+                if getgenv().matcha.UseFOV and onScreen then
+                    local dist = (Vector2.new(screenPos.X, screenPos.Y) - fovPosition).Magnitude
+                    if dist > getgenv().matcha.FOVSize then
+                        return oldNamecall(self, ...)
+                    end
+                end
+
+                -- === WALL CHECK ===
+                if table.find(getgenv().matcha.AimCheck, "Check Wall") then
+                    local rayParams = RaycastParams.new()
+                    rayParams.FilterDescendantsInstances = {LocalPlayer.Character}
+                    rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+                    local result = workspace:Raycast(Camera.CFrame.Position, (finalPos - Camera.CFrame.Position).Unit * 500, rayParams)
+                    if result and not result.Instance:IsDescendantOf(target.Character) then
+                        return oldNamecall(self, ...)
+                    end
+                end
+
+                -- === MODIFY RAY ===
+                local function modifyRay(origin)
+                    local start = origin
+                    if getgenv().matcha.BulletTP then
+                        start = (hitPart.CFrame * CFrame.new(0, 0, -1)).Position
+                    end
+                    return start, (finalPos - start).Unit * getgenv().matcha.MultiplyUnitBy
+                end
+
+                -- === RAYCAST ===
+                -- === RAYCAST ===
+                if Method == "Raycast" and getgenv().matcha.SilentAimMethod == "Raycast" then
+                    if ValidateArguments(Args, ExpectedArguments.Raycast) then
+                        local origin, direction = modifyRay(Args[1])
+                        return oldNamecall(self, origin, direction, Args[3])
+                    end
+
+                -- === FINDPARTONRAYWITHIGNORELIST ===
+                elseif Method == "FindPartOnRayWithIgnoreList" and getgenv().matcha.SilentAimMethod == "FindPartOnRayWithIgnoreList" then
+                    if ValidateArguments(Args, ExpectedArguments.FindPartOnRayWithIgnoreList) then
+                        local origin, direction = modifyRay(Args[1].Origin)
+                        Args[1] = Ray.new(origin, direction)
+                        return oldNamecall(self, unpack(Args))
+                    end
+
+                -- === CÁC METHOD KHÁC (tương tự) ===
+                elseif Method == "FindPartOnRayWithWhitelist" and getgenv().matcha.SilentAimMethod == "FindPartOnRayWithWhitelist" then
+                    if ValidateArguments(Args, ExpectedArguments.FindPartOnRayWithWhitelist) then
+                        local origin, direction = modifyRay(Args[1].Origin)
+                        Args[1] = Ray.new(origin, direction)
+                        return oldNamecall(self, unpack(Args))
+                    end
+
+                elseif (Method == "FindPartOnRay" or Method == "findPartOnRay") and getgenv().matcha.SilentAimMethod:lower() == Method:lower() then
+                    if ValidateArguments(Args, ExpectedArguments.FindPartOnRay) then
+                        local origin, direction = modifyRay(Args[1].Origin)
+                        Args[1] = Ray.new(origin, direction)
+                        return oldNamecall(self, unpack(Args))
+                    end
+
+                elseif Method == "ScreenPointToRay" and getgenv().matcha.SilentAimMethod == "ScreenPointToRay" then
+                    if ValidateArguments(Args, ExpectedArguments.ScreenPointToRay) then
+                        local origin = Camera.CFrame.Position
+                        if getgenv().matcha.BulletTP then
+                            origin = (hitPart.CFrame * CFrame.new(0, 0, -1)).Position
+                        end
+                        return Ray.new(origin, (finalPos - origin).Unit * getgenv().matcha.MultiplyUnitBy)
+                    end
+
+                elseif Method == "ViewportPointToRay" and getgenv().matcha.SilentAimMethod == "ViewportPointToRay" then
+                    if ValidateArguments(Args, ExpectedArguments.ViewportPointToRay) then
+                        local origin = Camera.CFrame.Position
+                        if getgenv().matcha.BulletTP then
+                            origin = (hitPart.CFrame * CFrame.new(0, 0, -1)).Position
+                        end
+                        return Ray.new(origin, (finalPos - origin).Unit * getgenv().matcha.MultiplyUnitBy)
                     end
                 end
             end
-            return oldIndex(self, key)
-        end)
-    end)
-    if not success then warn("[matcha] Silent Aim hook failed") end
-end)
+        end
+
+        return oldNamecall(self, ...)
+    end))
+else
+    warn("[matcha] Executor không hỗ trợ hookmetamethod → Silent Aim bị vô hiệu hóa")
+end
 
 --[[local rs = game:GetService("RunService")
 local uis = game:GetService("UserInputService")
