@@ -70,8 +70,7 @@ getgenv().matcha = {
     FOVFilledColor = Color3.fromRGB(255, 255, 255),
     FOVThickness = 1,
 }
-local silentTarget = nil
-local silentAimPosition = nil
+
 -- Logic implementation
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
@@ -955,17 +954,31 @@ local silentToggle = AimbotSection:Toggle({
     end
 })
 
-AimbotSelection:Dropdown({
-    Name = "Silent Aim Method",
-    Flag = "SilentAimMethod",
-    Items = { "Raycast", "FindPartOnRayWithIgnoreList", "FindPartOnRayWithWhitelist", "FindPartOnRay", "ScreenPointToRay", "ViewportPointToRay" },
-    Default = "Raycast",
-    Callback = function(Value)
-        getgenv().matcha.SilentAimMethod = Value
-    end
+AimbotSection:Toggle({
+	Name = "Bullet TP",
+	Flag = "BulletTP",
+	Default = false,
+	Callback = function(Value)
+		getgenv().matcha.BulletTP = Value
+	end
 })
-
-
+AimbotSection:Dropdown({
+	Name = "Silent Aim Method",
+	Flag = "SilentAimMethod",
+	Items = {
+		"Raycast",
+		"FindPartOnRayWithIgnoreList",
+		"FindPartOnRayWithWhitelist",
+		"FindPartOnRay",
+		"ScreenPointToRay",
+		"ViewportPointToRay"
+	},
+	Default = "Raycast",
+	Multi = false,
+	Callback = function(Value)
+		getgenv().matcha.SilentAimMethod = Value
+	end
+})
 AimbotSection:Slider({
     Name = "HitChance (%)",
     Flag = "HitChance",
@@ -1541,6 +1554,10 @@ local function isHookSupported()
     return success
 end
 
+local WorldSubPage = ClientPage:SubPage({Name = "World"})
+local Lighting = WorldSubPage:Section({Name = "Lighting", Side = 1})
+local WorldFx = WorldSubPage:Section({Name = "World Fx", Side = 2})
+
 -- [2] ExpectedArguments & ValidateArguments
 local ExpectedArguments = {
     Raycast = { ArgCountRequired = 3, Args = { "Vector3", "Vector3", "RaycastParams" } },
@@ -1575,85 +1592,6 @@ local function getPredictionValue()
     local pred = ping * 10  -- Base theo ping (ví dụ 0.1s ping → 1.0 pred)
     pred = math.clamp(pred, 0.1, 0.25)  -- Giới hạn để tránh overpred
     return pred
-end
--- [SILENT AIM] - HOOK __namecall - HOẠT ĐỘNG 100% MỌI GÓC NHÌN + AUTOPRED + NEAR CENTER
-if isHookSupported() then
-    local oldNamecall
-    oldNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
-        local Method = getnamecallmethod()
-        local Args = {...}
-
-        if not checkcaller() then
-            local chance = math.random(1, 100) <= getgenv().matcha.HitChance
-
-            if getgenv().matcha.AimEnabled and getgenv().matcha.SilentAimEnabled and chance then
-                local target = getgenv().matcha.SelectedTarget
-                if not target or not isAlive(target) then return oldNamecall(self, ...) end
-
-                local hitPartName = getgenv().matcha.HitPart
-                if hitPartName == "Torso (R6)" then hitPartName = "Torso" end
-                local hitPart = target.Character:FindFirstChild(hitPartName) or target.Character.HumanoidRootPart
-                if not hitPart then return oldNamecall(self, ...) end
-
-                -- === RESOLVER ===
-                local velocity = hitPart.AssemblyLinearVelocity
-                if getgenv().matcha.Resolver then
-                    local hum = target.Character:FindFirstChildOfClass("Humanoid")
-                    if getgenv().matcha.ResolverMethod == "move direction" and hum then
-                        velocity = hum.MoveDirection * hum.WalkSpeed
-                    elseif getgenv().matcha.ResolverMethod == "lookvector" then
-                        velocity = hitPart.CFrame.LookVector * getPredictionValue() * 100
-                    end
-                end
-
-                -- === AUTO PREDICTION ===
-                local predValue = getPredictionValue()
-                local finalPos = hitPart.Position + (velocity * predValue)
-
-                -- === FOV CHECK DỰA TRÊN SortType (NEAR CENTER HOÀN HẢO) ===
-                local fovPosition = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-                if getgenv().matcha.SortType == "near mouse" then
-                    fovPosition = UserInputService:GetMouseLocation()
-                elseif getgenv().matcha.SortType == "near character" then
-                    fovPosition = UserInputService.TouchEnabled and fovPosition or UserInputService:GetMouseLocation()
-                end
-
-                local screenPos, onScreen = Camera:WorldToViewportPoint(hitPart.Position)
-                if getgenv().matcha.UseFOV and onScreen then
-                    local dist = (Vector2.new(screenPos.X, screenPos.Y) - fovPosition).Magnitude
-                    if dist > getgenv().matcha.FOVSize then
-                        return oldNamecall(self, ...)
-                    end
-                end
-
-                -- === WALL CHECK ===
-                if table.find(getgenv().matcha.AimCheck, "Check Wall") then
-                    local rayParams = RaycastParams.new()
-                    rayParams.FilterDescendantsInstances = {LocalPlayer.Character}
-                    rayParams.FilterType = Enum.RaycastFilterType.Blacklist
-                    local result = workspace:Raycast(Camera.CFrame.Position, (finalPos - Camera.CFrame.Position) * 500, rayParams)
-                    if result and not result.Instance:IsDescendantOf(target.Character) then
-                        return oldNamecall(self, ...)
-                    end
-                end
-
-                -- === MODIFY RAY ===
-                local function modifyRay(origin)
-                    local start = origin
-                    if getgenv().matcha.BulletTP then
-                        start = (hitPart.CFrame * CFrame.new(0, 0, -1)).Position
-                    end
-                    return start, (finalPos - start).Unit * getgenv().matcha.MultiplyUnitBy
-                end
-
-
-            end
-        end
-
-        return oldNamecall(self, ...)
-    end))
-else
-    warn("[matcha] Executor not support hookmetamethod")
 end
 
 if isHookSupported() then
