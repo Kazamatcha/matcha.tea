@@ -595,13 +595,30 @@ RunService.RenderStepped:Connect(function()
 
     -- === CẬP NHẬT FOV ===
     local mousePos = UserInputService:GetMouseLocation()
-    fovFill.Position = mousePos
+    local centerPos = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+    local fovPosition
+
+    if getgenv().matcha.SortType == "near mouse" then
+        fovPosition = mousePos
+    elseif getgenv().matcha.SortType == "near center" then
+        fovPosition = centerPos
+    elseif getgenv().matcha.SortType == "near character" then
+        if UserInputService.TouchEnabled then
+            fovPosition = centerPos
+        else
+            fovPosition = mousePos
+        end
+    else
+        fovPosition = mousePos  -- Default fallback
+    end
+
+    fovFill.Position = fovPosition
     fovFill.Radius = getgenv().matcha.FOVSize
     fovFill.Visible = getgenv().matcha.FOVFilled
     fovFill.Color = getgenv().matcha.FOVFilledColor
     fovFill.Transparency = 0.5
 
-    fovOutline.Position = mousePos
+    fovOutline.Position = fovPosition
     fovOutline.Radius = getgenv().matcha.FOVSize
     fovOutline.Visible = getgenv().matcha.FOVOutline
     fovOutline.Color = getgenv().matcha.FOVOutlineColor
