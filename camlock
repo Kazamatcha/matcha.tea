@@ -1,5 +1,5 @@
 -- Load the UI Library
-local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/nosexclub/morbidstuffdw/main/lunarlib_solarafix.lua"))()
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/Kazamatcha/matcha.tea/refs/heads/main/libpvp"))()
 local flags = Library.Flags
 getgenv().ConfigFolder = "matchafree"
 
