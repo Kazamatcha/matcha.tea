@@ -1,4 +1,5 @@
 
+loadstring(game:HttpGet('https://raw.githubusercontent.com/Kazamatcha/matcha.tea/refs/heads/main/key%20system'))()
 local repo = 'https://raw.githubusercontent.com/mstudio45/LinoriaLib/main/'
 
 local Library = loadstring(game:HttpGet(repo .. 'Library.lua'))()
