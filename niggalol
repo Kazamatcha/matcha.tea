@@ -1,27 +1,81 @@
+if not game:IsLoaded() then 
+    game.Loaded:Wait()
+end
 
-loadstring(game:HttpGet('https://raw.githubusercontent.com/Kazamatcha/matcha.tea/refs/heads/main/key%20system'))()
-local repo = 'https://raw.githubusercontent.com/mstudio45/LinoriaLib/main/'
+if not syn or not protectgui then
+    getgenv().protectgui = function() end
+end
 
-local Library = loadstring(game:HttpGet(repo .. 'Library.lua'))()
-local ThemeManager = loadstring(game:HttpGet(repo .. 'addons/ThemeManager.lua'))()
-local SaveManager = loadstring(game:HttpGet(repo .. 'addons/SaveManager.lua'))()
+task.spawn(function()
+	local g = getinfo or debug.getinfo
+	local d = false
+	local h = {}
+
+	local x, y
+
+	setthreadidentity(2)
+
+	for i, v in getgc(true) do
+		if typeof(v) == "table" then
+			local a = rawget(v, "Detected")
+			local b = rawget(v, "Kill")
+		
+			if typeof(a) == "function" and not x then
+				x = a
+				local o; o = hookfunction(x, function(c, f, n)
+					if c ~= "_" then
+						if d then
+						end
+					end
+					
+					return true
+				end)
+				table.insert(h, x)
+			end
+
+			if rawget(v, "Variables") and rawget(v, "Process") and typeof(b) == "function" and not y then
+				y = b
+				local o; o = hookfunction(y, function(f)
+					if d then
+					end
+				end)
+				table.insert(h, y)
+			end
+		end
+	end
+
+	local o; o = hookfunction(getrenv().debug.info, newcclosure(function(...)
+		local a, f = ...
+
+		if x and a == x then
+			if d then
+				warn(`zins | adonis bypassed`)
+			end
+
+			return coroutine.yield(coroutine.running())
+		end
+		
+		return o(...)
+	end))
+
+	setthreadidentity(7)
+end)
+
+local repo = "https://raw.githubusercontent.com/deividcomsono/Obsidian/main/"
+local Library = loadstring(game:HttpGet(repo .. "Library.lua"))()
+local ThemeManager = loadstring(game:HttpGet(repo .. "addons/ThemeManager.lua"))()
+local SaveManager = loadstring(game:HttpGet(repo .. "addons/SaveManager.lua"))()
 local Options = Library.Options
 local Toggles = Library.Toggles
-
+Library.ForceCheckbox = false 
 Library.ShowToggleFrameInKeybinds = true
-Library.ShowCustomCursor = true
-Library.NotifySide = "Left"
-
 local Window = Library:CreateWindow({
-    Title = 'Nigga.lol | Anhchangm52',
-    Center = true,
-    AutoShow = true,
-    Resizable = true,
-    ShowCustomCursor = true,
-    UnlockMouseWhileOpen = true,
-    NotifySide = "Left",
-    TabPadding = 15,
-    MenuFadeTime = 0.2
+
+	Title = "Nigga.lol | Anhchangm52",
+	Footer = "Nigga.lol Free",
+	Icon = 77218680285262,
+	NotifySide = "Left",
+	ShowCustomCursor = true,
 })
 
 local Tabs = { Main = Window:AddTab('Main'), Character = Window:AddTab('Character'), Visuals = Window:AddTab('Visuals'), Misc = Window:AddTab('Misc'), Players = Window:AddTab('Players'), ['UI Settings'] = Window:AddTab('UI Settings') }
@@ -176,7 +230,7 @@ local TargetingGroup = Tabs.Main:AddLeftGroupbox('Targeting')
 
 TargetingGroup:AddToggle("StickyAim", {
     Text = "Sticky Aim",
-    Default = true,
+    Default = false,
     Tooltip = "Enable or disable sticky aim functionality",
     Callback = function(Value)
         StickyAimEnabled = Value
@@ -239,7 +293,7 @@ TargetingGroup:AddToggle("StickyAim", {
 
 TargetingGroup:AddToggle("TracerToggle", {
     Text = "Draw Tracer",
-    Default = true,
+    Default = false,
     Callback = function(Value)
         TracerEnabled = Value
         if not Value then
@@ -6163,7 +6217,7 @@ if not isfile(themeFolder .. '/matcha.json') then
     writefile(themeFolder .. '/matcha.json', game:GetService("HttpService"):JSONEncode(themeData))
 end
 
-SaveManager:SetFolder('MaddieHack/configs')
+SaveManager:SetFolder('Nigga/configs')
 
 SaveManager:BuildConfigSection(Tabs['UI Settings'])
 ThemeManager:ApplyToTab(Tabs['UI Settings'])
