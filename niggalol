@@ -17,7 +17,14 @@ local Window = Library:CreateWindow({
 	ShowCustomCursor = true,
 })
 
-local Tabs = { Main = Window:AddTab('Main'), Character = Window:AddTab('Character'), Visuals = Window:AddTab('Visuals'), Misc = Window:AddTab('Misc'), Players = Window:AddTab('Players'), ['UI Settings'] = Window:AddTab('UI Settings') }
+local Tabs = { 
+	Main = Window:AddTab('Main', 'swords'), 
+    Character = Window:AddTab('Character', 'user'), 
+	Visuals = Window:AddTab('Visuals', 'eye'), 
+	Misc = Window:AddTab('Misc', 'circleellipsis), 
+	Players = Window:AddTab('Players', 'contactround'), 
+	['UI Settings'] = Window:AddTab('UI Settings', "settings") 
+}
 local GunMods = Tabs.Main:AddRightGroupbox('Gun Mods')
 local KillAura = Tabs.Main:AddRightGroupbox('Combat')
 
