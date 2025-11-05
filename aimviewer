@@ -1,0 +1,183 @@
+--// Universal Aimviewer Advanced (by MatchaIsBest)
+--// U = bật/tắt viewer
+--// T = chọn target gần nhất
+--// Y = bật/tắt aimviewer cho tất cả người chơi
+
+game.StarterGui:SetCore("SendNotification", {
+    Title = "Universal Aimviewer",
+    Text = "Toggles: U = Enable | T = Target | Y = All Players",
+    Duration = 6
+})
+
+-- Settings
+_G.enable = false
+_G.showAll = false
+_G.color = Color3.fromRGB(61, 21, 133)
+_G.toggle_keybind = "u"
+_G.switch_key = "t"
+_G.all_key = "y"
+
+local rs = game:GetService("RunService")
+local Players = game:GetService("Players")
+local Camera = workspace.CurrentCamera
+local localPlayer = Players.LocalPlayer
+local mouse = localPlayer:GetMouse()
+
+local target = nil
+local beams = {} -- lưu các beam cho mỗi player
+
+local function sendnotifi(msg)
+    pcall(function()
+        game.StarterGui:SetCore("SendNotification", {
+            Title = "Aimviewer",
+            Text = msg,
+            Duration = 2.5
+        })
+    end)
+end
+
+--// Lấy player gần tâm nhất
+local function getClosest()
+    local shortest = math.huge
+    local closestPlayer
+
+    for _, v in ipairs(Players:GetPlayers()) do
+        if v ~= localPlayer and v.Character and v.Character:FindFirstChild("Head") then
+            local pos, onScreen = Camera:WorldToViewportPoint(v.Character.Head.Position)
+            if onScreen then
+                local dist = (Vector2.new(mouse.X, mouse.Y) - Vector2.new(pos.X, pos.Y)).Magnitude
+                if dist < shortest then
+                    shortest = dist
+                    closestPlayer = v
+                end
+            end
+        end
+    end
+    return closestPlayer
+end
+
+--// Tạo beam cho player cụ thể
+local function createBeamFor(player)
+    if beams[player] then return beams[player] end
+
+    local beam = Instance.new("Beam")
+    beam.Segments = 1
+    beam.Width0 = 0.15
+    beam.Width1 = 0.15
+    beam.Color = ColorSequence.new(_G.color)
+    beam.FaceCamera = true
+    beam.Enabled = false
+    beam.Parent = workspace.Terrain
+
+    local a0 = Instance.new("Attachment", workspace.Terrain)
+    local a1 = Instance.new("Attachment", workspace.Terrain)
+    beam.Attachment0 = a0
+    beam.Attachment1 = a1
+
+    beams[player] = {beam = beam, a0 = a0, a1 = a1}
+    return beams[player]
+end
+
+--// Xóa beam khi player rời game
+Players.PlayerRemoving:Connect(function(plr)
+    if beams[plr] then
+        beams[plr].beam:Destroy()
+        beams[plr].a0:Destroy()
+        beams[plr].a1:Destroy()
+        beams[plr] = nil
+    end
+end)
+
+--// Phím điều khiển
+mouse.KeyDown:Connect(function(k)
+    k = string.lower(k)
+
+    if k == _G.toggle_keybind then
+        _G.enable = not _G.enable
+        sendnotifi(_G.enable and "Aimviewer Enabled" or "Aimviewer Disabled")
+
+    elseif k == _G.switch_key then
+        if _G.showAll then
+            -- Nếu đang bật showAll thì tắt nó khi chọn target
+            _G.showAll = false
+        end
+        target = getClosest()
+        if target then
+            sendnotifi("Target: " .. target.Name)
+        else
+            sendnotifi("No target found")
+        end
+
+    elseif k == _G.all_key then
+        -- Nếu đang có target thì không bật all
+        if target then
+            sendnotifi("Aimviewer locked to target ("..target.Name..")")
+            return
+        end
+
+        _G.showAll = not _G.showAll
+        sendnotifi(_G.showAll and "Aimviewer: All Players" or "Stopped showing all")
+    end
+end)
+
+--// Cập nhật beam mỗi frame
+rs.RenderStepped:Connect(function()
+    if not _G.enable then
+        for _, data in pairs(beams) do
+            data.beam.Enabled = false
+        end
+        return
+    end
+
+    -- Nếu có target cụ thể
+    if target and target.Character and target.Character:FindFirstChild("Head") then
+        local info = createBeamFor(target)
+        local head = target.Character.Head
+        local dir = target.Character:FindFirstChild("HumanoidRootPart") and target.Character.HumanoidRootPart.CFrame.LookVector or head.CFrame.LookVector
+
+        info.a0.WorldPosition = head.Position
+        info.a1.WorldPosition = head.Position + (dir * 500)
+        info.beam.Enabled = true
+
+        -- Tắt tất cả beam khác
+        for plr, data in pairs(beams) do
+            if plr ~= target then
+                data.beam.Enabled = false
+            end
+        end
+
+    elseif _G.showAll then
+        -- Hiển thị cho tất cả
+        for _, v in ipairs(Players:GetPlayers()) do
+            if v ~= localPlayer and v.Character and v.Character:FindFirstChild("Head") then
+                local info = createBeamFor(v)
+                local head = v.Character.Head
+                local dir = v.Character:FindFirstChild("HumanoidRootPart") and v.Character.HumanoidRootPart.CFrame.LookVector or head.CFrame.LookVector
+
+                info.a0.WorldPosition = head.Position
+                info.a1.WorldPosition = head.Position + (dir * 500)
+                info.beam.Enabled = true
+            end
+        end
+    else
+        -- Không có target hoặc không bật all
+        for _, data in pairs(beams) do
+            data.beam.Enabled = false
+        end
+
+        -- Nếu mất target mà showAll đang bật → bật lại all
+        if (not target or not target.Character) and _G.showAll then
+            for _, v in ipairs(Players:GetPlayers()) do
+                if v ~= localPlayer and v.Character and v.Character:FindFirstChild("Head") then
+                    local info = createBeamFor(v)
+                    local head = v.Character.Head
+                    local dir = v.Character:FindFirstChild("HumanoidRootPart") and v.Character.HumanoidRootPart.CFrame.LookVector or head.CFrame.LookVector
+
+                    info.a0.WorldPosition = head.Position
+                    info.a1.WorldPosition = head.Position + (dir * 500)
+                    info.beam.Enabled = true
+                end
+            end
+        end
+    end
+end)
