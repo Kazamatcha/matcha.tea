@@ -21,7 +21,7 @@ local Tabs = {
 	Main = Window:AddTab('Main', 'swords'), 
     Character = Window:AddTab('Character', 'user'), 
 	Visuals = Window:AddTab('Visuals', 'eye'), 
-	Misc = Window:AddTab('Misc', 'circleellipsis), 
+	Misc = Window:AddTab('Misc', 'circleellipsis'), 
 	Players = Window:AddTab('Players', 'contactround'), 
 	['UI Settings'] = Window:AddTab('UI Settings', "settings") 
 }
@@ -3188,6 +3188,18 @@ desync_setback.Size = Vector3.new(2, 2, 1)
 desync_setback.CanCollide = false
 desync_setback.Anchored = true
 desync_setback.Transparency = 1
+AntiLock = {
+    Enabled = false,
+    Mode = "Custom",
+    Custom = { X = 0, Y = 0, Z = 0 },
+    Up = { Amount = 0 },
+    Down = { Amount = 0 },
+    VelMultiply = { Walk = 0, Jump = 0 },
+    LookVec = { Amount = 0 },
+    Reverse = { Amount = 0, Type = "CFrame" },
+    Confusion = { Amount = 0 },
+    PredBreaker = false
+}
 
 desync = {
     enabled = false,
@@ -3288,6 +3300,223 @@ RunService.Heartbeat:Connect(function()
                 rootPart.CFrame = desync.old_position
             end
         end
+    end
+end)
+
+DesyncBox:AddToggle("AntiLockEnabled", {
+	Text = "Anti Lock",
+	Default = false,
+
+	Callback = function(Value)
+		AntiLock.Enabled = Value
+	end,
+}):AddKeyPicker("AntiLockKeybind", {
+	Default = "B",
+	Mode = "Toggle",
+	Text = "Anti Lock Key",
+	NoUI = false,
+
+	Callback = function()
+		AntiLock.Enabled = not AntiLock.Enabled
+	end,
+})
+
+-- Anti Lock Mode
+DesyncBox:AddDropdown("AntiLockMode", {
+    Values = { "Custom", "Up", "Down", "VelMultiply", "LookVec", "Reverse", "Confusion", "PredBreaker" },
+    Default = "Custom",
+    Multi = false,
+    Text = "Anti Lock Mode",
+    Callback = function(v)
+        AntiLock.Mode = v
+    end
+})
+
+--====================================================================--
+--========================= CUSTOM MODE ==============================--
+--====================================================================--
+
+DesyncBox:AddSlider("CustomX", {
+    Text = "Custom X",
+    Min = -10000,
+    Max = 10000,
+    Default = 0,
+    Rounding = 0,
+    Callback = function(v)
+        AntiLock.Custom.X = v
+    end
+})
+
+DesyncBox:AddSlider("CustomY", {
+    Text = "Custom Y",
+    Min = -10000,
+    Max = 10000,
+    Default = 0,
+    Rounding = 0,
+    Callback = function(v)
+        AntiLock.Custom.Y = v
+    end
+})
+
+DesyncBox:AddSlider("CustomZ", {
+    Text = "Custom Z",
+    Min = -10000,
+    Max = 10000,
+    Default = 0,
+    Rounding = 0,
+    Callback = function(v)
+        AntiLock.Custom.Z = v
+    end
+})
+
+--====================================================================--
+--========================= UP / DOWN ================================--
+--====================================================================--
+
+DesyncBox:AddSlider("UpAmount", {
+    Text = "Up Amount",
+    Min = 1,
+    Max = 10000,
+    Default = 100,
+    Rounding = 0,
+    Callback = function(v)
+        AntiLock.Up.Amount = v
+    end
+})
+
+DesyncBox:AddSlider("DownAmount", {
+    Text = "Down Amount",
+    Min = 1,
+    Max = 10000,
+    Default = 100,
+    Rounding = 0,
+    Callback = function(v)
+        AntiLock.Down.Amount = v
+    end
+})
+
+--====================================================================--
+--========================= VELOCITY MULTIPLY ========================--
+--====================================================================--
+
+DesyncBox:AddInput("VelWalk", {
+    Text = "Vel Walk",
+    Default = "1.5",
+    Numeric = true,
+    Finished = true,
+    Placeholder = "1.5",
+    Callback = function(v)
+        AntiLock.VelMultiply.Walk = tonumber(v) or 1.5
+    end
+})
+
+DesyncBox:AddInput("VelJump", {
+    Text = "Vel Jump",
+    Default = "1.0",
+    Numeric = true,
+    Finished = true,
+    Placeholder = "1.0",
+    Callback = function(v)
+        AntiLock.VelMultiply.Jump = tonumber(v) or 1.0
+    end
+})
+
+--====================================================================--
+--========================= LOOKVEC / REVERSE ========================--
+--====================================================================--
+
+DesyncBox:AddSlider("LookVecAmt", {
+    Text = "LookVec Amount",
+    Min = 1,
+    Max = 10000,
+    Default = 500,
+    Rounding = 0,
+    Callback = function(v)
+        AntiLock.LookVec.Amount = v
+    end
+})
+
+DesyncBox:AddSlider("ReverseAmt", {
+    Text = "Reverse Amount",
+    Min = 1,
+    Max = 10000,
+    Default = 50,
+    Rounding = 0,
+    Callback = function(v)
+        AntiLock.Reverse.Amount = v
+    end
+})
+
+DesyncBox:AddDropdown("ReverseType", {
+    Values = { "CFrame", "Velocity" },
+    Default = "CFrame",
+    Multi = false,
+    Text = "Reverse Type",
+    Callback = function(v)
+        AntiLock.Reverse.Type = v
+    end
+})
+
+--====================================================================--
+--========================= CONFUSION ================================--
+--====================================================================--
+
+DesyncBox:AddSlider("ConfusionAmt", {
+    Text = "Confusion Amount",
+    Min = 1,
+    Max = 10000,
+    Default = 5,
+    Rounding = 0,
+    Callback = function(v)
+        AntiLock.Confusion.Amount = v
+    end
+})
+
+-- === ANTI LOCK LOGIC (Heartbeat) ===
+RunService.Heartbeat:Connect(function()
+    if not AntiLock.Enabled or not LocalPlayer.Character then return end
+    local hrp = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    local hum = LocalPlayer.Character:FindFirstChild("Humanoid")
+    if not hrp or not hum then return end
+
+    local vel = hrp.Velocity
+    local cf = hrp.CFrame
+    local S = AntiLock
+
+    if S.Mode == "Custom" and (S.Custom.X ~= 0 or S.Custom.Y ~= 0 or S.Custom.Z ~= 0) then
+        hrp.Velocity = Vector3.new(S.Custom.X, S.Custom.Y, S.Custom.Z)
+        RunService.RenderStepped:Wait()
+        hrp.Velocity = vel
+    elseif S.Mode == "Up" and S.Up.Amount > 0 then
+        hrp.Velocity = Vector3.new(vel.X, S.Up.Amount, vel.Z)
+        RunService.RenderStepped:Wait()
+        hrp.Velocity = vel
+    elseif S.Mode == "Down" and S.Down.Amount > 0 then
+        hrp.Velocity = Vector3.new(vel.X, -S.Down.Amount, vel.Z)
+        RunService.RenderStepped:Wait()
+        hrp.Velocity = vel
+    elseif S.Mode == "VelMultiply" and (S.VelMultiply.Walk > 0 or S.VelMultiply.Jump > 0) then
+        hrp.Velocity = vel * Vector3.new(S.VelMultiply.Walk, S.VelMultiply.Jump, S.VelMultiply.Walk)
+        RunService.RenderStepped:Wait()
+        hrp.Velocity = vel
+    elseif S.Mode == "LookVec" and S.LookVec.Amount > 0 then
+        hrp.Velocity = cf.lookVector * S.LookVec.Amount
+        RunService.RenderStepped:Wait()
+        hrp.Velocity = vel
+    elseif S.Mode == "Reverse" and S.Reverse.Amount > 0 then
+        if S.Reverse.Type == "CFrame" then
+            hrp.CFrame = cf - hum.MoveDirection * (S.Reverse.Amount / 10)
+        else
+            hrp.Velocity = vel * Vector3.new(-S.Reverse.Amount/2.5, 1, -S.Reverse.Amount/2.5)
+            RunService.RenderStepped:Wait()
+            hrp.Velocity = vel
+        end
+    elseif S.Mode == "Confusion" and S.Confusion.Amount > 0 then
+        hrp.CFrame = cf * CFrame.new(math.random(1,2)==1 and S.Confusion.Amount or -S.Confusion.Amount, 0, 0)
+    elseif S.Mode == "PredBreaker" then
+        hrp.Velocity = Vector3.zero
+        RunService.RenderStepped:Wait()
+        hrp.Velocity = vel
     end
 end)
 
@@ -5488,12 +5717,11 @@ local UIS          = game:GetService("UserInputService")
 local LocalPlayer  = Players.LocalPlayer
 
 -- ==================== MÀU CỐ ĐỊNH ====================
-local MATCHA      = Color3.fromRGB(152,251,152)   -- xanh lá tươi
-local DARK_BG     = Color3.fromRGB(30,30,30)      -- nền đen tối
-local DARK_BORDER = Color3.fromRGB(20,20,20)      -- viền đen
-local TEXT_WHITE  = Color3.fromRGB(255,255,255)   -- chữ trắng
-local HOVER_BG    = Color3.fromRGB(50,50,50)      -- hover nhẹ
-
+local MATCHA = Color3.fromRGB(152, 251, 152)  -- xanh lá tươi (AccentColor)
+local DARK_BG = Color3.fromRGB(30, 30, 30)    -- nền đen tối (MainColor)
+local DARK_BORDER = Color3.fromRGB(20, 20, 20) -- viền đen (OutlineColor)
+local TEXT_WHITE = Color3.fromRGB(224, 255, 255) -- chữ (FontColor, gần light cyan)
+local HOVER_BG = Color3.fromRGB(35, 35, 35)   -- hover nhẹ (BackgroundColor)
 -- ==================== GUI SETUP ====================
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "MatchaPlayerList_"..tostring(math.random(1e6,1e7))
@@ -5560,13 +5788,13 @@ end
 
 -- ==================== UPDATE LIST ====================
 local function UpdateList()
-    for _,c in pairs(Scroller:GetChildren()) do
+    for _, c in pairs(Scroller:GetChildren()) do
         if c:IsA("TextButton") then c:Destroy() end
     end
-    for _,p in ipairs(Players:GetPlayers()) do
+    for _, p in ipairs(Players:GetPlayers()) do
         if p ~= LocalPlayer then
             local btn = Instance.new("TextButton")
-            btn.Size = UDim2.new(1,-4,0,26)
+            btn.Size = UDim2.new(1, -4, 0, 26)
             btn.BackgroundColor3 = DARK_BG
             btn.BackgroundTransparency = 0.3
             btn.TextColor3 = TEXT_WHITE
@@ -5574,21 +5802,21 @@ local function UpdateList()
             btn.TextSize = 13
             btn.AutoButtonColor = false
             btn.Parent = Scroller
-            Instance.new("UICorner", btn).CornerRadius = UDim.new(0,6)
+            Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
             btn.BorderSizePixel = 0
 
-            -- Tick sau tên
             local function refresh()
-                btn.Text = p.DisplayName .. (getgenv().SelectedTarget == p.Name and " [TICK]" or "")
+                local tick = (getgenv().SelectedTarget == p.Name) and " ✓" or ""
+                btn.Text = p.DisplayName .. " (@" .. p.Name .. ")" .. tick
             end
             refresh()
 
             -- Hover
             btn.MouseEnter:Connect(function()
-                TweenService:Create(btn,TweenInfo.new(0.15),{BackgroundTransparency=0}):Play()
+                TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundTransparency = 0}):Play()
             end)
             btn.MouseLeave:Connect(function()
-                TweenService:Create(btn,TweenInfo.new(0.15),{BackgroundTransparency=0.3}):Play()
+                TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundTransparency = 0.3}):Play()
             end)
 
             -- Click → select / unselect
@@ -5598,7 +5826,7 @@ local function UpdateList()
                     Library:Notify("Đã untarget.", 2)
                 else
                     getgenv().SelectedTarget = p.Name
-                    Library:Notify("Đã chọn target: "..p.DisplayName.." (@"..p.Name..")", 3)
+                    Library:Notify("Đã chọn target: " .. p.DisplayName .. " (@" .. p.Name .. ")", 3)
                 end
                 UpdateList()
             end)
@@ -5656,30 +5884,6 @@ PlayerInfo:AddToggle('ShowPlayerListToggle', {
             Library:Notify("Không tìm thấy người chơi gần!", 2)
         end
     end
-})
-PlayerInfo:AddInput('playerSearch', {
-    Text = 'Search Player',
-    Tooltip = 'Type to search for a player.',
-    Callback = function(value)
-        local matches = {}
-        value = string.lower(value)
-
-        for _, player in ipairs(Services.Players:GetPlayers()) do
-            local playerName = string.lower(player.Name)
-            local displayName = string.lower(player.DisplayName)
-
-            if string.find(playerName, value) or string.find(displayName, value) then
-                table.insert(matches, player.Name) -- Use actual username
-            end
-        end
-
-        options.yepyep:SetValue(matches)
-
-        if #matches == 1 then
-            Options.myPlayerDropdown:SetValue(matches[1])
-            getgenv().SelectedTarget = matches[1]
-        end
-    end,
 })
 
 getgenv().animEnabled = false
