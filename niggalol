@@ -1,65 +1,4 @@
-if not game:IsLoaded() then 
-    game.Loaded:Wait()
-end
 
-if not syn or not protectgui then
-    getgenv().protectgui = function() end
-end
-
-task.spawn(function()
-	local g = getinfo or debug.getinfo
-	local d = false
-	local h = {}
-
-	local x, y
-
-	setthreadidentity(2)
-
-	for i, v in getgc(true) do
-		if typeof(v) == "table" then
-			local a = rawget(v, "Detected")
-			local b = rawget(v, "Kill")
-		
-			if typeof(a) == "function" and not x then
-				x = a
-				local o; o = hookfunction(x, function(c, f, n)
-					if c ~= "_" then
-						if d then
-						end
-					end
-					
-					return true
-				end)
-				table.insert(h, x)
-			end
-
-			if rawget(v, "Variables") and rawget(v, "Process") and typeof(b) == "function" and not y then
-				y = b
-				local o; o = hookfunction(y, function(f)
-					if d then
-					end
-				end)
-				table.insert(h, y)
-			end
-		end
-	end
-
-	local o; o = hookfunction(getrenv().debug.info, newcclosure(function(...)
-		local a, f = ...
-
-		if x and a == x then
-			if d then
-				warn(`zins | adonis bypassed`)
-			end
-
-			return coroutine.yield(coroutine.running())
-		end
-		
-		return o(...)
-	end))
-
-	setthreadidentity(7)
-end)
 loadstring(game:HttpGet('https://raw.githubusercontent.com/Kazamatcha/matcha.tea/refs/heads/main/key%20system'))()
 local repo = "https://raw.githubusercontent.com/deividcomsono/Obsidian/main/"
 local Library = loadstring(game:HttpGet(repo .. "Library.lua"))()
@@ -3721,163 +3660,191 @@ Modifications:AddToggle('Flashback', {
     end,
 })
 
-getgenv().XZQW_ENABLED = false
-getgenv().HIDE_ANIMATIONS = false
-getgenv().YRWL_Connection___ = {}
-getgenv().BlockedAnimations = {
-    "rbxassetid://2788289281",
-    "rbxassetid://507766388",
-    "rbxassetid://2788292075",
-    "rbxassetid://278829075",
-    "rbxassetid://4798175381",
-    "rbxassetid://2953512033",
-    "rbxassetid://2788309982",
-    "rbxassetid://2788312709",
-    "rbxassetid://2788313790",
-    "rbxassetid://2788316350",
-    "rbxassetid://2788315673",
-    "rbxassetid://2788314837"
-}
+local isDaHood = (game.PlaceId == 2788229376)
 
+if isDaHood then
+    -- === CHỈ LOAD KHI LÀ DA HOOD ===
+    getgenv().XZQW_ENABLED = false
+    getgenv().HIDE_ANIMATIONS = false
+    getgenv().YRWL_Connection___ = {}
+    getgenv().BlockedAnimations = {
+        "rbxassetid://2788289281",
+        "rbxassetid://507766388",
+        "rbxassetid://2788292075",
+        "rbxassetid://278829075",
+        "rbxassetid://4798175381",
+        "rbxassetid://2953512033",
+        "rbxassetid://2788309982",
+        "rbxassetid://2788312709",
+        "rbxassetid://2788313790",
+        "rbxassetid://2788316350",
+        "rbxassetid://2788315673",
+        "rbxassetid://2788314837"
+    }
 
-ReplicatedStorage:WaitForChild("ClientAnimations").Block.AnimationId = "rbxassetid://0"
+    -- Fix animation block
+    local ReplicatedStorage = game:GetService("ReplicatedStorage")
+    pcall(function()
+        ReplicatedStorage:WaitForChild("ClientAnimations").Block.AnimationId = "rbxassetid://0"
+    end)
 
-local function startAutoBlock()
-    table.insert(getgenv().YRWL_Connection___, RunService.Stepped:Connect(function()
-        if getgenv().XZQW_ENABLED then
-            local character = LocalPlayer.Character
-            if character and character:FindFirstChild("BodyEffects") then
-                local bodyEffects = character.BodyEffects
-                if bodyEffects:FindFirstChild("Block") then
-                    bodyEffects.Block:Destroy()
-                end
-                local tool = character:FindFirstChildWhichIsA("Tool")
-                if tool and tool:FindFirstChild("Ammo") then
-                    MainRemote:FireServer("Block", false)
-                else
-                    MainRemote:FireServer("Block", true)
-                    wait()
-                    MainRemote:FireServer("Block", false)
+    local RunService = game:GetService("RunService")
+    local Players = game:GetService("Players")
+    local LocalPlayer = Players.LocalPlayer
+
+    local function startAutoBlock()
+        table.insert(getgenv().YRWL_Connection___, RunService.Stepped:Connect(function()
+            if getgenv().XZQW_ENABLED then
+                local character = LocalPlayer.Character
+                if character and character:FindFirstChild("BodyEffects") then
+                    local bodyEffects = character.BodyEffects
+                    if bodyEffects:FindFirstChild("Block") then
+                        bodyEffects.Block:Destroy()
+                    end
+                    local tool = character:FindFirstChildWhichIsA("Tool")
+                    if tool and tool:FindFirstChild("Ammo") then
+                        MainRemote:FireServer("Block", false)
+                    else
+                        MainRemote:FireServer("Block", true)
+                        task.wait()
+                        MainRemote:FireServer("Block", false)
+                    end
                 end
             end
-        end
-    end))
-end
-
-local function stopAutoBlock()
-    for _, connection in ipairs(getgenv().YRWL_Connection___) do
-        connection:Disconnect()
+        end))
     end
-    table.clear(getgenv().YRWL_Connection___)
-end
 
-local function startHidingAnimations()
-    RunService:BindToRenderStep("Hide - Block", 0, function()
-        if getgenv().HIDE_ANIMATIONS then
-            local character = LocalPlayer.Character
-            if character then
-                local humanoid = character:FindFirstChildWhichIsA("Humanoid")
-                if humanoid then
-                    for _, animationTrack in pairs(humanoid:GetPlayingAnimationTracks()) do
-                        if table.find(getgenv().BlockedAnimations, animationTrack.Animation.AnimationId) then
-                            animationTrack:Stop()
+    local function stopAutoBlock()
+        for _, conn in ipairs(getgenv().YRWL_Connection___) do
+            conn:Disconnect()
+        end
+        table.clear(getgenv().YRWL_Connection___)
+    end
+
+    local function startHidingAnimations()
+        RunService:BindToRenderStep("Hide - Block", Enum.RenderPriority.Last.Value, function()
+            if getgenv().HIDE_ANIMATIONS then
+                local character = LocalPlayer.Character
+                if character then
+                    local humanoid = character:FindFirstChildOfClass("Humanoid")
+                    if humanoid then
+                        for _, track in pairs(humanoid:GetPlayingAnimationTracks()) do
+                            if table.find(getgenv().BlockedAnimations, track.Animation.AnimationId) then
+                                track:Stop()
+                            end
                         end
                     end
                 end
             end
-        end
-    end)
+        end)
+    end
+
+    local function stopHidingAnimations()
+        pcall(function()
+            RunService:UnbindFromRenderStep("Hide - Block")
+        end)
+    end
+
+    -- UI Obsidian
+    local RightGroupbox = Tabs.Character:AddRightGroupbox('Auto Block Settings')
+    RightGroupbox:AddToggle('AutoBlock', {
+        Text = 'God Block',
+        Default = false,
+        Callback = function(state)
+            getgenv().XZQW_ENABLED = state
+            if state then startAutoBlock() else stopAutoBlock() end
+        end,
+    })
+
+    local Depbox = RightGroupbox:AddDependencyBox()
+    Depbox:AddToggle('HideAnimations', {
+        Text = 'Hide Animations',
+        Default = false,
+        Callback = function(state)
+            getgenv().HIDE_ANIMATIONS = state
+            if state then startHidingAnimations() else stopHidingAnimations() end
+        end,
+    })
+
+    Depbox:SetupDependencies({ { Toggles.AutoBlock, true } })
+
+else
+    -- === BỎ QUA NẾU KHÔNG PHẢI DA HOOD ===
+    print("Không phải Da Hood → Bỏ qua Auto Block")
 end
 
-local function stopHidingAnimations()
-    RunService:UnbindFromRenderStep("Hide - Block")
-end
+if isDaHood then
+    -- === CHỈ LOAD CASH AURA KHI LÀ DA HOOD ===
+    getgenv().CASH_AURA_ENABLED = false
+    getgenv().CASH_AURA_RANGE = 17
+    getgenv().COOLDOWN = 0.2
 
-local RightGroupbox = Tabs.Character:AddRightGroupbox('Auto Block Settings')
+    local Players = game:GetService("Players")
+    local LocalPlayer = Players.LocalPlayer
+    local Workspace = game:GetService("Workspace")
 
-RightGroupbox:AddToggle('AutoBlock', {
-    Text = 'God Block',
-    Default = false,
+    local function GetCash()
+        local Found = {}
+        local Drop = Workspace:FindFirstChild("Ignored") and Workspace.Ignored:FindFirstChild("Drop")
+        if not Drop then return Found end
 
-    Callback = function(state)
-        getgenv().XZQW_ENABLED = state
-        if state then
-            startAutoBlock()
-        else
-            stopAutoBlock()
-        end
-    end,
-})
+        local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if not root then return Found end
 
-local Depbox = RightGroupbox:AddDependencyBox()
-
-Depbox:AddToggle('HideAnimations', {
-    Text = 'Hide Animations',
-    Default = false,
-
-    Callback = function(state)
-        getgenv().HIDE_ANIMATIONS = state
-        if state then
-            startHidingAnimations()
-        else
-            stopHidingAnimations()
-        end
-    end,
-})
-
-Depbox:SetupDependencies({
-    { Toggles.AutoBlock, true }
-})
-
-CASH_AURA_ENABLED = false
-COOLDOWN = 0.2
-CASH_AURA_RANGE = 17
-
-function GetCash()
-    local Found = {}
-    local Drop = workspace:FindFirstChild("Ignored") and workspace.Ignored:FindFirstChild("Drop")
-    
-    if Drop then
-        for _, v in pairs(Drop:GetChildren()) do 
-            if v.Name == "MoneyDrop" then 
-                local Pos = v:GetAttribute("OriginalPos") or v.Position
-                
-                if game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and 
-                   (Pos - game.Players.LocalPlayer.Character.HumanoidRootPart.Position).Magnitude <= CASH_AURA_RANGE then
+        for _, v in Drop:GetChildren() do
+            if v.Name == "MoneyDrop" then
+                local pos = v:GetAttribute("OriginalPos") or v.Position
+                if (pos - root.Position).Magnitude <= getgenv().CASH_AURA_RANGE then
                     table.insert(Found, v)
                 end
             end
         end
+        return Found
     end
-    
-    return Found
-end
 
-function CashAura()
-    while CASH_AURA_ENABLED do
-        local Cash = GetCash()
-        
-        for _, v in pairs(Cash) do
-            local clickDetector = v:FindFirstChildOfClass("ClickDetector")
-            if clickDetector then
-                fireclickdetector(clickDetector)
+    local function CashAura()
+        while getgenv().CASH_AURA_ENABLED do
+            local cash = GetCash()
+            for _, v in cash do
+                local cd = v:FindFirstChildOfClass("ClickDetector")
+                if cd then fireclickdetector(cd) end
             end
+            task.wait(getgenv().COOLDOWN)
         end
-        
-        task.wait(COOLDOWN)
     end
-end
 
-Modifications:AddToggle('Cash_Aura_Toggle', {
-    Text = 'Cash Aura',
-    Default = false,
-    Callback = function(Value)
-        CASH_AURA_ENABLED = Value
-        if CASH_AURA_ENABLED then
-            task.spawn(CashAura)
+    -- UI Obsidian Lib
+    Modifications:AddToggle('Cash_Aura_Toggle', {
+        Text = 'Cash Aura',
+        Default = false,
+        Callback = function(v)
+            getgenv().CASH_AURA_ENABLED = v
+            if v then task.spawn(CashAura) end
         end
-    end
-})
+    })
+
+    Modifications:AddSlider('CashAuraRange', {
+        Text = 'Cash Aura Range',
+        Default = 17,
+        Min = 10,
+        Max = 50,
+        Rounding = 1,
+        Callback = function(v) getgenv().CASH_AURA_RANGE = v end
+    })
+
+    Modifications:AddSlider('CashAuraCooldown', {
+        Text = 'Cash Aura Cooldown',
+        Default = 0.2,
+        Min = 0.1,
+        Max = 1,
+        Rounding = 2,
+        Callback = function(v) getgenv().COOLDOWN = v end
+    })
+
+else
+    -- === BỎ QUA NẾU KHÔNG PHẢI DA HOOD ===
+    print("Không phải Da Hood → Bỏ qua Cash Aura")
+end
 
 local autoReloadEnabled = false
 local reloadMethod = "Normal"
@@ -4176,152 +4143,142 @@ Modifications:AddToggle('AntiSlowToggle', {
     end
 })
 
-getgenv().autoArmorEnabled = false
-getgenv().autoFArmorEnabled = false
-getgenv().armorThreshold = 75
-getgenv().fArmorThreshold = 75
+if isDaHood then
+    -- === CHỈ LOAD AUTO ARMOR KHI LÀ DA HOOD ===
+    getgenv().autoArmorEnabled = false
+    getgenv().autoFArmorEnabled = false
+    getgenv().armorThreshold = 75
+    getgenv().fArmorThreshold = 75
 
-local player = game:GetService("Players").LocalPlayer
-local dataFolder = player:WaitForChild("DataFolder")
+    local Players = game:GetService("Players")
+    local LocalPlayer = Players.LocalPlayer
+    local RunService = game:GetService("RunService")
+    local Workspace = game:GetService("Workspace")
 
--- Thông tin giáp
-local armorInfo = dataFolder:WaitForChild("Information"):FindFirstChild("ArmorSave")
-local fireArmorInfo = dataFolder:WaitForChild("Information"):FindFirstChild("FireArmorSave")
+    local dataFolder = LocalPlayer:WaitForChild("DataFolder")
+    local armorInfo = dataFolder:WaitForChild("Information"):FindFirstChild("ArmorSave")
+    local fireArmorInfo = dataFolder:WaitForChild("Information"):FindFirstChild("FireArmorSave")
 
--- Shop armor (nếu tồn tại trong game)
-local armorShop = workspace.Ignored.Shop:FindFirstChild("[High-Medium Armor] - $2513")
-local fireArmorShop = workspace.Ignored.Shop:FindFirstChild("[Fire Armor] - $2623")
+    local armorShop = Workspace:FindFirstChild("Ignored") and Workspace.Ignored:FindFirstChild("Shop") and Workspace.Ignored.Shop:FindFirstChild("[High-Medium Armor] - $2513")
+    local fireArmorShop = Workspace:FindFirstChild("Ignored") and Workspace.Ignored:FindFirstChild("Shop") and Workspace.Ignored.Shop:FindFirstChild("[Fire Armor] - $2623")
 
--- ClickDetector (check nil để tránh lỗi)
-local armorClickDetector = armorShop and armorShop:FindFirstChild("ClickDetector")
-local fireArmorClickDetector = fireArmorShop and fireArmorShop:FindFirstChild("ClickDetector")
+    local armorClickDetector = armorShop and armorShop:FindFirstChild("ClickDetector")
+    local fireArmorClickDetector = fireArmorShop and fireArmorShop:FindFirstChild("ClickDetector")
 
--- Check có thể mua
-local function canBuyArmor()
-    local character = player.Character
-    if not character then return false end
-    local humanoid = character:FindFirstChild("Humanoid")
-    if humanoid and humanoid.Health <= 1 then return false end
-    local bodyEffects = character:FindFirstChild("BodyEffects")
-    local isKO = bodyEffects and bodyEffects:FindFirstChild("K.O") and bodyEffects["K.O"].Value
-    if isKO then return false end
-    return true
-end
+    -- Kiểm tra điều kiện mua
+    local function canBuyArmor()
+        local char = LocalPlayer.Character
+        if not char or not char:FindFirstChild("Humanoid") then return false end
+        if char.Humanoid.Health <= 1 then return false end
+        local bodyEffects = char:FindFirstChild("BodyEffects")
+        if bodyEffects and bodyEffects:FindFirstChild("K.O") and bodyEffects["K.O"].Value then return false end
+        return true
+    end
 
--- Teleport mua đồ
-local function teleportAndBuy(shop, clickDetector)
-    local character = player.Character
-    if not character or not character.PrimaryPart or not shop or not clickDetector then return end
+    -- Teleport + mua
+    local function teleportAndBuy(shop, detector)
+        local char = LocalPlayer.Character
+        if not char or not char.PrimaryPart or not shop or not detector then return end
 
-    local originalPosition = character.PrimaryPart.CFrame
-    task.wait(0.1)
+        local origCFrame = char.PrimaryPart.CFrame
+        task.wait(0.1)
 
-    character:SetPrimaryPartCFrame(shop.Head.CFrame * CFrame.new(0, 3.1, 0))
-    task.wait(0.2)
+        char:SetPrimaryPartCFrame(shop.Head.CFrame * CFrame.new(0, 3.1, 0))
+        task.wait(0.2)
 
-    fireclickdetector(clickDetector)
-    task.wait(0.1)
+        fireclickdetector(detector)
+        task.wait(0.1)
 
-    character:SetPrimaryPartCFrame(originalPosition)
-    task.wait(0.1)
-end
+        char:SetPrimaryPartCFrame(origCFrame)
+        task.wait(0.1)
+    end
 
--- Auto mua Armor
-local function buyArmor()
-    if armorInfo and getgenv().autoArmorEnabled and tonumber(armorInfo.Value) < getgenv().armorThreshold and canBuyArmor() then
-        if armorShop and armorClickDetector then
-            local wasDesyncEnabled = desync.enabled
-            if wasDesyncEnabled then
-                toggleDesync(false)
-            end
+    -- Mua Armor thường
+    local function buyArmor()
+        if armorInfo and getgenv().autoArmorEnabled and tonumber(armorInfo.Value) < getgenv().armorThreshold and canBuyArmor() then
+            if armorShop and armorClickDetector then
+                local wasDesync = desync and desync.enabled
+                if wasDesync then toggleDesync(false) end
 
-            teleportAndBuy(armorShop, armorClickDetector)
+                teleportAndBuy(armorShop, armorClickDetector)
 
-            if wasDesyncEnabled then
-                toggleDesync(true)
+                if wasDesync then toggleDesync(true) end
             end
         end
     end
-end
 
--- Auto mua Fire Armor
-local function buyFireArmor()
-    if fireArmorInfo and getgenv().autoFArmorEnabled and tonumber(fireArmorInfo.Value) < getgenv().fArmorThreshold and canBuyArmor() then
-        if fireArmorShop and fireArmorClickDetector then
-            local wasDesyncEnabled = desync.enabled
-            if wasDesyncEnabled then
-                toggleDesync(false)
-            end
+    -- Mua Fire Armor
+    local function buyFireArmor()
+        if fireArmorInfo and getgenv().autoFArmorEnabled and tonumber(fireArmorInfo.Value) < getgenv().fArmorThreshold and canBuyArmor() then
+            if fireArmorShop and fireArmorClickDetector then
+                local wasDesync = desync and desync.enabled
+                if wasDesync then toggleDesync(false) end
 
-            teleportAndBuy(fireArmorShop, fireArmorClickDetector)
+                teleportAndBuy(fireArmorShop, fireArmorClickDetector)
 
-            if wasDesyncEnabled then
-                toggleDesync(true)
+                if wasDesync then toggleDesync(true) end
             end
         end
     end
-end
 
--- Loop check giáp
-local function checkArmor()
-    while task.wait(0.1) do
-        if armorInfo and armorShop and armorClickDetector then
-            buyArmor()
-        end
-        if fireArmorInfo and fireArmorShop and fireArmorClickDetector then
-            buyFireArmor()
-        end
+    -- Loop kiểm tra
+    local function startArmorLoop()
+        task.spawn(function()
+            while task.wait(0.3) do
+                if getgenv().autoArmorEnabled or getgenv().autoFArmorEnabled then
+                    buyArmor()
+                    buyFireArmor()
+                end
+            end
+        end)
     end
+
+    -- Khi respawn
+    LocalPlayer.CharacterAdded:Connect(function()
+        task.wait(1.5)
+        startArmorLoop()
+    end)
+
+    -- Bắt đầu ngay
+    startArmorLoop()
+
+    -- === UI OBSIDIAN LIB ===
+    Modifications:AddToggle('AutoArmorToggle', {
+        Text = 'Auto Armor',
+        Default = false,
+        Callback = function(v) getgenv().autoArmorEnabled = v end
+    })
+
+    Modifications:AddSlider('ArmorThresholdSlider', {
+        Text = 'Armor Threshold',
+        Default = 75,
+        Min = 1,
+        Max = 130,
+        Rounding = 0,
+        Callback = function(v) getgenv().armorThreshold = v end
+    })
+
+    Modifications:AddToggle('AutoFArmorToggle', {
+        Text = 'Auto Fire Armor',
+        Default = false,
+        Callback = function(v) getgenv().autoFArmorEnabled = v end
+    })
+
+    Modifications:AddSlider('FArmorThresholdSlider', {
+        Text = 'Fire Armor Threshold',
+        Default = 75,
+        Min = 1,
+        Max = 130,
+        Rounding = 0,
+        Callback = function(v) getgenv().fArmorThreshold = v end
+    })
+
+else
+    -- === BỎ QUA NẾU KHÔNG PHẢI DA HOOD ===
+    print("Không phải Da Hood → Bỏ qua Auto Armor")
 end
 
--- Khi spawn nhân vật thì chạy checkArmor
-player.CharacterAdded:Connect(function()
-    task.wait(1.4)
-    checkArmor()
-end)
-
--- Chạy luôn từ đầu
-task.spawn(checkArmor)
-
-
-Modifications:AddToggle('AutoArmorToggle', {
-    Text = 'Auto Armor',
-    Default = false,
-    Callback = function(state)
-        getgenv().autoArmorEnabled = state
-    end,
-})
-
-Modifications:AddSlider('ArmorThresholdSlider', {
-    Text = 'Armor Threshold',
-    Default = 75,
-    Min = 1,
-    Max = 130,
-    Rounding = 0,
-    Callback = function(value)
-        getgenv().armorThreshold = value
-    end,
-})
-
-Modifications:AddToggle('AutoFArmorToggle', {
-    Text = 'Auto Fire Armor',
-    Default = false,
-    Callback = function(state)
-        getgenv().autoFArmorEnabled = state
-    end,
-})
-
-Modifications:AddSlider('FArmorThresholdSlider', {
-    Text = 'Fire Armor Threshold',
-    Default = 75,
-    Min = 1,
-    Max = 130,
-    Rounding = 0,
-    Callback = function(value)
-        getgenv().fArmorThreshold = value
-    end,
-})
-
+-- === CODE SAU VẪN CHẠY BÌNH THƯỜNG (ngoài if) ===
 Modifications:AddToggle("AntiSitToggle", {
     Text = "Anti Sit",
     Default = false,
@@ -5265,21 +5222,6 @@ getgenv().oldPosition = nil
 getgenv().invisiblePart = nil
 getgenv().isActionRunning = false -- To track if an action is running
 
-function updatePlayerList()
-    getgenv().PlayerList = {}
-    for _, player in ipairs(Players:GetPlayers()) do
-        table.insert(getgenv().PlayerList, player.Name)
-    end
-    if getgenv().TargetDropdown then
-        getgenv().TargetDropdown:SetValues(getgenv().PlayerList)
-    end
-end
-
-updatePlayerList()
-
-Players.PlayerAdded:Connect(updatePlayerList)
-Players.PlayerRemoving:Connect(updatePlayerList)
-
 function knockTarget(targetPlayer)
     local character = targetPlayer.Character
     local humanoid = character:FindFirstChild("Humanoid")
@@ -5529,15 +5471,185 @@ PlayerInfo:AddDropdown('teleportType', {
     end,
 })
 
-getgenv().TargetDropdown = PlayerInfo:AddDropdown('yepyep', {
-    SpecialType = 'Player',
-    Text = 'Select a Player',
-    Tooltip = 'Select a player to perform actions on.',
-    Callback = function(value)
-        getgenv().SelectedTarget = value
-    end,
-})
+--------------------------------------------------------------
+--  PLAYER LIST GUI – MÀU MATCHA TƯƠI + ĐEN (CỐ ĐỊNH)
+--------------------------------------------------------------
+local CoreGui      = game:GetService("CoreGui")
+local Players      = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local UIS          = game:GetService("UserInputService")
+local LocalPlayer  = Players.LocalPlayer
 
+-- ==================== MÀU CỐ ĐỊNH ====================
+local MATCHA      = Color3.fromRGB(152,251,152)   -- xanh lá tươi
+local DARK_BG     = Color3.fromRGB(30,30,30)      -- nền đen tối
+local DARK_BORDER = Color3.fromRGB(20,20,20)      -- viền đen
+local TEXT_WHITE  = Color3.fromRGB(255,255,255)   -- chữ trắng
+local HOVER_BG    = Color3.fromRGB(50,50,50)      -- hover nhẹ
+
+-- ==================== GUI SETUP ====================
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "MatchaPlayerList_"..tostring(math.random(1e6,1e7))
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = CoreGui
+ScreenGui.Enabled = true
+
+local Frame = Instance.new("Frame")
+Frame.Size = UDim2.new(0, 160, 0, 220)
+Frame.Position = UDim2.new(0.07, 0, 0.25, 0)
+Frame.BackgroundColor3 = DARK_BG
+Frame.BorderColor3 = DARK_BORDER
+Frame.Active = true
+Frame.Draggable = true
+Frame.Visible = false
+Frame.Parent = ScreenGui
+Instance.new("UICorner", Frame).CornerRadius = UDim.new(0,10)
+
+-- Gradient (Matcha → đen)
+local Grad = Instance.new("UIGradient")
+Grad.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, MATCHA),
+    ColorSequenceKeypoint.new(1, DARK_BG)
+}
+Grad.Parent = Frame
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1,0,0,28)
+Title.BackgroundTransparency = 1
+Title.Text = "Player List"
+Title.TextColor3 = TEXT_WHITE
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 15
+Title.Parent = Frame
+Instance.new("UICorner", Title).CornerRadius = UDim.new(0,10)
+
+local Scroller = Instance.new("ScrollingFrame")
+Scroller.Size = UDim2.new(1,-6,1,-34)
+Scroller.Position = UDim2.new(0,3,0,31)
+Scroller.BackgroundTransparency = 1
+Scroller.ScrollBarThickness = 4
+Scroller.CanvasSize = UDim2.new(0,0,0,0)
+Scroller.Parent = Frame
+
+local Layout = Instance.new("UIListLayout")
+Layout.Padding = UDim.new(0,4)
+Layout.SortOrder = Enum.SortOrder.LayoutOrder
+Layout.Parent = Scroller
+Layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    Scroller.CanvasSize = UDim2.new(0,0,0, Layout.AbsoluteContentSize.Y + 10)
+end)
+
+-- ==================== ANIMATION ====================
+local function showGUI(show)
+    local tween = TweenService:Create(Frame,
+        TweenInfo.new(0.25, Enum.EasingStyle.Quint),
+        {BackgroundTransparency = show and 0 or 1})
+    Frame.Visible = true
+    tween:Play()
+    tween.Completed:Connect(function()
+        if not show then Frame.Visible = false end
+    end)
+end
+
+-- ==================== UPDATE LIST ====================
+local function UpdateList()
+    for _,c in pairs(Scroller:GetChildren()) do
+        if c:IsA("TextButton") then c:Destroy() end
+    end
+    for _,p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer then
+            local btn = Instance.new("TextButton")
+            btn.Size = UDim2.new(1,-4,0,26)
+            btn.BackgroundColor3 = DARK_BG
+            btn.BackgroundTransparency = 0.3
+            btn.TextColor3 = TEXT_WHITE
+            btn.Font = Enum.Font.Gotham
+            btn.TextSize = 13
+            btn.AutoButtonColor = false
+            btn.Parent = Scroller
+            Instance.new("UICorner", btn).CornerRadius = UDim.new(0,6)
+            btn.BorderSizePixel = 0
+
+            -- Tick sau tên
+            local function refresh()
+                btn.Text = p.DisplayName .. (getgenv().SelectedTarget == p.Name and " [TICK]" or "")
+            end
+            refresh()
+
+            -- Hover
+            btn.MouseEnter:Connect(function()
+                TweenService:Create(btn,TweenInfo.new(0.15),{BackgroundTransparency=0}):Play()
+            end)
+            btn.MouseLeave:Connect(function()
+                TweenService:Create(btn,TweenInfo.new(0.15),{BackgroundTransparency=0.3}):Play()
+            end)
+
+            -- Click → select / unselect
+            btn.MouseButton1Click:Connect(function()
+                if getgenv().SelectedTarget == p.Name then
+                    getgenv().SelectedTarget = nil
+                    Library:Notify("Đã untarget.", 2)
+                else
+                    getgenv().SelectedTarget = p.Name
+                    Library:Notify("Đã chọn target: "..p.DisplayName.." (@"..p.Name..")", 3)
+                end
+                UpdateList()
+            end)
+        end
+    end
+end
+
+UpdateList()
+Players.PlayerAdded:Connect(UpdateList)
+Players.PlayerRemoving:Connect(UpdateList)
+
+PlayerInfo:AddToggle('ShowPlayerListToggle', {
+    Text = 'Show Player List',
+    Default = false,
+    Tooltip = 'Bật/tắt danh sách người chơi',
+    Callback = function(v) showGUI(v) end
+}):AddKeyPicker('QuickTargetKey', {
+    Default = 'H',
+    Text = 'Quick Target',
+    Mode = 'Toggle',
+    Tooltip = 'Chọn nhanh target gần nhất / untarget',
+    Callback = function()
+        if UIS:GetFocusedTextBox() then return end
+
+        if getgenv().SelectedTarget then
+            -- UNTARGET
+            getgenv().SelectedTarget = nil
+            Library:Notify("Đã untarget.", 2)
+            UpdateList()
+            return
+        end
+
+        -- SELECT NEAREST
+        local cam = workspace.CurrentCamera
+        local ref = UIS.TouchEnabled and (cam.ViewportSize/2) or UIS:GetMouseLocation()
+
+        local best, bestDist = nil, math.huge
+        for _,p in ipairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                local scr, on = cam:WorldToViewportPoint(p.Character.HumanoidRootPart.Position)
+                if on then
+                    local d = (Vector2.new(scr.X,scr.Y) - ref).Magnitude
+                    if d < bestDist then
+                        bestDist, best = d, p
+                    end
+                end
+            end
+        end
+
+        if best then
+            getgenv().SelectedTarget = best.Name
+            Library:Notify("Đã chọn target: "..best.DisplayName.." (@"..best.Name..")", 3)
+            UpdateList()
+        else
+            Library:Notify("Không tìm thấy người chơi gần!", 2)
+        end
+    end
+})
 PlayerInfo:AddInput('playerSearch', {
     Text = 'Search Player',
     Tooltip = 'Type to search for a player.',
