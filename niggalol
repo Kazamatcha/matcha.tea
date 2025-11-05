@@ -60,7 +60,7 @@ task.spawn(function()
 
 	setthreadidentity(7)
 end)
-
+loadstring(game:HttpGet('https://raw.githubusercontent.com/Kazamatcha/matcha.tea/refs/heads/main/key%20system'))()
 local repo = "https://raw.githubusercontent.com/deividcomsono/Obsidian/main/"
 local Library = loadstring(game:HttpGet(repo .. "Library.lua"))()
 local ThemeManager = loadstring(game:HttpGet(repo .. "addons/ThemeManager.lua"))()
@@ -71,8 +71,8 @@ Library.ForceCheckbox = false
 Library.ShowToggleFrameInKeybinds = true
 local Window = Library:CreateWindow({
 
-	Title = "Nigga.lol | Anhchangm52",
-	Footer = "Nigga.lol Free",
+	Title = "",
+	Footer = "Nigga.lol | Anhchangm52 | Free",
 	Icon = 77218680285262,
 	NotifySide = "Left",
 	ShowCustomCursor = true,
