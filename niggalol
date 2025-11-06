@@ -490,7 +490,7 @@ UserInputService.InputEnded:Connect(function(input)
         isFiring2 = false
     end
 end)
-local FakeSilentAim = Tabs.Main:AddLeftGroupbox('Fake Silent Aim')
+local FakeSilentAim = Tabs.Main:AddLeftGroupbox('Fake Silent Aim for bad executor')
 
 FakeSilentAim:AddToggle('SilentAimToggle', {
     Text = 'Silent Aim',
