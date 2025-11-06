@@ -51,19 +51,19 @@ getgenv().Matcha = {
     },
     ['Camlock'] = {
         ['Enabled'] = true,
-        ['Keybind'] = 'Q',
+        ['Keybind'] = 'C',
         ['Checks'] = {'Wall', 'Knocked', 'Grabbed', 'Vehicle'},
         ['Fov'] = 50,
         ['Show Fov'] = true,
         
         ['Value'] = {
-            ['Snappiness'] = 0.123,
+            ['Snappiness'] = 0.893,
             ['ThirdPerson'] = false,
             ['FirstPerson'] = true, 
         },
     
         ['Hit Location'] = {
-            ['Type'] = 'Closest Part', -- [[ Closest Part or Closest Point ]]
+            ['Type'] = 'Head', -- [[ Closest Part or Closest Point ]]
             ['Parts'] = {'Head', 'UpperTorso', 'HumanoidRootPart', 'LowerTorso', 'LeftHand', 'RightHand', 'LeftLowerArm', 'RightLowerArm', 'LeftUpperArm', 'RightUpperArm', 'LeftFoot', 'LeftLowerLeg',  'LeftUpperLeg', 'RightLowerLeg', 'RightFoot',  'RightUpperLeg'}
         },
     
