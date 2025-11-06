@@ -321,7 +321,7 @@ local function showConsole()
     creditsLabel.Size                   = UDim2.new(1, 0, 0, 20)
     creditsLabel.Position               = UDim2.new(0, -180, 0, 150)
     creditsLabel.Font                   = Enum.Font.Code
-    creditsLabel.Text                   = "Credits to Horror Icey and Reaper"
+    creditsLabel.Text                   = "Credits to anhchangm52"
     creditsLabel.TextColor3             = Color3.fromRGB(180, 180, 180)
     creditsLabel.TextSize               = 12
     creditsLabel.TextXAlignment         = Enum.TextXAlignment.Center
