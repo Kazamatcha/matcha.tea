@@ -8,7 +8,7 @@ getgenv().Matcha = {
         ['Checks'] = {'Wall', 'Knocked', 'Grabbed', 'Vehicle'}, -- [[ Wall, Knocked, Grabbed, Vehicle ]]
         ['Keybind'] = 'Y',
         ['Hit Location'] = {
-            ['Type'] = 'Closest Part', -- [[ Closest Part or Closest Point ]]
+            ['Type'] = 'Closest Point', -- [[ Closest Part or Closest Point ]]
             ['Parts'] = {'Head', 'UpperTorso', 'HumanoidRootPart', 'LowerTorso', 'LeftHand', 'RightHand', 'LeftLowerArm', 'RightLowerArm', 'LeftUpperArm', 'RightUpperArm', 'LeftFoot', 'LeftLowerLeg',  'LeftUpperLeg', 'RightLowerLeg', 'RightFoot',  'RightUpperLeg'} --- you can put more than one parts
         },
         ['Fov'] = {
@@ -53,8 +53,8 @@ getgenv().Matcha = {
         ['Enabled'] = true,
         ['Keybind'] = 'Q',
         ['Checks'] = {'Wall', 'Knocked', 'Grabbed', 'Vehicle'},
-        ['Fov'] = 10,
-        ['Show Fov'] = false,
+        ['Fov'] = 50,
+        ['Show Fov'] = true,
         
         ['Value'] = {
             ['Snappiness'] = 0.123,
@@ -98,7 +98,7 @@ getgenv().Matcha = {
         },
     },
     ['Range'] = {
-        ['Enabled'] = true, --- how far you want them to sense someone
+        ['Enabled'] = true, 
         ['Silent Aim'] = 250,
         ['Camlock'] = 250,
         ['Trigger bot'] = 250
@@ -299,18 +299,14 @@ local function showConsole()
     textLabel2.Position               = UDim2.new(0.007, 0, -0.1, 0)
     textLabel2.Font                   = Enum.Font.Code
     textLabel2.Text                   =[[
-    ,·'´¨;.  '                                   ,.,   '               ,  . .,  °                 ,. - .,               .·¨'`;        ,.·´¨;\                   ,.,   '      
-    ;   ';:\           .·´¨';\                 ;´   '· .,        ;'´    ,   ., _';\'          ,·'´ ,. - ,   ';\          ';   ;'\       ';   ;::\                ;´   '· .,     
-   ;     ';:'\      .'´     ;:'\              .´  .-,    ';\      \:´¨¯:;'   `;::'\:'\     ,·´  .'´\:::::;'   ;:'\ '       ;   ;::'\      ,'   ;::';             .´  .-,    ';\   
-   ;   ,  '·:;  .·´,.´';  ,'::;'             /   /:\:';   ;:'\'      \::::;   ,'::_'\;'    /  ,'´::::'\;:-/   ,' ::;  '     ;  ;::_';,. ,.'   ;:::';°           /   /:\:';   ;:'\' 
-  ;   ;'`.    ¨,.·´::;'  ;:::;            ,'  ,'::::'\';  ;::';          ,'  ,'::;'  ‘    ,'   ;':::::;'´ ';   /\::;' '     .'     ,. -·~-·,   ;:::'; '         ,'  ,'::::'\';  ;::'; 
-  ;  ';::; \*´\:::::;  ,':::;‘        ,.-·'  '·~^*'´¨,  ';::;          ;  ;:::;  °    ;   ;:::::;   '\*'´\::\'  °     ';   ;'\::::::::;  '/::::;       ,.-·'  '·~^*'´¨,  ';::; 
- ';  ,'::;   \::\;:·';  ;:::; '        ':,  ,·:²*´¨¯'`;  ;::';          ;  ;::;'  ‘     ';   ';::::';    '\::'\/.'         ;  ';:;\;::-··;  ;::::;        ':,  ,·:²*´¨¯'`;  ;::'; 
- ;  ';::;     '*´  ;',·':::;‘          ,'  / \::::::::';  ;::';          ;  ;::;'‚        \    '·:;:'_ ,. -·'´.·´\‘       ':,.·´\;'    ;' ,' :::/  '       ,'  / \::::::::';  ;::'; 
- \´¨\::;          \¨\::::;          ,' ,'::::\·²*'´¨¯':,'\:;           ',.'\::;'‚         '\:` ·  .,.  -·:´::::::\'       \:::::\    \·.'::::;         ,' ,'::::\·²*'´¨¯':,'\:;  
-  '\::\;            \:\;·'           \`¨\:::/          \::\'            \::\:;'‚           \:::::::\:::::::;:·'´'          \;:·´     \:\::';          \`¨\:::/          \::\'  
-    '´¨               ¨'              '\::\;'            '\;'  '           \;:'      ‘         `· :;::\;::-·´                          `·\;'            '\::\;'            '\;'  '
-                                       `¨'                                °                                                           '               `¨'                   
+                       888            888              
+                       888            888              
+                       888            888              
+88888b.d88b.   8888b.  888888 .d8888b 88888b.   8888b. 
+888 "888 "88b     "88b 888   d88P"    888 "88b     "88b
+888  888  888 .d888888 888   888      888  888 .d888888
+888  888  888 888  888 Y88b. Y88b.    888  888 888  888
+888  888  888 "Y888888  "Y888 "Y8888P 888  888 "Y888888
 ]]
     textLabel2.TextColor3     = Color3.fromRGB(128, 128, 128)
     textLabel2.TextSize       = 13
@@ -559,235 +555,36 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- GAME-SPECIFIC SETTINGS (truncated for brevity, use your full table)
 local Games = {
-    DaHood = {
-    ID = 2788229376,
-    Details = {
-      Name = "Da Hood",
-      Argument = "UpdateMousePosI2",
-      Remote = "MainEvent",
-      BodyEffects = "K.O"
-    }
-    },
-    DaHoodMacro = {
-    ID = 16033173781,
-    Details = {
-      Name = "Da Hood Macro",
-      Argument = "UpdateMousePosI2",
-      Remote = "MainEvent",
-      BodyEffects = "K.O"
-    }
-    },
-    DaHoodVC = {
-    ID = 7213786345,
-    Details = {
-      Name = "Da Hood VC",
-      Argument = "UpdateMousePosI",
-      Remote = "MainEvent",
-      BodyEffects = "K.O"
-    }
-    },
-    HoodCustoms = {
-    ID = 9825515356,
-    Details = {
-      Name = "Hood Customs",
-      Argument = "MousePosUpdate",
-      Remote = "MainEvent"
-    }
-    },
-    HoodModded = {
-    ID = 5602055394,
-    Details = {
-      Name = "Hood Modded",
-      Argument = "MousePos",
-      Remote = "Bullets"
-    }
-    },
-    DaDownhillPSXbox = {
-    ID = 77369032494150,
-    Details = {
-      Name = "Da Downhill [PS/Xbox]",
-      Argument = "MOUSE",
-      Remote = "MAINEVENT"
-    }
-    },
-    DaBank = {
-    ID = 132023669786646,
-    Details = {
-      Name = "Da Bank",
-      Argument = "MOUSE",
-      Remote = "MAINEVENT"
-    }
-    },
-    DaUphill = {
-    ID = 84366677940861,
-    Details = {
-      Name = "Da Uphill",
-      Argument = "MOUSE",
-      Remote = "MAINEVENT"
-    }
-    },
-    DaHoodBotAimTrainer = {
-    ID = 14487637618,
-    Details = {
-      Name = "Da Hood Bot Aim Trainer",
-      Argument = "MOUSE",
-      Remote = "MAINEVENT"
-    }
-    },
-    HoodAimTrainer1v1 = {
-    ID = 11143225577,
-    Details = {
-      Name = "1v1 Hood Aim Trainer",
-      Argument = "UpdateMousePos",
-      Remote = "MainEvent"
-    }
-    },
-    HoodAim = {
-    ID = 14413712255,
-    Details = {
-      Name = "Hood Aim",
-      Argument = "MOUSE",
-      Remote = "MAINEVENT"
-    }
-    },
-    MoonHood = {
-    ID = 14472848239,
-    Details = {
-      Name = "Moon Hood",
-      Argument = "MoonUpdateMousePos",
-      Remote = "MainEvent"
-    }
-    },
-    DaStrike = {
-    ID = 15186202290,
-    Details = {
-      Name = "Da Strike",
-      Argument = "MOUSE",
-      Remote = "MAINEVENT"
-    }
-    },
-    OGDaHood = {
-    ID = 17319408836,
-    Details = {
-      Name = "OG Da Hood",
-      Argument = "UpdateMousePos",
-      Remote = "MainEvent",
-      BodyEffects = "K.O"
-    }
-    },
-    DahAimTrainner = {
-    ID = 12804651854,
-    Details = {
-      Name = "DahAimTrainner",
-      Argument = "UpdateMousePos",
-      Remote = "MainEvent",
-      BodyEffects = "K.O"
-    }
-    },
-    MekoHood = {
-    ID = 17780567699,
-    Details = {
-      Name = "Meko Hood",
-      Argument = "UpdateMousePos",
-      Remote = "MainEvent",
-      BodyEffects = "K.O"
-    }
-    },
-    DaCraft = {
-    ID = 128258288926907,
-    Details = {
-      Name = "Da Craft",
-      Argument = "UpdateMousePos",
-      Remote = "MainEvent",
-      BodyEffects = "K.O"
-    }
-    },
-    NewHood = {
-    ID = 17809101348,
-    Details = {
-      Name = "New Hood",
-      Argument = "UpdateMousePos",
-      Remote = "MainEvent",
-      BodyEffects = "K.O"
-    }
-    },
-    NewHood2 = {
-    ID = 99991590066512,
-    Details = {
-      Name = "New Hood",
-      Argument = "UpdateMousePos",
-      Remote = "MainEvent",
-      BodyEffects = "K.O"
-    }
-    },
-    MayHood = {
-    ID = 77852114927492,
-    Details = {
-      Name = "may Hood",
-      Argument = "UpdateMousePosI2",
-      Remote = "MainEvent",
-      BodyEffects = "K.O"
-    }
-    },
-    DeeHood = {
-    ID = 102372656720272,
-    Details = {
-      Name = "Dee Hood",
-      Argument = "UpdateMousePosI",
-      Remote = "MainEvent",
-      BodyEffects = "K.O"
-    }
-    },
-    DerHood = {
-    ID = 138293393214382,
-    Details = {
-      Name = "Der Hood",
-      Argument = "DERHOODMOUSEPOS666^",
-      Remote = "MainRemoteEvent",
-      BodyEffects = "K.O"
-    }
-    },
-    ARhood = {
-    ID = 98930372136494,
-    Details = {
-      Name = "AR hood",
-      Argument = "UpdateMousePos",
-      Remote = "MainEvent",
-      BodyEffects = "K.O"
-    }
-    },
-    OGDahood = {
-    ID = 76565633209271,
-    Details = {
-      Name = "OG da hood",
-      Argument = "UpdateMousePos",
-      Remote = "MainEvent",
-      BodyEffects = "K.O"
-    }
-    },
-    DelHoodAim = {
-    ID = 88582222971530,
-    Details = {
-      Name = "Del Hood Aim",
-      Argument = "UpdateMousePos",
-      Remote = "MainEvent",
-      BodyEffects = "K.O"
-    }
-    },
-    DaKitty = {
-    ID = 113357850268933,
-    Details = {
-      Name = "Da kitty",
-      Argument = "UpdateMousePos",
-      Remote = "MainEvent",
-      BodyEffects = "K.O"
-    }
-    }
-    }
+    DaHood = {ID = 2788229376, Details = {Name = "Da Hood", Argument = "UpdateMousePosI2", Remote = "MainEvent", BodyEffects = "K.O"}},
+    DaHoodMacro = {ID = 16033173781, Details = {Name = "Da Hood Macro", Argument = "UpdateMousePosI2", Remote = "MainEvent", BodyEffects = "K.O"}},
+    DaHoodVC = {ID = 7213786345, Details = {Name = "Da Hood VC", Argument = "UpdateMousePosI", Remote = "MainEvent", BodyEffects = "K.O"}},
+    HoodCustoms = {ID = 9825515356, Details = {Name = "Hood Customs", Argument = "MousePosUpdate", Remote = "MainEvent"}},
+    HoodModded = {ID = 5602055394, Details = {Name = "Hood Modded", Argument = "MousePos", Remote = "Bullets"}},
+    DaDownhillPSXbox = {ID = 77369032494150, Details = {Name = "Da Downhill [PS/Xbox]", Argument = "MOUSE", Remote = "MAINEVENT"}},
+    DaBank = {ID = 132023669786646, Details = {Name = "Da Bank", Argument = "MOUSE", Remote = "MAINEVENT"}},
+    DaUphill = {ID = 84366677940861, Details = {Name = "Da Uphill", Argument = "MOUSE", Remote = "MAINEVENT"}},
+    DaHoodBotAimTrainer = {ID = 14487637618, Details = {Name = "Da Hood Bot Aim Trainer", Argument = "MOUSE", Remote = "MAINEVENT"}},
+    HoodAimTrainer1v1 = {ID = 11143225577, Details = {Name = "1v1 Hood Aim Trainer", Argument = "UpdateMousePos", Remote = "MainEvent"}},
+    HoodAim = {ID = 14413712255, Details = {Name = "Hood Aim", Argument = "MOUSE", Remote = "MAINEVENT"}},
+    MoonHood = {ID = 14472848239, Details = {Name = "Moon Hood", Argument = "MoonUpdateMousePos", Remote = "MainEvent"}},
+    DaStrike = {ID = 15186202290, Details = {Name = "Da Strike", Argument = "MOUSE", Remote = "MAINEVENT"}},
+    OGDaHood = {ID = 17319408836, Details = {Name = "OG Da Hood", Argument = "UpdateMousePos", Remote = "MainEvent", BodyEffects = "K.O"}},
+    DahAimTrainner = {ID = 12804651854, Details = {Name = "DahAimTrainner", Argument = "UpdateMousePos", Remote = "MainEvent", BodyEffects = "K.O"}},
+    MekoHood = {ID = 17780567699, Details = {Name = "Meko Hood", Argument = "UpdateMousePos", Remote = "MainEvent", BodyEffects = "K.O"}},
+    DaCraft = {ID = 128258288926907, Details = {Name = "Da Craft", Argument = "UpdateMousePos", Remote = "MainEvent", BodyEffects = "K.O"}},
+    NewHood = {ID = 17809101348, Details = {Name = "New Hood", Argument = "UpdateMousePos", Remote = "MainEvent", BodyEffects = "K.O"}},
+    NewHood2 = {ID = 99991590066512, Details = {Name = "New Hood", Argument = "UpdateMousePos", Remote = "MainEvent", BodyEffects = "K.O"}},
+    MayHood = {ID = 77852114927492, Details = {Name = "may Hood", Argument = "UpdateMousePosI2", Remote = "MainEvent", BodyEffects = "K.O"}},
+    DeeHood = {ID = 102372656720272, Details = {Name = "Dee Hood", Argument = "UpdateMousePosI", Remote = "MainEvent", BodyEffects = "K.O"}},
+    DerHood = {ID = 138293393214382, Details = {Name = "Der Hood", Argument = "DERHOODMOUSEPOS666^", Remote = "MainRemoteEvent", BodyEffects = "K.O"}},
+    ARhood = {ID = 98930372136494, Details = {Name = "AR hood", Argument = "UpdateMousePos", Remote = "MainEvent", BodyEffects = "K.O"}},
+    OGDahood = {ID = 76565633209271, Details = {Name = "OG da hood", Argument = "UpdateMousePos", Remote = "MainEvent", BodyEffects = "K.O"}},
+    DelHoodAim = {ID = 88582222971530, Details = {Name = "Del Hood Aim", Argument = "UpdateMousePos", Remote = "MainEvent", BodyEffects = "K.O"}},
+    DaKitty = {ID = 113357850268933, Details = {Name = "Da kitty", Argument = "UpdateMousePos", Remote = "MainEvent", BodyEffects = "K.O"}}
+}
 
-local gameSettings
+local gameSettings = nil
 for _, gameData in pairs(Games) do
     if gameData.ID == game.PlaceId then
         gameSettings = gameData.Details
@@ -795,19 +592,10 @@ for _, gameData in pairs(Games) do
     end
 end
 
-if not gameSettings then
-    Client:Kick("Unsupported game.")
-    return
-end
-
-local RemoteEventName = gameSettings.Remote or "MainEvent"
-local RemoteArgument  = gameSettings.Argument or "UpdateMousePos"
-local MainEvent       = ReplicatedStorage:FindFirstChild(RemoteEventName)
-if not MainEvent then
-    Client:Kick("Remote not found")
-    return
-end
-
+local RemoteEventName = gameSettings and gameSettings.Remote or nil
+local RemoteArgument  = gameSettings and gameSettings.Argument or nil
+local MainEvent       = RemoteEventName and ReplicatedStorage:FindFirstChild(RemoteEventName)
+local hasMainEvent    = MainEvent ~= nil
 -- UTILITIES
 local function hasCheck(name)
     for _, v in ipairs(SilentAim.Checks or {}) do
@@ -828,32 +616,20 @@ local function WallCheck(pos, ignoreList)
 end
 
 local function CustomChecks(plr)
-    local ch = plr.Character
-    if not ch then return false end
-
-    if hasCheck("Knocked") then
-        local ko = ch:FindFirstChild("BodyEffects")
-        if ko and ko:FindFirstChild("K.O") and ko["K.O"].Value then
-            return false
-        end
-    end
-
-    if hasCheck("Grabbed") then
-        local g = ch:FindFirstChild("Grabbed")
-        if g and g.Value then
-            return false
-        end
-    end
-
-    if hasCheck("Vehicle") then
-        if ch:FindFirstChildOfClass("VehicleSeat") then
-            return false
-        end
-    end
-
-    return true
+local ch = plr.Character or nil
+if not ch then return false end
+if hasCheck("Knocked") then
+    local ko = ch:FindFirstChild("BodyEffects")
+    if ko and ko:FindFirstChild("K.O") and ko["K.O"].Value then return false end
 end
-
+if hasCheck("Grabbed") then
+    if ch:FindFirstChild("Grabbed") and ch.Grabbed.Value then return false end
+end
+if hasCheck("Vehicle") then
+    if ch:FindFirstChildOfClass("VehicleSeat") then return false end
+end
+return true
+end
 -- TARGETING
 local function GetClosest()
     local best, tgt = math.huge, nil
@@ -929,63 +705,67 @@ local function PredictPos(plr)
     return nil
 end
 
--- HOOK MOUSE.Hit
---// KIỂM TRA HỖ TRỢ META HOOK
-local metaSupported = (getrawmetatable and setreadonly and newcclosure)
-
+local metaSupported = (getrawmetatable and setreadonly and newcclosure and hookmetamethod)
 if metaSupported then
     local success, err = pcall(function()
-        if not getgenv().__SilentHooked then
-            getgenv().__SilentHooked = true
+        if getgenv().__SilentHooked then return end
+        getgenv().__SilentHooked = true
 
-            local mt = getrawmetatable(game)
-            if not mt then
-                warn("[SilentAim] ❌ Không thể lấy metatable, dừng hook.")
-                return
+        local Mouse = game.Players.LocalPlayer:GetMouse()
+        local MainEvent = (gameSettings and gameSettings.MainEvent) or nil
+        local hasMainEvent = MainEvent ~= nil
+
+        hookmetamethod(game, "__index", newcclosure(function(self, key)
+            if self ~= Mouse or checkcaller() then return oldIndex(self, key) end
+            if not SilentAim.Enabled then return oldIndex(self, key) end
+
+            local target = GetClosest()
+            if not target then return oldIndex(self, key) end
+
+            local pos = PredictPos(target) or target.Character.HumanoidRootPart.Position
+            local predicted = CFrame.new(pos + (target.Character.HumanoidRootPart.Velocity * (SilentAim.Prediction or 0.135)))
+
+            -- Fire MainEvent nếu có (giữ logic cũ)
+            if hasMainEvent then
+                pcall(function()
+                    MainEvent:FireServer(RemoteArgument or "Update", pos)
+                end)
             end
 
-            local old = mt.__index
-            setreadonly(mt, false)
+            -- Trả về giá trị cho Mouse.Hit / Target / X / Y / UnitRay
+            if key == "Hit" or key == "hit" then
+                return predicted
+            elseif key == "Target" or key == "target" then
+                return target.Character.HumanoidRootPart
+            elseif key == "X" or key == "x" then
+                return predicted.X
+            elseif key == "Y" or key == "y" then
+                return predicted.Y
+            elseif key == "UnitRay" then
+                return Ray.new(self.Origin, (predicted.Position - self.Origin).Unit * 1000)
+            end
 
-            mt.__index = newcclosure(function(self, k)
-                if self == Mouse and k == "Hit" then
-                    if SilentAim and SilentAim.Enabled then
-                        local pl = GetClosest()
-                        if pl then
-                            local pos = PredictPos(pl)
-                            if pos then
-                                pcall(function()
-                                    MainEvent:FireServer(RemoteArgument, pos)
-                                end)
-                                return CFrame.new(pos)
-                            end
-                        end
-                    end
-                end
-                return old(self, k)
-            end)
+            return oldIndex(self, key)
+        end))
 
-            setreadonly(mt, true)
-            print("[SilentAim] ✅ Hook Mouse.Hit thành công.")
-        end
+        print("[SilentAim] ✅ Hook Mouse.Hit/Target success (MainEvent: " .. (hasMainEvent and "Yes" or "No") .. ")")
     end)
 
     if not success then
-        warn("[SilentAim] ❌ Hook Mouse.Hit thất bại:", err)
+        warn("[SilentAim] ❌ Hook failed:", err)
     end
 
-    --// TOGGLE KEYBIND (chỉ load khi meta hook tồn tại)
-    local UserInputService = game:GetService("UserInputService")
-    UserInputService.InputBegan:Connect(function(input, gp)
+    -- TOGGLE KEYBIND
+    local UIS = game:GetService("UserInputService")
+    UIS.InputBegan:Connect(function(i, gp)
         if gp then return end
-        if input.KeyCode == Enum.KeyCode[SilentAim.Keybind] then
+        if i.KeyCode == Enum.KeyCode[SilentAim.Keybind or "V"] then
             SilentAim.Enabled = not SilentAim.Enabled
-            print("[SilentAim] Silent Aim:", SilentAim.Enabled and "Enabled" or "Disabled")
+            print("[SilentAim] Trạng thái:", SilentAim.Enabled and "BẬT" or "TẮT")
         end
     end)
-
 else
-    warn("[SilentAim] ⚠️ Executor không hỗ trợ meta hook -> không load SilentAim.")
+    warn("[SilentAim] ⚠️ Executor not supported meta hook!")
 end
 
 
@@ -1346,9 +1126,17 @@ local function isValidTarget(player)
     return true
 end
 
+local UserInputService = game:GetService("UserInputService")
+local Camera = workspace.CurrentCamera
+local Players = game:GetService("Players")
+
+local isMobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+
 local function getClosestTarget()
     local closestPlayer = nil
     local shortestDistance = FOV
+    local centerPos = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+    local mousePos = isMobile and centerPos or UserInputService:GetMouseLocation()
 
     for _, plr in ipairs(Players:GetPlayers()) do
         if isValidTarget(plr) then
@@ -1357,8 +1145,8 @@ local function getClosestTarget()
                 local part = char:FindFirstChild(partName)
                 if part then
                     local screenPos, onScreen = Camera:WorldToViewportPoint(part.Position)
-                    if onScreen then
-                        local dist = (Vector2.new(screenPos.X, screenPos.Y) - UserInputService:GetMouseLocation()).Magnitude
+                    if onScreen and screenPos.Z > 0 then
+                        local dist = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
                         if dist < shortestDistance then
                             closestPlayer = plr
                             shortestDistance = dist
@@ -1402,7 +1190,7 @@ end)
 
 -- Main Camlock loop
 RunService.RenderStepped:Connect(function()
-    if not Camlock.Enabled then return end
+    if not CamlockEnabled then return end
 
     if FOVCircle then
         FOVCircle.Position = UserInputService:GetMouseLocation()
@@ -1430,6 +1218,4 @@ RunService.RenderStepped:Connect(function()
         end
     end
 end)
-
-
 end)
