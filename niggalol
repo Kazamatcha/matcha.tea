@@ -6240,9 +6240,12 @@ local AnimationSets = {
 
 local function applyCustomAnimations(character)
     if not character then return end
+
     local Animate = character:FindFirstChild("Animate")
     if not Animate then return end
+
     local ClonedAnimate = Animate:Clone()
+
     ClonedAnimate.idle.Animation1.AnimationId = AnimationOptions["Idle1"]
     ClonedAnimate.idle.Animation2.AnimationId = AnimationOptions["Idle2"]
     ClonedAnimate.walk.WalkAnim.AnimationId = AnimationOptions["Walk"]
@@ -6250,16 +6253,18 @@ local function applyCustomAnimations(character)
     ClonedAnimate.jump.JumpAnim.AnimationId = AnimationOptions["Jump"]
     ClonedAnimate.climb.ClimbAnim.AnimationId = AnimationOptions["Climb"]
     ClonedAnimate.fall.FallAnim.AnimationId = AnimationOptions["Fall"]
+
     Animate:Destroy()
     ClonedAnimate.Parent = character
-    Library:Notify("Animations applied successfully!", 2)  -- Notify để debug
 end
+
 LocalPlayer.CharacterAdded:Connect(function(character)
     if KeepOnDeath then
         task.wait(1)
         applyCustomAnimations(character)
     end
 end)
+
 local animationNames = {"Default", "Ninja", "Superhero", "Robot", "Cartoon", "Catwalk", "Zombie", "Mage", "Pirate", "Knight", "Vampire", "Bubbly", "Elder", "Toy"}
 
 LeftGroupBox:AddDropdown("Idle1Dropdown", {
@@ -6275,78 +6280,67 @@ LeftGroupBox:AddDropdown("Idle1Dropdown", {
 
 LeftGroupBox:AddDropdown("Idle2Dropdown", {
     Values = animationNames,
-    Default = 1,  -- Sửa: 1
+    Default = 0,
     Multi = false,
     Text = "Idle2",
     Callback = function(Value)
-        if Value and AnimationSets[Value] then
-            AnimationOptions["Idle2"] = AnimationSets[Value].idle2
-            applyCustomAnimations(LocalPlayer.Character)
-        end
+        AnimationOptions["Idle2"] = AnimationSets[Value].idle2
+        applyCustomAnimations(LocalPlayer.Character)
     end
 })
+
 LeftGroupBox:AddDropdown("WalkDropdown", {
     Values = animationNames,
-    Default = 1,  -- Sửa: 1
+    Default = 0,
     Multi = false,
     Text = "Walk",
     Callback = function(Value)
-        if Value and AnimationSets[Value] then
-            AnimationOptions["Walk"] = AnimationSets[Value].walk
-            applyCustomAnimations(LocalPlayer.Character)
-        end
+        AnimationOptions["Walk"] = AnimationSets[Value].walk
+        applyCustomAnimations(LocalPlayer.Character)
     end
 })
 
 LeftGroupBox:AddDropdown("RunDropdown", {
     Values = animationNames,
-    Default = 1,
+    Default = 0,
     Multi = false,
     Text = "Run",
     Callback = function(Value)
-        if Value and AnimationSets[Value] then
-            AnimationOptions["Run"] = AnimationSets[Value].run
-            applyCustomAnimations(LocalPlayer.Character)
-        end
+        AnimationOptions["Run"] = AnimationSets[Value].run
+        applyCustomAnimations(LocalPlayer.Character)
     end
 })
 
 LeftGroupBox:AddDropdown("JumpDropdown", {
     Values = animationNames,
-    Default = 1,
+    Default = 0,
     Multi = false,
     Text = "Jump",
     Callback = function(Value)
-        if Value and AnimationSets[Value] then
-            AnimationOptions["Jump"] = AnimationSets[Value].run
-            applyCustomAnimations(LocalPlayer.Character)
-        end
+        AnimationOptions["Jump"] = AnimationSets[Value].jump
+        applyCustomAnimations(LocalPlayer.Character)
     end
 })
 
 LeftGroupBox:AddDropdown("ClimbDropdown", {
     Values = animationNames,
-    Default = 1,
+    Default = 0,
     Multi = false,
     Text = "Climb",
     Callback = function(Value)
-        if Value and AnimationSets[Value] then
-            AnimationOptions["Climb"] = AnimationSets[Value].run
-            applyCustomAnimations(LocalPlayer.Character)
-        end
+        AnimationOptions["Climb"] = AnimationSets[Value].climb
+        applyCustomAnimations(LocalPlayer.Character)
     end
 })
 
 LeftGroupBox:AddDropdown("FallDropdown", {
     Values = animationNames,
-    Default = 1,
+    Default = 0,
     Multi = false,
     Text = "Fall",
     Callback = function(Value)
-        if Value and AnimationSets[Value] then
-            AnimationOptions["Fall"] = AnimationSets[Value].run
-            applyCustomAnimations(LocalPlayer.Character)
-        end
+        AnimationOptions["Fall"] = AnimationSets[Value].fall
+        applyCustomAnimations(LocalPlayer.Character)
     end
 })
 
