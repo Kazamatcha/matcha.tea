@@ -4716,11 +4716,9 @@ end)
 
 local Modifications = Tabs.Misc:AddRightGroupbox("Modifications")
 
-local Modifications = Tabs.Misc:AddRightGroupbox('Modifications')
-
 getgenv().Ohio = {
-    Fps = 120,  --// anything above 3 should be good, 10+ if you want to make the most cash.
-    Saver = false,  --// black screen to save usage, shows wallet, timer, broken atms, profit.
+    Fps = 120, 
+    Saver = false, 
 }
 if isDaHood then
 	Modifications:AddButton({
@@ -5239,15 +5237,14 @@ if isDaHood then
 	local AmmoBuyCount = 0
 	
 	local ShopItems = {
-	    "[Taco] - $2",
-	    "[Hamburger] - $5",
+	    "[Taco] - $4",
+	    "[Hamburger] - $11",
 	    "[Revolver] - $1421",
-	    "12 [Revolver Ammo] - $55",
-	    "90 [AUG Ammo] - $87",
 	    "[AUG] - $2131",
 	    "[Rifle] - $1694",
 	    "[LMG] - $4098",
-	    "200 [LMG Ammo] - $328",
+        "[GrenadeLauncher] - $10927",
+        "[Double-Barrel SG] - $1530",
 	}
 	
 	AutoBuy:AddDropdown('Shop_Dropdown', {
@@ -5315,10 +5312,12 @@ if isDaHood then
 	    if not SelectedItem or Debounce then return end
 	
 	    local AmmoMap = {
-	        ["[Revolver] - $1421"] = "12 [Revolver Ammo] - $55",
+	        ["[Revolver] - $1421"] = "12 [Revolver Ammo] - $82",
 	        ["[AUG] - $2131"] = "90 [AUG Ammo] - $87",
 	        ["[LMG] - $4098"] = "200 [LMG Ammo] - $328",
 	        ["[Rifle] - $1694"] = "5 [Rifle Ammo] - $273",
+            ["[GrenadeLauncher] - $10927"] = "12 [GrenadeLauncher Ammo] - $3278",
+	        ["["Double-Barrel SG] - $1530"] = "18 [Double-Barrel SG Ammo] - $66",
 	    }
 	
 	    local AmmoItem = AmmoMap[SelectedItem]
