@@ -14,6 +14,7 @@ local Window = Library:CreateWindow({
 	Icon = 77218680285262,
 	NotifySide = "Left",
 	ShowCustomCursor = true,
+    Compact = true,
 })
 task.wait(1)
 local isDaHood = (game.PlaceId == 2788229376)
