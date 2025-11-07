@@ -9,14 +9,14 @@ local Toggles = Library.Toggles
 Library.ForceCheckbox = false 
 Library.ShowToggleFrameInKeybinds = true
 local Window = Library:CreateWindow({
-
-	Title = "",
+	Title = "Nigga.lol",
 	Footer = "Nigga.lol | Anhchangm52 | Free",
 	Icon = 77218680285262,
 	NotifySide = "Left",
 	ShowCustomCursor = true,
 })
-
+task.wait(1)
+local isDaHood = (game.PlaceId == 2788229376)
 local Tabs = { 
 	Main = Window:AddTab('Main', 'swords'), 
     Character = Window:AddTab('Character', 'user'), 
@@ -39,6 +39,7 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local TextChatService = game:GetService("TextChatService")
 local chatWindow = TextChatService:FindFirstChild("ChatWindowConfiguration")
+local StatsService = game:GetService("Stats")
 local VIM = game:GetService("VirtualInputManager")
 getgenv().whitelist = {}
 local lockedTarget = nil
@@ -55,6 +56,7 @@ local strafeEnabled = false
 local strafeMode = "Orbit"
 local strafeSpeed = 5
 local strafeXOffset = 5
+local strafeyOffset = 0
 local predictMovementEnabled = false
 getgenv().switchWhenDie = false
 local stompTargetEnabled = false
@@ -83,24 +85,32 @@ tracer.Color = Color3.fromRGB(255, 255, 255)
 local desync_setback = Instance.new("Part")
 desync_setback.Name = "Spoofer"
 desync_setback.Parent = workspace
-desync_setback.Size = Vector3.new(2, 2, 1)  -- Kích thước HRP
+desync_setback.Size = Vector3.new(2, 2, 1)
 desync_setback.CanCollide = false
 desync_setback.Anchored = true
 desync_setback.Transparency = 1
-getgenv().visualizeStrafeEnabled = false  -- Biến mới để toggle visualize
-getgenv().visualizeColor = Color3.fromRGB(153, 0, 153)  -- Màu mặc định (tím neon)
-getgenv().CFrameVisualize = game:GetObjects("rbxassetid://9474737816")[1] or Instance.new("Model")
-getgenv().CFrameVisualize.Name = "StrafeVisualize"
-getgenv().CFrameVisualize.Parent = nil  -- Ẩn ban đầu
-for _, v in pairs(getgenv().CFrameVisualize:GetChildren()) do
-    if v:IsA("BasePart") then
-        v.Transparency = v.Name == "HumanoidRootPart" and 1 or 0.7
-        v.Material = Enum.Material.Neon
-        v.Color = getgenv().visualizeColor  -- Sử dụng màu mặc định
-        v.CanCollide = false
-        v.Anchored = false
-    end
-end
+AntiLock = {
+    Enabled = false,
+    Mode = "Custom",
+    Custom = { X = 0, Y = 0, Z = 0 },
+    Up = { Amount = 0 },
+    Down = { Amount = 0 },
+    VelMultiply = { Walk = 0, Jump = 0 },
+    LookVec = { Amount = 0 },
+    Reverse = { Amount = 0, Type = "CFrame" },
+    Confusion = { Amount = 0 },
+    PredBreaker = false
+}
+local CoreGui = game:GetService("CoreGui")
+local TweenService = game:GetService("TweenService")
+desync = {
+    enabled = false,
+    mode = "Void",
+    teleportPosition = Vector3.new(0, 0, 0),
+    old_position = nil,
+    voidSpamActive = false,
+    toggleEnabled = false
+}
 local function getMainRemote()
     if ReplicatedStorage:FindFirstChild("MainEvent") then
         return ReplicatedStorage.MainEvent
@@ -356,13 +366,13 @@ Target:AddToggle("killsay", {
         killSayEnabled = Value
     end
 })
-maddieplsnomad = false
+vhuyplsnomad = false
 
 TargetingGroup:AddToggle("ViewTarget", {
     Text = "spectate",
     Default = false,
     Callback = function(Value)
-        maddieplsnomad = Value
+        vhuyplsnomad = Value
         if not Value then
             ViewTargetEnabled = false
             workspace.CurrentCamera.CameraSubject = LocalPlayer.Character:FindFirstChild("Humanoid")
@@ -374,7 +384,7 @@ TargetingGroup:AddToggle("ViewTarget", {
     Text = "spectate",
     Mode = "Toggle",
     Callback = function()
-        if not maddieplsnomad or UserInputService:GetFocusedTextBox() then return end
+        if not vhuyplsnomad or UserInputService:GetFocusedTextBox() then return end
         ViewTargetEnabled = not ViewTargetEnabled
         if ViewTargetEnabled and lockedTarget then
             workspace.CurrentCamera.CameraSubject = lockedTarget.Character
@@ -572,7 +582,7 @@ Target:AddToggle("StrafeToggle", {
                 BodyVelocity:Destroy()
                 BodyVelocity = nil
             end
-            if oldPosition and not getgenv().strafeSpooferEnabled then
+            if oldPosition then
                 LocalPlayer.Character.HumanoidRootPart.CFrame = oldPosition
                 oldPosition = nil
             end
@@ -596,7 +606,7 @@ Target:AddToggle("StrafeToggle", {
                 BodyVelocity:Destroy()
                 BodyVelocity = nil
             end
-            if oldPosition and not getgenv().strafeSpooferEnabled then
+            if oldPosition then
                 LocalPlayer.Character.HumanoidRootPart.CFrame = oldPosition
                 oldPosition = nil
             end
@@ -604,36 +614,13 @@ Target:AddToggle("StrafeToggle", {
         end
     end
 })
-Target:AddToggle("StrafeSpooferToggle", {
-    Text = "Strafe Spoofer",
+Target:AddToggle("SpectateStrafe", {
+    Text = "Spectate Strafe",
     Default = false,
     Callback = function(Value)
-        getgenv().strafeSpooferEnabled = Value
+        spectateStrafeEnabled = Value
         if not Value then
             workspace.CurrentCamera.CameraSubject = LocalPlayer.Character:FindFirstChild("Humanoid")
-        end
-    end
-})
-
-Target:AddToggle("VisualizeStrafeToggle", {
-    Text = "Visualize",
-    Default = false,
-    Callback = function(Value)
-        getgenv().visualizeStrafeEnabled = Value
-        if Value then
-            getgenv().CFrameVisualize.Parent = workspace  -- Hiện visualize
-        else
-            getgenv().CFrameVisualize.Parent = nil  -- Ẩn visualize
-        end
-    end
-}):AddColorPicker('VisualizeColorPicker', {
-    Default = getgenv().visualizeColor,
-    Callback = function(color)
-        getgenv().visualizeColor = color
-        for _, v in pairs(getgenv().CFrameVisualize:GetChildren()) do
-            if v:IsA("BasePart") then
-                v.Color = color  
-            end
         end
     end
 })
@@ -658,11 +645,22 @@ Target:AddSlider("StrafeSpeed", {
     end
 })
 
+Target:AddSlider("StrafeYOffset", {
+    Text = "Y offset",
+    Default = 0,
+    Min = 1,
+    Max = 100,
+    Rounding = 1,
+    Callback = function(Value)
+        strafeyOffset = Value
+    end
+})
+
 Target:AddSlider("StrafeXOffset", {
-    Text = "z offset",
+    Text = "x offset",
     Default = 5,
     Min = 1,
-    Max = 20,
+    Max = 100,
     Rounding = 1,
     Callback = function(Value)
         strafeXOffset = Value
@@ -890,27 +888,7 @@ GunMods:AddSlider('hsvolume', {
 RunService.RenderStepped:Connect(function()
     checkAmmoAndBuy()
     
-    if lockedTarget and lockedTarget.Character then
-        local bodyEffects = lockedTarget.Character:FindFirstChild("BodyEffects")
-        local isSDeath = bodyEffects and bodyEffects:FindFirstChild("SDeath") and bodyEffects["SDeath"].Value
-        
-        if not getgenv().lastSDeath[lockedTarget.Name] then
-            getgenv().lastSDeath[lockedTarget.Name] = false
-        end
-        
-        if killSayEnabled and isSDeath and not getgenv().lastSDeath[lockedTarget.Name] then
-            local randomMessage = killSayMessages[math.random(1, #killSayMessages)]
-            local textChannels = TextChatService:FindFirstChild("TextChannels")
-            if textChannels then
-                local generalChannel = textChannels:FindFirstChild("RBXGeneral")
-                if generalChannel then
-                    generalChannel:SendAsync(randomMessage)
-                end
-            end
-        end
-        
-        getgenv().lastSDeath[lockedTarget.Name] = isSDeath
-        
+    if lockedTarget and lockedTarget.Character then 
         local targetPart = lockedTarget.Character:FindFirstChild(targetHitPart)
         local bodyEffects = lockedTarget.Character:FindFirstChild("BodyEffects")
         local isKO = bodyEffects and bodyEffects:FindFirstChild("K.O") and bodyEffects["K.O"].Value
@@ -937,7 +915,7 @@ RunService.RenderStepped:Connect(function()
             workspace.CurrentCamera.CameraSubject = lockedTarget.Character:FindFirstChild("Head")
         end
         
-        if strafeEnabled and targetPart then
+        if strafeEnabled and targetPart and not isGrabbed then
             local targetRoot = lockedTarget.Character:FindFirstChild("HumanoidRootPart")
             local targetPosition = targetRoot.Position
 
@@ -946,13 +924,11 @@ RunService.RenderStepped:Connect(function()
             end
 
             local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-            if not root then return end
-            local SavedCFrame = root.CFrame
-            local FakeCFrame
+            local pos = root.CFrame
             if strafeMode == "Orbit" then
                 local angle = tick() * strafeSpeed
-                local offset = Vector3.new(math.cos(angle) * strafeXOffset, -0.1, math.sin(angle) * strafeXOffset)
-                FakeCFrame = CFrame.new(targetPosition + offset, targetPosition)
+                local offset = Vector3.new(math.cos(angle) * strafeXOffset, strafeXOffset, math.sin(angle) * strafeXOffset)
+                pos = CFrame.new(targetPosition + offset, targetPosition)
             elseif strafeMode == "Random" then
                 local offset = Vector3.new(math.random(-20, 20), math.random(-10, 10), math.random(-20, 20))
                 local randomrotation = CFrame.Angles(
@@ -960,29 +936,41 @@ RunService.RenderStepped:Connect(function()
                     math.rad(math.random(0, 360)),
                     math.rad(math.random(0, 360))
                 )
-                FakeCFrame = CFrame.new(targetPosition + offset) * randomrotation
+                pos = CFrame.new(targetPosition + offset) * randomrotation
             end
-
-			if getgenv().visualizeStrafeEnabled then
-			    getgenv().CFrameVisualize.Parent = workspace  -- Đảm bảo hiện nếu bật
-			    getgenv().CFrameVisualize:SetPrimaryPartCFrame(SavedCFrame)
-			end
-
-			if getgenv().strafeSpooferEnabled then
-				root.CFrame = FakeCFrame
-				workspace.CurrentCamera.CameraSubject = desync_setback
-				RunService.RenderStepped:Wait()
-				desync_setback.CFrame = SavedCFrame * CFrame.new(0, rootPart.Size.Y / 2 + 0.5, 0)
-				root.CFrame = SavedCFrame
-			else
-				if not oldPosition then
-					oldPosition = root.CFrame
-				end
-				root.CFrame = FakeCFrame
+			if root then
+			    root.CFrame = pos
 			end
         else
-            workspace.CurrentCamera.CameraSubject = LocalPlayer.Character:FindFirstChild("Humanoid")
+			if oldPosition then
+				local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+				if root then
+					root.CFrame = oldPosition
+				end
+				oldPosition = nil
+				workspace.CurrentCamera.CameraSubject = LocalPlayer.Character:FindFirstChild("Humanoid")
+			end
         end
+
+        local bodyEffects = lockedTarget.Character:FindFirstChild("BodyEffects")
+        local isSDeath = bodyEffects and bodyEffects:FindFirstChild("SDeath") and bodyEffects["SDeath"].Value
+        
+        if not getgenv().lastSDeath[lockedTarget.Name] then
+            getgenv().lastSDeath[lockedTarget.Name] = false
+        end
+        
+        if killSayEnabled and isSDeath and not getgenv().lastSDeath[lockedTarget.Name] then
+            local randomMessage = killSayMessages[math.random(1, #killSayMessages)]
+            local textChannels = TextChatService:FindFirstChild("TextChannels")
+            if textChannels then
+                local generalChannel = textChannels:FindFirstChild("RBXGeneral")
+                if generalChannel then
+                    generalChannel:SendAsync(randomMessage)
+                end
+            end
+        end
+        
+        getgenv().lastSDeath[lockedTarget.Name] = isSDeath
         
         -- Hitsound check
         local humanoid = lockedTarget.Character:FindFirstChild("Humanoid")
@@ -1046,8 +1034,7 @@ RunService.RenderStepped:Connect(function()
             end
         end
     else
-        -- Không có target -> về chỗ cũ
-        if oldPosition and not getgenv().strafeSpooferEnabled then
+        if oldPosition then
             local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
             if root then
                 root.CFrame = oldPosition
@@ -1056,14 +1043,13 @@ RunService.RenderStepped:Connect(function()
         end
         workspace.CurrentCamera.CameraSubject = LocalPlayer.Character:FindFirstChild("Humanoid")
         tracer.Visible = false
-        getgenv().CFrameVisualize.Parent = nil  -- Ẩn visualize
         if getgenv().switchWhenDie and StickyAimEnabled and lockedTarget and lockedTarget.Character then
             local bodyEffects = lockedTarget.Character:FindFirstChild("BodyEffects")
             local isKO = bodyEffects and bodyEffects:FindFirstChild("K.O") and bodyEffects["K.O"].Value
             local isSDeath = bodyEffects and bodyEffects:FindFirstChild("SDeath") and bodyEffects["SDeath"].Value
             if (isKO or isSDeath) and lockedTarget.Character:FindFirstChild("Humanoid").Health <= 0 then
                 lockedTarget = nil
-                selectClosestTarget() -- Chọn target mới ngay lập tức
+                selectClosestTarget()
             end
         end
     end
@@ -1200,8 +1186,6 @@ local hitboxColor = Color3.new(0, 1, 1)
 local visualizeHitbox = false
 local hitboxExpanderEnabled = false
 local Client = game.Players.LocalPlayer
-local RunService = game:GetService("RunService")
-local Players = game:GetService("Players")
 
 HBE:AddToggle('HitboxExpanderToggle', {
     Text = 'Hitbox Expander',
@@ -1926,25 +1910,37 @@ task.spawn(function()
     end
 end)
 
--- Configuration
 getgenv().espEnabled = false
-getgenv().espColor = Color3.new(1, 1, 1)
+getgenv().espColor = Color3.fromRGB(255, 255, 255)
 getgenv().nameESPEnabled = false
-getgenv().nameColor = Color3.new(1, 1, 1) -- New: Name ESP color
+getgenv().nameColor = Color3.fromRGB(255, 255, 255)
 getgenv().nameDisplayMode = "DisplayName"
 getgenv().nameTextSize = 14
 getgenv().studsESPEnabled = false
-getgenv().distanceColor = Color3.new(1, 1, 1)
+getgenv().distanceColor = Color3.fromRGB(255, 255, 255)
 getgenv().distanceTextSize = 14
 getgenv().healthBarESP = false
-getgenv().healthBarColor = Color3.new(0, 1, 0) -- New: Health bar color
+getgenv().healthBarColor = Color3.fromRGB(0, 255, 0)
+getgenv().healthBased = false  -- New: Health-based color toggle
+getgenv().healthTextEnabled = false  -- New: Health text toggle
+getgenv().healthTextColor = Color3.fromRGB(255, 255, 255)  -- New: Health text color
 getgenv().weaponESPEnabled = false
-getgenv().weaponColor = Color3.new(1, 1, 1) -- New: Weapon ESP color
+getgenv().weaponColor = Color3.fromRGB(255, 255, 255)
 getgenv().armorBarESP = false
-getgenv().armorBarColor = Color3.new(0, 0, 1) -- New: Armor bar color
+getgenv().armorBarColor = Color3.fromRGB(0, 0, 255)
 getgenv().outlineEnabled = false
+getgenv().outlineColor = Color3.fromRGB(0, 0, 0)  -- New: Outline color (for thickness fix)
 getgenv().penisESPEnabled = false
-getgenv().penisColor = Color3.new(1, 0, 0) -- New: Penis ESP color
+getgenv().penisColor = Color3.fromRGB(255, 0, 0)
+getgenv().ESPSkeleton = false  -- New: Skeleton toggle
+getgenv().ESPSkeletonColor = Color3.fromRGB(255, 255, 255)  -- New: Skeleton color
+getgenv().headDotEnabled = false  -- New: Head dot toggle
+getgenv().headDotColor = Color3.fromRGB(255, 0, 0)  -- New: Head dot color
+getgenv().headDotSize = 5  -- New: Head dot size
+getgenv().tracerEnabled = false  -- New: Tracer toggle
+getgenv().tracerColor = Color3.fromRGB(255, 255, 255)  -- New: Tracer color
+getgenv().ESPTracerType = "Cursor"  -- New: Tracer type
+getgenv().espTransparency = 1  -- Transparency (add slider if needed)
 
 -- Font mapping
 local fontMap = {
@@ -1961,7 +1957,13 @@ local Camera = workspace.CurrentCamera
 local function DestroyESP(player)
     if ESPObjects[player] then
         for _, obj in pairs(ESPObjects[player]) do
-            obj:Remove()
+            if typeof(obj) == "table" then
+                for _, subObj in pairs(obj) do
+                    subObj:Remove()
+                end
+            else
+                obj:Remove()
+            end
         end
         ESPObjects[player] = nil
     end
@@ -1970,82 +1972,119 @@ end
 -- Function to create ESP for a player
 local function CreateESP(player)
     DestroyESP(player)
-
+    
     local box = Drawing.new("Square")
     box.Thickness = 1
     box.Filled = false
     box.Color = getgenv().espColor
     box.Visible = false
     box.ZIndex = 1
-
+    
     local boxOutline = Drawing.new("Square")
     boxOutline.Thickness = 3
     boxOutline.Filled = false
-    boxOutline.Color = Color3.new(0, 0, 0)
+    boxOutline.Color = getgenv().outlineColor
     boxOutline.Visible = false
     boxOutline.ZIndex = 0
-
+    
     local username = Drawing.new("Text")
     username.Size = getgenv().nameTextSize
     username.Center = true
     username.Color = getgenv().nameColor
     username.Visible = false
     username.Font = fontMap["SourceSans"]
-    username.Outline = getgenv().outlineEnabled
-    username.OutlineColor = Color3.new(0, 0, 0)
-
+    username.Outline = true
+    username.OutlineColor = getgenv().outlineColor
+    
     local distance = Drawing.new("Text")
     distance.Size = getgenv().distanceTextSize
     distance.Center = true
     distance.Color = getgenv().distanceColor
     distance.Visible = false
     distance.Font = fontMap["SourceSans"]
-    distance.Outline = getgenv().outlineEnabled
-    distance.OutlineColor = Color3.new(0, 0, 0)
-
+    distance.Outline = true
+    distance.OutlineColor = getgenv().outlineColor
+    
     local healthBar = Drawing.new("Square")
     healthBar.Thickness = 1
     healthBar.Filled = true
     healthBar.Color = getgenv().healthBarColor
     healthBar.Visible = false
     healthBar.ZIndex = 1
-
+    
     local healthBarOutline = Drawing.new("Square")
     healthBarOutline.Thickness = 3
     healthBarOutline.Filled = false
-    healthBarOutline.Color = Color3.new(0, 0, 0)
+    healthBarOutline.Color = getgenv().outlineColor
     healthBarOutline.Visible = false
     healthBarOutline.ZIndex = 0
-
+    
+    local healthText = Drawing.new("Text")  -- New: Health text
+    healthText.Size = 12
+    healthText.Center = true
+    healthText.Color = getgenv().healthTextColor
+    healthText.Visible = false
+    healthText.Font = fontMap["SourceSans"]
+    healthText.Outline = true
+    healthText.OutlineColor = getgenv().outlineColor
+    
     local weapon = Drawing.new("Text")
     weapon.Size = getgenv().nameTextSize
     weapon.Center = true
     weapon.Color = getgenv().weaponColor
     weapon.Visible = false
     weapon.Font = fontMap["SourceSans"]
-    weapon.Outline = getgenv().outlineEnabled
-    weapon.OutlineColor = Color3.new(0, 0, 0)
-
+    weapon.Outline = true
+    weapon.OutlineColor = getgenv().outlineColor
+    
     local armorBar = Drawing.new("Square")
     armorBar.Thickness = 1
     armorBar.Filled = true
     armorBar.Color = getgenv().armorBarColor
     armorBar.Visible = false
     armorBar.ZIndex = 1
-
+    
     local armorBarOutline = Drawing.new("Square")
     armorBarOutline.Thickness = 3
     armorBarOutline.Filled = false
-    armorBarOutline.Color = Color3.new(0, 0, 0)
+    armorBarOutline.Color = getgenv().outlineColor
     armorBarOutline.Visible = false
     armorBarOutline.ZIndex = 0
-
+    
     local penisLine = Drawing.new("Line")
     penisLine.Thickness = 2
     penisLine.Color = getgenv().penisColor
     penisLine.Visible = false
     penisLine.ZIndex = 1
-
+    
+    local skeletonLines = {}  -- New: Skeleton lines
+    for i = 1, 14 do
+        local line = Drawing.new("Line")
+        line.Thickness = 1
+        line.Color = getgenv().ESPSkeletonColor
+        line.Visible = false
+        skeletonLines[i] = line
+    end
+    
+    local headDot = Drawing.new("Circle") 
+    headDot.Filled = false
+    headDot.Radius = getgenv().headDotSize
+    headDot.Color = getgenv().headDotColor
+    headDot.Visible = false
+    headDot.ZIndex = 2
+    
+    local tracer = Drawing.new("Line")  -- New: Tracer
+    tracer.Thickness = 1
+    tracer.Color = getgenv().tracerColor
+    tracer.Visible = false
+    tracer.ZIndex = 1
+    
+    local tracerOutline = Drawing.new("Line")  -- New: Tracer outline
+    tracerOutline.Thickness = 3
+    tracerOutline.Color = getgenv().outlineColor
+    tracerOutline.Visible = false
+    tracerOutline.ZIndex = 0
+    
     ESPObjects[player] = {
         Box = box,
         BoxOutline = boxOutline,
@@ -2053,10 +2092,15 @@ local function CreateESP(player)
         Distance = distance,
         HealthBar = healthBar,
         HealthBarOutline = healthBarOutline,
+        HealthText = healthText,  -- New
         Weapon = weapon,
         ArmorBar = armorBar,
         ArmorBarOutline = armorBarOutline,
-        PenisLine = penisLine
+        PenisLine = penisLine,
+        SkeletonLines = skeletonLines,  -- New
+        HeadDot = headDot,  -- New
+        Tracer = tracer,  -- New
+        TracerOutline = tracerOutline  -- New
     }
 end
 
@@ -2067,27 +2111,29 @@ local function UpdateESP()
         if character and character:FindFirstChild("HumanoidRootPart") and player ~= LocalPlayer and getgenv().espEnabled then
             local rootPart = character.HumanoidRootPart
             local humanoid = character:FindFirstChildOfClass("Humanoid")
-
             if humanoid and humanoid.Health > 0 then
                 local rootPosition, onScreen = Camera:WorldToViewportPoint(rootPart.Position)
-                local headPosition = Camera:WorldToViewportPoint(rootPart.Position + Vector3.new(0, 3, 0))
+                local headPart = character:FindFirstChild("Head")
+                local headPosition = headPart and Camera:WorldToViewportPoint(headPart.Position) or rootPosition
                 local footPosition = Camera:WorldToViewportPoint(rootPart.Position - Vector3.new(0, 3, 0))
-
                 if onScreen then
                     local boxHeight = math.abs(headPosition.Y - footPosition.Y)
                     local boxWidth = boxHeight / 2
-
+                    
                     -- Box ESP
                     objects.Box.Position = Vector2.new(rootPosition.X - boxWidth / 2, headPosition.Y)
                     objects.Box.Size = Vector2.new(boxWidth, boxHeight)
                     objects.Box.Color = getgenv().espColor
+                    objects.Box.Transparency = getgenv().espTransparency
                     objects.Box.Visible = true
-
+                    
                     -- Box Outline
                     objects.BoxOutline.Position = Vector2.new(rootPosition.X - boxWidth / 2, headPosition.Y)
                     objects.BoxOutline.Size = Vector2.new(boxWidth, boxHeight)
+                    objects.BoxOutline.Color = getgenv().outlineColor
+                    objects.BoxOutline.Transparency = getgenv().espTransparency
                     objects.BoxOutline.Visible = getgenv().outlineEnabled
-
+                    
                     -- Name ESP (Above the box)
                     if getgenv().nameESPEnabled then
                         local displayName
@@ -2100,18 +2146,18 @@ local function UpdateESP()
                         elseif getgenv().nameDisplayMode == "Username (DisplayName) [UserID]" then
                             displayName = player.Name .. " (" .. player.DisplayName .. ") [" .. player.UserId .. "]"
                         end
-
-                        objects.Username.Position = Vector2.new(rootPosition.X, headPosition.Y - 15) -- Adjusted position
+                        objects.Username.Position = Vector2.new(rootPosition.X, headPosition.Y - 15)
                         objects.Username.Text = displayName
                         objects.Username.Size = getgenv().nameTextSize
                         objects.Username.Font = fontMap["SourceSans"]
-                        objects.Username.Visible = true
                         objects.Username.Color = getgenv().nameColor
-                        objects.Username.Outline = getgenv().outlineEnabled
+                        objects.Username.Transparency = getgenv().espTransparency
+                        objects.Username.Visible = true
+                        objects.Username.OutlineColor = getgenv().outlineColor
                     else
                         objects.Username.Visible = false
                     end
-
+                    
                     -- Distance ESP (Below the box)
                     if getgenv().studsESPEnabled then
                         local distanceText = math.floor((LocalPlayer.Character.HumanoidRootPart.Position - rootPart.Position).Magnitude) .. " studs"
@@ -2119,49 +2165,70 @@ local function UpdateESP()
                         objects.Distance.Text = distanceText
                         objects.Distance.Size = getgenv().distanceTextSize
                         objects.Distance.Font = fontMap["SourceSans"]
-                        objects.Distance.Visible = true
                         objects.Distance.Color = getgenv().distanceColor
-                        objects.Distance.Outline = getgenv().outlineEnabled
+                        objects.Distance.Transparency = getgenv().espTransparency
+                        objects.Distance.Visible = true
+                        objects.Distance.OutlineColor = getgenv().outlineColor
                     else
                         objects.Distance.Visible = false
                     end
-
+                    
                     -- Health Bar ESP
-                    if getgenv().healthBarESP then
+                    if getgenv().healthBarESP and humanoid then
                         local healthRatio = humanoid.Health / humanoid.MaxHealth
                         local barHeight = boxHeight * healthRatio
-                        objects.HealthBar.Position = Vector2.new(rootPosition.X - boxWidth / 2 - 6, headPosition.Y + (boxHeight - barHeight))
+                        local barPositionY = headPosition.Y + (boxHeight - barHeight)
+                        
+                        -- Health Bar (inline/fill)
+                        objects.HealthBar.Position = Vector2.new(rootPosition.X - boxWidth / 2 - 6, barPositionY)
                         objects.HealthBar.Size = Vector2.new(3, barHeight)
-                        objects.HealthBar.Color = getgenv().healthBarColor
+                        objects.HealthBar.Color = getgenv().healthBased and Color3.new(1 - healthRatio, healthRatio, 0) or getgenv().healthBarColor
+                        objects.HealthBar.Transparency = getgenv().espTransparency
                         objects.HealthBar.Visible = true
-
+                        
                         -- Health Bar Outline
-                        objects.HealthBarOutline.Position = Vector2.new(rootPosition.X - boxWidth / 2 - 6, headPosition.Y + (boxHeight - barHeight))
-                        objects.HealthBarOutline.Size = Vector2.new(3, barHeight)
+                        objects.HealthBarOutline.Position = Vector2.new(rootPosition.X - boxWidth / 2 - 6, headPosition.Y)
+                        objects.HealthBarOutline.Size = Vector2.new(3, boxHeight)
+                        objects.HealthBarOutline.Color = getgenv().outlineColor
+                        objects.HealthBarOutline.Transparency = getgenv().espTransparency
                         objects.HealthBarOutline.Visible = getgenv().outlineEnabled
+                        
+                        -- Health Text
+                        if getgenv().healthTextEnabled then
+                            objects.HealthText.Text = tostring(math.floor(humanoid.Health))
+                            objects.HealthText.Position = Vector2.new(rootPosition.X - boxWidth / 2 - 6 - objects.HealthText.TextBounds.X / 2, barPositionY - objects.HealthText.Size / 2)
+                            objects.HealthText.Color = getgenv().healthTextColor
+                            objects.HealthText.Transparency = getgenv().espTransparency
+                            objects.HealthText.Visible = true
+                            objects.HealthText.OutlineColor = getgenv().outlineColor
+                        else
+                            objects.HealthText.Visible = false
+                        end
                     else
                         objects.HealthBar.Visible = false
                         objects.HealthBarOutline.Visible = false
+                        objects.HealthText.Visible = false
                     end
-
+                    
                     -- Weapon ESP
                     if getgenv().weaponESPEnabled then
                         local tool = character:FindFirstChildOfClass("Tool")
                         if tool then
                             objects.Weapon.Position = Vector2.new(rootPosition.X, footPosition.Y + 20)
-                            objects.Weapon.Text = "" .. tool.Name .. ""
+                            objects.Weapon.Text = tool.Name
                             objects.Weapon.Size = getgenv().nameTextSize
                             objects.Weapon.Font = fontMap["SourceSans"]
-                            objects.Weapon.Visible = true
                             objects.Weapon.Color = getgenv().weaponColor
-                            objects.Weapon.Outline = getgenv().outlineEnabled
+                            objects.Weapon.Transparency = getgenv().espTransparency
+                            objects.Weapon.Visible = true
+                            objects.Weapon.OutlineColor = getgenv().outlineColor
                         else
                             objects.Weapon.Visible = false
                         end
                     else
                         objects.Weapon.Visible = false
                     end
-
+                    
                     -- Armor Bar ESP
                     if getgenv().armorBarESP then
                         local dataFolder = player:FindFirstChild("DataFolder")
@@ -2170,16 +2237,20 @@ local function UpdateESP()
                             if information then
                                 local armorSave = information:FindFirstChild("ArmorSave")
                                 if armorSave then
-                                    local armorRatio = armorSave.Value / 130 -- Assuming max armor is 100
+                                    local armorRatio = armorSave.Value / 130  -- Adjust max if needed
                                     local armorHeight = boxHeight * armorRatio
-                                    objects.ArmorBar.Position = Vector2.new(rootPosition.X + boxWidth / 2 + 3, headPosition.Y + (boxHeight - armorHeight))
+                                    local armorPositionY = headPosition.Y + (boxHeight - armorHeight)
+                                    
+                                    objects.ArmorBar.Position = Vector2.new(rootPosition.X + boxWidth / 2 + 3, armorPositionY)
                                     objects.ArmorBar.Size = Vector2.new(3, armorHeight)
                                     objects.ArmorBar.Color = getgenv().armorBarColor
+                                    objects.ArmorBar.Transparency = getgenv().espTransparency
                                     objects.ArmorBar.Visible = true
-
-                                    -- Armor Bar Outline
-                                    objects.ArmorBarOutline.Position = Vector2.new(rootPosition.X + boxWidth / 2 + 3, headPosition.Y + (boxHeight - armorHeight))
-                                    objects.ArmorBarOutline.Size = Vector2.new(3, armorHeight)
+                                    
+                                    objects.ArmorBarOutline.Position = Vector2.new(rootPosition.X + boxWidth / 2 + 3, headPosition.Y)
+                                    objects.ArmorBarOutline.Size = Vector2.new(3, boxHeight)
+                                    objects.ArmorBarOutline.Color = getgenv().outlineColor
+                                    objects.ArmorBarOutline.Transparency = getgenv().espTransparency
                                     objects.ArmorBarOutline.Visible = getgenv().outlineEnabled
                                 else
                                     objects.ArmorBar.Visible = false
@@ -2197,59 +2268,168 @@ local function UpdateESP()
                         objects.ArmorBar.Visible = false
                         objects.ArmorBarOutline.Visible = false
                     end
-
+                    
                     -- Penis ESP
                     if getgenv().penisESPEnabled then
-                        local pelvis = character:FindFirstChild("LowerTorso") or character:FindFirstChild("Torso")
+                        local pelvis = character:FindFirstChild("Head")
                         if pelvis then
-                            local pelvisPosition = Camera:WorldToViewportPoint(pelvis.Position)
+                            local pelvisPosition, pelvisOnScreen = Camera:WorldToViewportPoint(pelvis.Position)
                             local lookVector = rootPart.CFrame.LookVector
-                            local penisEndPosition = Camera:WorldToViewportPoint(pelvis.Position + lookVector * 2) -- Adjust length as needed
-
-                            objects.PenisLine.From = Vector2.new(pelvisPosition.X, pelvisPosition.Y)
-                            objects.PenisLine.To = Vector2.new(penisEndPosition.X, penisEndPosition.Y)
-                            objects.PenisLine.Color = getgenv().penisColor
-                            objects.PenisLine.Visible = true
+                            local penisEndPosition, penisEndOnScreen = Camera:WorldToViewportPoint(pelvis.Position + lookVector * 2)
+                            if pelvisOnScreen and penisEndOnScreen then
+                                objects.PenisLine.From = Vector2.new(pelvisPosition.X, pelvisPosition.Y)
+                                objects.PenisLine.To = Vector2.new(penisEndPosition.X, penisEndPosition.Y)
+                                objects.PenisLine.Color = getgenv().penisColor
+                                objects.PenisLine.Transparency = getgenv().espTransparency
+                                objects.PenisLine.Visible = true
+                            else
+                                objects.PenisLine.Visible = false
+                            end
                         else
                             objects.PenisLine.Visible = false
                         end
                     else
                         objects.PenisLine.Visible = false
                     end
+                    
+                    -- Skeleton ESP (New)
+                    if getgenv().ESPSkeleton then
+                        local parts = {
+                            head = character:FindFirstChild("Head"),
+                            upper_torso = character:FindFirstChild("UpperTorso"),
+                            lower_torso = character:FindFirstChild("LowerTorso"),
+                            left_upper_arm = character:FindFirstChild("LeftUpperArm"),
+                            left_lower_arm = character:FindFirstChild("LeftLowerArm"),
+                            left_hand = character:FindFirstChild("LeftHand"),
+                            right_upper_arm = character:FindFirstChild("RightUpperArm"),
+                            right_lower_arm = character:FindFirstChild("RightLowerArm"),
+                            right_hand = character:FindFirstChild("RightHand"),
+                            left_upper_leg = character:FindFirstChild("LeftUpperLeg"),
+                            left_lower_leg = character:FindFirstChild("LeftLowerLeg"),
+                            left_foot = character:FindFirstChild("LeftFoot"),
+                            right_upper_leg = character:FindFirstChild("RightUpperLeg"),
+                            right_lower_leg = character:FindFirstChild("RightLowerLeg"),
+                            right_foot = character:FindFirstChild("RightFoot")
+                        }
+                        if parts.head and parts.upper_torso and parts.lower_torso and parts.left_upper_arm and parts.left_lower_arm and parts.left_hand and parts.right_upper_arm and parts.right_lower_arm and parts.right_hand and parts.left_upper_leg and parts.left_lower_leg and parts.left_foot and parts.right_upper_leg and parts.right_lower_leg and parts.right_foot then
+                            local connections = {
+                                {parts.head, parts.upper_torso, 1},
+                                {parts.upper_torso, parts.lower_torso, 2},
+                                {parts.upper_torso, parts.left_upper_arm, 3},
+                                {parts.left_upper_arm, parts.left_lower_arm, 4},
+                                {parts.left_lower_arm, parts.left_hand, 5},
+                                {parts.upper_torso, parts.right_upper_arm, 6},
+                                {parts.right_upper_arm, parts.right_lower_arm, 7},
+                                {parts.right_upper_arm, parts.right_hand, 8},
+                                {parts.lower_torso, parts.left_upper_leg, 9},
+                                {parts.left_upper_leg, parts.left_lower_leg, 10},
+                                {parts.left_lower_leg, parts.left_foot, 11},
+                                {parts.lower_torso, parts.right_upper_leg, 12},
+                                {parts.right_upper_leg, parts.right_lower_leg, 13},
+                                {parts.right_lower_leg, parts.right_foot, 14}
+                            }
+                            for _, conn in ipairs(connections) do
+                                local from_pos, from_on_screen = Camera:WorldToViewportPoint(conn[1].Position)
+                                local to_pos, to_on_screen = Camera:WorldToViewportPoint(conn[2].Position)
+                                if from_on_screen and to_on_screen then
+                                    objects.SkeletonLines[conn[3]].From = Vector2.new(from_pos.X, from_pos.Y)
+                                    objects.SkeletonLines[conn[3]].To = Vector2.new(to_pos.X, to_pos.Y)
+                                    objects.SkeletonLines[conn[3]].Color = getgenv().ESPSkeletonColor
+                                    objects.SkeletonLines[conn[3]].Transparency = getgenv().espTransparency
+                                    objects.SkeletonLines[conn[3]].Visible = true
+                                else
+                                    objects.SkeletonLines[conn[3]].Visible = false
+                                end
+                            end
+                        else
+                            for _, line in ipairs(objects.SkeletonLines) do line.Visible = false end
+                        end
+                    else
+                        for _, line in ipairs(objects.SkeletonLines) do line.Visible = false end
+                    end
+                    
+                    -- Head Dot ESP (New)
+                    if getgenv().headDotEnabled and headPart then
+                        local headPos, headOnScreen = Camera:WorldToViewportPoint(headPart.Position)
+                        if headOnScreen then
+                            objects.HeadDot.Position = Vector2.new(headPos.X, headPos.Y)
+                            objects.HeadDot.Radius = getgenv().headDotSize
+                            objects.HeadDot.Color = getgenv().headDotColor
+                            objects.HeadDot.Transparency = getgenv().espTransparency
+                            objects.HeadDot.Visible = true
+                        else
+                            objects.HeadDot.Visible = false
+                        end
+                    else
+                        objects.HeadDot.Visible = false
+                    end
+                    
+                    -- Tracer ESP (New)
+                    if getgenv().tracerEnabled then
+                        local from_pos
+                        if getgenv().ESPTracerType == "Cursor" then
+                            from_pos = UserInputService:GetMouseLocation()
+                        elseif getgenv().ESPTracerType == "Bottom Screen" then
+                            from_pos = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
+                        elseif getgenv().ESPTracerType == "Top Screen" then
+                            from_pos = Vector2.new(Camera.ViewportSize.X / 2, 0)
+                        end
+                        local to_pos = Vector2.new(rootPosition.X, footPosition.Y + boxHeight / 2)  -- To center or foot
+                        objects.Tracer.From = from_pos
+                        objects.Tracer.To = to_pos
+                        objects.Tracer.Color = getgenv().tracerColor
+                        objects.Tracer.Transparency = getgenv().espTransparency
+                        objects.Tracer.Visible = true
+                        
+                        -- Tracer Outline
+                        objects.TracerOutline.From = from_pos
+                        objects.TracerOutline.To = to_pos
+                        objects.TracerOutline.Color = getgenv().outlineColor
+                        objects.TracerOutline.Transparency = getgenv().espTransparency
+                        objects.TracerOutline.Visible = getgenv().outlineEnabled
+                    else
+                        objects.Tracer.Visible = false
+                        objects.TracerOutline.Visible = false
+                    end
                 else
-                    -- Hide all ESP elements if off-screen
+                    -- Hide all if off-screen or dead
                     objects.Box.Visible = false
                     objects.BoxOutline.Visible = false
                     objects.Username.Visible = false
                     objects.Distance.Visible = false
                     objects.HealthBar.Visible = false
                     objects.HealthBarOutline.Visible = false
+                    objects.HealthText.Visible = false
                     objects.Weapon.Visible = false
                     objects.ArmorBar.Visible = false
                     objects.ArmorBarOutline.Visible = false
                     objects.PenisLine.Visible = false
+                    for _, line in ipairs(objects.SkeletonLines) do line.Visible = false end
+                    objects.HeadDot.Visible = false
+                    objects.Tracer.Visible = false
+                    objects.TracerOutline.Visible = false
                 end
             end
         end
     end
 end
 
--- Function to apply ESP settings
-function applyESP()
+-- Function to apply ESP settings (optional, call on toggle changes)
+local function applyESP()
     for _, objects in pairs(ESPObjects) do
         objects.Box.Visible = getgenv().espEnabled
         objects.BoxOutline.Visible = getgenv().outlineEnabled and getgenv().espEnabled
+        -- Apply to others similarly if needed
     end
 end
 
 -- Player Added/Removed Events
 Players.PlayerAdded:Connect(function(player)
     player.CharacterAdded:Connect(function()
-        wait(1)
+        task.wait(1)
         CreateESP(player)
     end)
 end)
-
 Players.PlayerRemoving:Connect(DestroyESP)
 
 -- Initialize ESP for existing players
@@ -2262,137 +2442,219 @@ end
 -- Update ESP on every frame
 RunService.RenderStepped:Connect(UpdateESP)
 
--- UI for ESP Settings
-local espUI = Tabs.Visuals:AddLeftGroupbox('ESP')
+local ESPGroup = Tabs.Visuals:AddLeftGroupbox('ESP')
 
-espUI:AddToggle("ESPEnabled", {
-    Text = "Enable",
+ESPGroup:AddToggle('ESPEnabled', {
+    Text = 'Enable ESP',
     Default = false,
-    Callback = function(value)
-        getgenv().espEnabled = value
+    Callback = function(Value)
+        getgenv().espEnabled = Value
         applyESP()
     end
-}):AddColorPicker("ESPColor", {
-    Text = "ESP Color",
-    Default = getgenv().espColor,
-    Callback = function(value)
-        getgenv().espColor = value
-        applyESP()
+}):AddColorPicker('ESPColor', {
+    Default = Color3.fromRGB(255, 255, 255),
+    Callback = function(color)
+        getgenv().espColor = color
     end
 })
 
-espUI:AddToggle("name", {
-    Text = "Names",
+ESPGroup:AddToggle('NameESP', {
+    Text = 'Name ESP',
     Default = false,
-    Callback = function(value)
-        getgenv().nameESPEnabled = value
-        applyESP()
+    Callback = function(Value)
+        getgenv().nameESPEnabled = Value
     end
-}):AddColorPicker("NameColor", {
-    Text = "Name Color",
-    Default = getgenv().nameColor,
-    Callback = function(value)
-        getgenv().nameColor = value
-        applyESP()
+}):AddColorPicker('NameColor', {
+    Default = Color3.fromRGB(255, 255, 255),
+    Callback = function(color)
+        getgenv().nameColor = color
     end
 })
 
-espUI:AddDropdown("NameDisplayMode", {
-    Text = "Name Mode",
+ESPGroup:AddDropdown('NameMode', {
+    Text = 'Name Mode',
     Values = {"Username", "DisplayName", "Username (DisplayName)", "Username (DisplayName) [UserID]"},
     Default = "DisplayName",
-    Callback = function(value)
-        getgenv().nameDisplayMode = value
-        applyESP()
+    Callback = function(Value)
+        getgenv().nameDisplayMode = Value
     end
 })
 
-espUI:AddToggle("HealthBarESP", {
-    Text = "Health Bar",
-    Default = false,
-    Callback = function(value)
-        getgenv().healthBarESP = value
-        applyESP()
-    end
-}):AddColorPicker("HealthBarColor", {
-    Text = "Health Bar Color",
-    Default = getgenv().healthBarColor,
-    Callback = function(value)
-        getgenv().healthBarColor = value
-        applyESP()
+ESPGroup:AddSlider('NameSize', {
+    Text = 'Name Size',
+    Min = 10,
+    Max = 20,
+    Default = 14,
+    Callback = function(Value)
+        getgenv().nameTextSize = Value
     end
 })
 
-espUI:AddToggle("StudsESPEnabled", {
-    Text = "Distance",
+ESPGroup:AddToggle('StudsESP', {
+    Text = 'Distance ESP',
     Default = false,
-    Callback = function(value)
-        getgenv().studsESPEnabled = value
-        applyESP()
+    Callback = function(Value)
+        getgenv().studsESPEnabled = Value
     end
-}):AddColorPicker("DistanceColor", {
-    Text = "Distance Color",
-    Default = getgenv().distanceColor,
-    Callback = function(value)
-        getgenv().distanceColor = value
-        applyESP()
+}):AddColorPicker('DistanceColor', {
+    Default = Color3.fromRGB(255, 255, 255),
+    Callback = function(color)
+        getgenv().distanceColor = color
     end
 })
 
-espUI:AddToggle("WeaponESPEnabled", {
-    Text = "Weapon ESP",
-    Default = false,
-    Callback = function(value)
-        getgenv().weaponESPEnabled = value
-        applyESP()
-    end
-}):AddColorPicker("WeaponColor", {
-    Text = "Weapon Color",
-    Default = getgenv().weaponColor,
-    Callback = function(value)
-        getgenv().weaponColor = value
-        applyESP()
+ESPGroup:AddSlider('DistanceSize', {
+    Text = 'Distance Size',
+    Min = 10,
+    Max = 20,
+    Default = 14,
+    Callback = function(Value)
+        getgenv().distanceTextSize = Value
     end
 })
 
-espUI:AddToggle("ArmorBarESP", {
-    Text = "Armor Bar",
+ESPGroup:AddToggle('HealthBarESP', {
+    Text = 'Health Bar ESP',
     Default = false,
-    Callback = function(value)
-        getgenv().armorBarESP = value
-        applyESP()
+    Callback = function(Value)
+        getgenv().healthBarESP = Value
     end
-}):AddColorPicker("ArmorBarColor", {
-    Text = "Armor Bar Color",
-    Default = getgenv().armorBarColor,
-    Callback = function(value)
-        getgenv().armorBarColor = value
-        applyESP()
+}):AddColorPicker('HealthBarColor', {
+    Default = Color3.fromRGB(0, 255, 0),
+    Callback = function(color)
+        getgenv().healthBarColor = color
     end
 })
 
-espUI:AddToggle("OutlineEnabled", {
-    Text = "Outline",
+ESPGroup:AddToggle('HealthBased', {
+    Text = 'Health Based Color',
     Default = false,
-    Callback = function(value)
-        getgenv().outlineEnabled = value
-        applyESP()
+    Callback = function(Value)
+        getgenv().healthBased = Value
     end
 })
 
-espUI:AddToggle("PenisESPEnabled", {
-    Text = "Penis ESP",
+ESPGroup:AddToggle('HealthTextESP', {
+    Text = 'Health Text ESP',
     Default = false,
-    Callback = function(value)
-        getgenv().penisESPEnabled = value
+    Callback = function(Value)
+        getgenv().healthTextEnabled = Value
+    end
+}):AddColorPicker('HealthTextColor', {
+    Default = Color3.fromRGB(255, 255, 255),
+    Callback = function(color)
+        getgenv().healthTextColor = color
+    end
+})
+
+ESPGroup:AddToggle('WeaponESP', {
+    Text = 'Weapon ESP',
+    Default = false,
+    Callback = function(Value)
+        getgenv().weaponESPEnabled = Value
+    end
+}):AddColorPicker('WeaponColor', {
+    Default = Color3.fromRGB(255, 255, 255),
+    Callback = function(color)
+        getgenv().weaponColor = color
+    end
+})
+
+ESPGroup:AddToggle('ArmorBarESP', {
+    Text = 'Armor Bar ESP',
+    Default = false,
+    Callback = function(Value)
+        getgenv().armorBarESP = Value
+    end
+}):AddColorPicker('ArmorBarColor', {
+    Default = Color3.fromRGB(0, 0, 255),
+    Callback = function(color)
+        getgenv().armorBarColor = color
+    end
+})
+
+ESPGroup:AddToggle('OutlineEnabled', {
+    Text = 'Outline ESP',
+    Default = false,
+    Callback = function(Value)
+        getgenv().outlineEnabled = Value
         applyESP()
     end
-}):AddColorPicker("PenisColor", {
-    Text = "Penis Color",
-    Default = getgenv().penisColor,
-    Callback = function(value)
-        getgenv().penisColor = value
-        applyESP()
+}):AddColorPicker('OutlineColor', {
+    Default = Color3.fromRGB(0, 0, 0),
+    Callback = function(color)
+        getgenv().outlineColor = color
+    end
+})
+
+ESPGroup:AddToggle('PenisESP', {
+    Text = 'Penis ESP',
+    Default = false,
+    Callback = function(Value)
+        getgenv().penisESPEnabled = Value
+    end
+}):AddColorPicker('PenisColor', {
+    Default = Color3.fromRGB(255, 0, 0),
+    Callback = function(color)
+        getgenv().penisColor = color
+    end
+})
+
+ESPGroup:AddToggle('ESPSkeleton', {
+    Text = 'Skeleton ESP',
+    Default = false,
+    Callback = function(Value)
+        getgenv().ESPSkeleton = Value
+    end
+}):AddColorPicker('ESPSkeletonColor', {
+    Default = Color3.fromRGB(255, 255, 255),
+    Callback = function(color)
+        getgenv().ESPSkeletonColor = color
+    end
+})
+
+ESPGroup:AddToggle('HeadDotEnabled', {
+    Text = 'Head Dot ESP',
+    Default = false,
+    Callback = function(Value)
+        getgenv().headDotEnabled = Value
+    end
+}):AddColorPicker('HeadDotColor', {
+    Default = Color3.fromRGB(255, 0, 0),
+    Callback = function(color)
+        getgenv().headDotColor = color
+    end
+})
+
+ESPGroup:AddSlider('HeadDotSize', {
+    Text = 'Head Dot Size',
+    Min = 1,
+    Max = 20,
+    Default = 5,
+    Callback = function(Value)
+        getgenv().headDotSize = Value
+    end
+})
+
+ESPGroup:AddToggle('TracerEnabled', {
+    Text = 'Tracer ESP',
+    Default = false,
+    Callback = function(Value)
+        getgenv().tracerEnabled = Value
+    end
+}):AddColorPicker('TracerColor', {
+    Default = Color3.fromRGB(255, 255, 255),
+    Callback = function(color)
+        getgenv().tracerColor = color
+    end
+})
+
+ESPGroup:AddDropdown('TracerType', {
+    Text = 'Tracer Type',
+    Values = {"Cursor", "Bottom Screen", "Top Screen"},
+    Default = "Cursor",
+    Callback = function(Value)
+        getgenv().ESPTracerType = Value
     end
 })
 
@@ -2510,8 +2772,6 @@ player.CharacterAdded:Connect(function()
     end
 end)
 
-
-local Players = game:GetService("Players")
 local player = Players.LocalPlayer
 
 local Auras = Tabs.Visuals:AddRightGroupbox("Self")
@@ -2569,7 +2829,7 @@ utility.trail_character = function(Bool)
         end
     end
 end
-
+task.wait(1)
 local function onCharacterAdded(character)
     if getgenv().trailEnabled then
         utility.trail_character(true)
@@ -2630,7 +2890,6 @@ local HitEffectModule = {
         }
     }
 }
-
 local Attachment = Instance.new("Attachment")
 HitEffectModule.Locals.HitEffect.Type["Skibidi RedRizz"] = Attachment
 local swirl = Instance.new("ParticleEmitter", Attachment)
@@ -2651,7 +2910,6 @@ swirl.LockedToPart = true
 swirl.Texture = "rbxassetid://10558425570"
 swirl.RotSpeed = NumberRange.new(200)
 swirl.Orientation = Enum.ParticleOrientation.VelocityPerpendicular
-
 local Bolts = Instance.new("ParticleEmitter", Attachment)
 Bolts.Name = "Bolts"
 Bolts.Lifetime = NumberRange.new(0.333)
@@ -2675,7 +2933,6 @@ Bolts.Size = NumberSequence.new(4.8)
 Bolts.Rate = 12
 Bolts.Texture = "rbxassetid://1084955012"
 Bolts.Rotation = NumberRange.new(-180, 180)
-
 local Bubble = Instance.new("ParticleEmitter", Attachment)
 Bubble.Name = "Bubble"
 Bubble.Lifetime = NumberRange.new(1)
@@ -2689,32 +2946,100 @@ Bubble.Rate = 6
 Bubble.Texture = "rbxassetid://1084955488"
 Bubble.Rotation = NumberRange.new(-180, 180)
 
+local HealingWave1 = Instance.new("ParticleEmitter", Attachment)
+HealingWave1.Name = "HealingWave1"
+HealingWave1.Lifetime = NumberRange.new(1.5, 1.5)
+HealingWave1.SpreadAngle = Vector2.new(10, -10)
+HealingWave1.LockedToPart = true
+HealingWave1.Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.1702454, 0.7, 0.014881), NumberSequenceKeypoint.new(0.2254601, 0.03125, 0.03125), NumberSequenceKeypoint.new(0.2852761, 0), NumberSequenceKeypoint.new(0.702454, 0), NumberSequenceKeypoint.new(0.8374233, 0.9125, 0.0601461), NumberSequenceKeypoint.new(1, 1)})
+HealingWave1.LightEmission = 0.4
+HealingWave1.Color = ColorSequence.new(Settings.Visuals.SelfESP.Aura.Color)
+HealingWave1.VelocitySpread = 10
+HealingWave1.Speed = NumberRange.new(3, 6)
+HealingWave1.Brightness = 10
+HealingWave1.Size = NumberSequence.new({NumberSequenceKeypoint.new(0, 3.0624998, 1.8805969), NumberSequenceKeypoint.new(0.6420546, 1.9999999, 1.7619393), NumberSequenceKeypoint.new(1, 0.7499999, 0.7499999)})
+HealingWave1.Rate = 20
+HealingWave1.Texture = "rbxassetid://8047533775"
+HealingWave1.RotSpeed = NumberRange.new(200, 400)
+HealingWave1.Rotation = NumberRange.new(-180, 180)
+HealingWave1.Orientation = Enum.ParticleOrientation.VelocityPerpendicular
+
+local HealingWave2 = Instance.new("ParticleEmitter", Attachment)
+HealingWave2.Name = "HealingWave2"
+HealingWave2.Lifetime = NumberRange.new(1.5, 1.5)
+HealingWave2.SpreadAngle = Vector2.new(10, -10)
+HealingWave2.LockedToPart = true
+HealingWave2.Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.2254601, 0.03125, 0.03125), NumberSequenceKeypoint.new(0.6288344, 0.25625, 0.0593491), NumberSequenceKeypoint.new(0.8374233, 0.9125, 0.0601461), NumberSequenceKeypoint.new(1, 1)})
+HealingWave2.LightEmission = 1
+HealingWave2.Color = ColorSequence.new(Settings.Visuals.SelfESP.Aura.Color)
+HealingWave2.VelocitySpread = 10
+HealingWave2.Speed = NumberRange.new(3, 5)
+HealingWave2.Brightness = 10
+HealingWave2.Size = NumberSequence.new({NumberSequenceKeypoint.new(0, 3.125), NumberSequenceKeypoint.new(0.4165329, 1.3749999, 1.3749999), NumberSequenceKeypoint.new(1, 0.9375, 0.9375)})
+HealingWave2.Rate = 20
+HealingWave2.Texture = "rbxassetid://8047796070"
+HealingWave2.RotSpeed = NumberRange.new(100, 300)
+HealingWave2.Rotation = NumberRange.new(-180, 180)
+HealingWave2.Orientation = Enum.ParticleOrientation.VelocityPerpendicular
+
+local Sparks = Instance.new("ParticleEmitter", Attachment)
+Sparks.Name = "Sparks"
+Sparks.Lifetime = NumberRange.new(0.5, 2)
+Sparks.SpreadAngle = Vector2.new(180, -180)
+Sparks.LightEmission = 1
+Sparks.Color = ColorSequence.new(Settings.Visuals.SelfESP.Aura.Color)
+Sparks.Drag = 3
+Sparks.VelocitySpread = 180
+Sparks.Speed = NumberRange.new(5, 15)
+Sparks.Brightness = 10
+Sparks.Size = NumberSequence.new({NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(0.14687, 0.4374999, 0.1875001), NumberSequenceKeypoint.new(1, 0)})
+Sparks.Acceleration = Vector3.new(0, 3, 0)
+Sparks.ZOffset = -1
+Sparks.Rate = 40
+Sparks.Texture = "rbxassetid://8611887361"
+Sparks.RotSpeed = NumberRange.new(-30, 30)
+Sparks.Orientation = Enum.ParticleOrientation.VelocityParallel
+
+local StarSparks = Instance.new("ParticleEmitter", Attachment)
+StarSparks.Name = "StarSparks"
+StarSparks.Lifetime = NumberRange.new(1.5, 1.5)
+StarSparks.SpreadAngle = Vector2.new(180, -180)
+StarSparks.LightEmission = 1
+StarSparks.Color = ColorSequence.new(Settings.Visuals.SelfESP.Aura.Color)
+StarSparks.Drag = 3
+StarSparks.VelocitySpread = 180
+StarSparks.Speed = NumberRange.new(5, 10)
+StarSparks.Brightness = 10
+StarSparks.Size = NumberSequence.new({NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(0.1492777, 0.6874996, 0.6874996), NumberSequenceKeypoint.new(1, 0)})
+StarSparks.Acceleration = Vector3.new(0, 3, 0)
+StarSparks.ZOffset = 2
+StarSparks.Texture = "rbxassetid://8611887703"
+StarSparks.RotSpeed = NumberRange.new(-30, 30)
+StarSparks.Rotation = NumberRange.new(-30, 30)
+
 local function applyAura(auraName)
     local character = player.Character or player.CharacterAdded:Wait()
     local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
-
     Attachment.Parent = humanoidRootPart
-
     if getgenv().auraEnabled then
         swirl.Enabled = auraName == "Skibidi RedRizz"
         Bolts.Enabled = auraName == "Bolts"
         Bubble.Enabled = auraName == "Bubble"
+        HealingWave1.Enabled = auraName == "Heal"
+        HealingWave2.Enabled = auraName == "Heal"
+        Sparks.Enabled = auraName == "Heal"
+        StarSparks.Enabled = auraName == "Heal"
         humanoidRootPart.Material = Enum.Material.Neon
     else
         swirl.Enabled = false
         Bolts.Enabled = false
         Bubble.Enabled = false
+        HealingWave1.Enabled = false
+        HealingWave2.Enabled = false
+        Sparks.Enabled = false
+        StarSparks.Enabled = false
     end
 end
-
-local function onCharacterAdded(character)
-    if getgenv().auraEnabled then
-        applyAura(getgenv().selectedAura or "Skibidi RedRizz")
-    end
-end
-
-player.CharacterAdded:Connect(onCharacterAdded)
-if player.Character then onCharacterAdded(player.Character) end
 
 Auras:AddToggle("AuraToggle", {
     Text = "Auras",
@@ -2731,15 +3056,18 @@ Auras:AddToggle("AuraToggle", {
         swirl.Color = ColorSequence.new(color)
         Bolts.Color = ColorSequence.new(color)
         Bubble.Color = ColorSequence.new(color)
+        HealingWave1.Color = ColorSequence.new(color)
+        HealingWave2.Color = ColorSequence.new(color)
+        Sparks.Color = ColorSequence.new(color)
+        StarSparks.Color = ColorSequence.new(color)
         if getgenv().auraEnabled then
             applyAura(getgenv().selectedAura or "Skibidi RedRizz")
         end
     end
 })
-
 Auras:AddDropdown("AuraType", {
     Text = "Select Aura",
-    Values = {"Skibidi RedRizz", "Bolts", "Bubble"},
+    Values = {"Skibidi RedRizz", "Bolts", "Bubble", "Heal"},
     Default = "Bubble",
     Callback = function(selected)
         getgenv().selectedAura = selected
@@ -2748,297 +3076,594 @@ Auras:AddDropdown("AuraType", {
         end
     end
 })
+getgenv().envt = Tabs.Visuals:AddRightGroupbox('Environment')
 
-getgenv().envt = Tabs.Visuals:AddRightGroupbox("Environment")
-
-getgenv().Lighting = game:GetService("Lighting")
-
--- Get current game values as defaults
-getgenv().DefaultFogStart = Lighting.FogStart
-getgenv().DefaultFogEnd = Lighting.FogEnd
-getgenv().DefaultFogColor = Lighting.FogColor
-getgenv().DefaultAmbient = Lighting.Ambient
-getgenv().DefaultTechnology = Lighting.Technology.Name
-getgenv().originalColorCorrectionEnabled = Lighting.ColorCorrection.Enabled
-getgenv().originalSaturation = Lighting.ColorCorrection.Saturation
-
-local ColorCorrection = false
-
-envt:AddToggle('ColorCorrection', {
-    Text = 'ColorCorrection',
+local LightingService = game:GetService("Lighting")
+local originalAmbient = LightingService.Ambient
+local originalOutdoorAmbient = LightingService.OutdoorAmbient
+local originalFogColor = LightingService.FogColor
+local originalFogStart = LightingService.FogStart
+local originalFogEnd = LightingService.FogEnd
+local originalBrightness = LightingService.Brightness
+local originalClockTime = LightingService.ClockTime
+local originalGlobalShadows = LightingService.GlobalShadows
+local originalEnvironmentDiffuseScale = LightingService.EnvironmentDiffuseScale
+local originalEnvironmentSpecularScale = LightingService.EnvironmentSpecularScale
+local originalExposureCompensation = LightingService.ExposureCompensation
+local originalColorShiftBottom = LightingService.ColorShift_Bottom
+local originalColorShiftTop = LightingService.ColorShift_Top
+local originalGeographicLatitude = LightingService.GeographicLatitude
+local originalShadowSoftness = LightingService.ShadowSoftness
+local nebulaThemeColor = Color3.fromRGB(173, 216, 230)
+local Visuals = {}
+local Skyboxes = {}
+function Visuals:NewSky(Data)
+    local Name = Data.Name
+    Skyboxes[Name] = {
+        SkyboxBk = Data.SkyboxBk,
+        SkyboxDn = Data.SkyboxDn,
+        SkyboxFt = Data.SkyboxFt,
+        SkyboxLf = Data.SkyboxLf,
+        SkyboxRt = Data.SkyboxRt,
+        SkyboxUp = Data.SkyboxUp,
+        MoonTextureId = Data.Moon or "rbxasset://sky/moon.jpg",
+        SunTextureId = Data.Sun or "rbxasset://sky/sun.jpg"
+    }
+end
+function Visuals:SwitchSkybox(Name)
+    local OldSky = LightingService:FindFirstChildOfClass("Sky")
+    if OldSky then OldSky:Destroy() end
+    local Sky = Instance.new("Sky", LightingService)
+    for Index, Value in pairs(Skyboxes[Name]) do
+        Sky[Index] = Value
+    end
+end
+if LightingService:FindFirstChildOfClass("Sky") then
+    local OldSky = LightingService:FindFirstChildOfClass("Sky")
+    Visuals:NewSky({
+        Name = "Game's Default Sky",
+        SkyboxBk = OldSky.SkyboxBk,
+        SkyboxDn = OldSky.SkyboxDn,
+        SkyboxFt = OldSky.SkyboxFt,
+        SkyboxLf = OldSky.SkyboxLf,
+        SkyboxRt = OldSky.SkyboxRt,
+        SkyboxUp = OldSky.SkyboxUp
+    })
+end
+Visuals:NewSky({
+    Name = "Sunset",
+    SkyboxBk = "rbxassetid://600830446",
+    SkyboxDn = "rbxassetid://600831635",
+    SkyboxFt = "rbxassetid://600832720",
+    SkyboxLf = "rbxassetid://600886090",
+    SkyboxRt = "rbxassetid://600833862",
+    SkyboxUp = "rbxassetid://600835177"
+})
+Visuals:NewSky({
+    Name = "Arctic",
+    SkyboxBk = "http://www.roblox.com/asset/?id=225469390",
+    SkyboxDn = "http://www.roblox.com/asset/?id=225469395",
+    SkyboxFt = "http://www.roblox.com/asset/?id=225469403",
+    SkyboxLf = "http://www.roblox.com/asset/?id=225469450",
+    SkyboxRt = "http://www.roblox.com/asset/?id=225469471",
+    SkyboxUp = "http://www.roblox.com/asset/?id=225469481"
+})
+Visuals:NewSky({
+    Name = "Space",
+    SkyboxBk = "http://www.roblox.com/asset/?id=166509999",
+    SkyboxDn = "http://www.roblox.com/asset/?id=166510057",
+    SkyboxFt = "http://www.roblox.com/asset/?id=166510116",
+    SkyboxLf = "http://www.roblox.com/asset/?id=166510092",
+    SkyboxRt = "http://www.roblox.com/asset/?id=166510131",
+    SkyboxUp = "http://www.roblox.com/asset/?id=166510114"
+})
+Visuals:NewSky({
+    Name = "Roblox Default",
+    SkyboxBk = "rbxasset://textures/sky/sky512_bk.tex",
+    SkyboxDn = "rbxasset://textures/sky/sky512_dn.tex",
+    SkyboxFt = "rbxasset://textures/sky/sky512_ft.tex",
+    SkyboxLf = "rbxasset://textures/sky/sky512_lf.tex",
+    SkyboxRt = "rbxasset://textures/sky/sky512_rt.tex",
+    SkyboxUp = "rbxasset://textures/sky/sky512_up.tex"
+})
+Visuals:NewSky({
+    Name = "Red Night",
+    SkyboxBk = "http://www.roblox.com/Asset/?ID=401664839";
+    SkyboxDn = "http://www.roblox.com/Asset/?ID=401664862";
+    SkyboxFt = "http://www.roblox.com/Asset/?ID=401664960";
+    SkyboxLf = "http://www.roblox.com/Asset/?ID=401664881";
+    SkyboxRt = "http://www.roblox.com/Asset/?ID=401664901";
+    SkyboxUp = "http://www.roblox.com/Asset/?ID=401664936";
+})
+Visuals:NewSky({
+    Name = "Deep Space",
+    SkyboxBk = "http://www.roblox.com/asset/?id=149397692";
+    SkyboxDn = "http://www.roblox.com/asset/?id=135207662";
+    SkyboxFt = "http://www.roblox.com/asset/?id=135207770";
+    SkyboxLf = "http://www.roblox.com/asset/?id=135207615";
+    SkyboxRt = "http://www.roblox.com/asset/?id=135207695";
+    SkyboxUp = "http://www.roblox.com/asset/?id=135207794";
+})
+Visuals:NewSky({
+    Name = "Pink Skies",
+    SkyboxBk = "http://www.roblox.com/asset/?id=151165214";
+    SkyboxDn = "http://www.roblox.com/asset/?id=151165197";
+    SkyboxFt = "http://www.roblox.com/asset/?id=151165224";
+    SkyboxLf = "http://www.roblox.com/asset/?id=151165191";
+    SkyboxRt = "http://www.roblox.com/asset/?id=151165206";
+    SkyboxUp = "http://www.roblox.com/asset/?id=151165227";
+})
+Visuals:NewSky({
+    Name = "Purple Sunset",
+    SkyboxBk = "rbxassetid://264908339";
+    SkyboxDn = "rbxassetid://264907909";
+    SkyboxFt = "rbxassetid://264909420";
+    SkyboxLf = "rbxassetid://264909758";
+    SkyboxRt = "rbxassetid://264908886";
+    SkyboxUp = "rbxassetid://264907379";
+})
+Visuals:NewSky({
+    Name = "Blue Night",
+    SkyboxBk = "http://www.roblox.com/Asset/?ID=12064107";
+    SkyboxDn = "http://www.roblox.com/Asset/?ID=12064152";
+    SkyboxFt = "http://www.roblox.com/Asset/?ID=12064121";
+    SkyboxLf = "http://www.roblox.com/Asset/?ID=12063984";
+    SkyboxRt = "http://www.roblox.com/Asset/?ID=12064115";
+    SkyboxUp = "http://www.roblox.com/Asset/?ID=12064131";
+})
+Visuals:NewSky({
+    Name = "Blossom Daylight",
+    SkyboxBk = "http://www.roblox.com/asset/?id=271042516";
+    SkyboxDn = "http://www.roblox.com/asset/?id=271077243";
+    SkyboxFt = "http://www.roblox.com/asset/?id=271042556";
+    SkyboxLf = "http://www.roblox.com/asset/?id=271042310";
+    SkyboxRt = "http://www.roblox.com/asset/?id=271042467";
+    SkyboxUp = "http://www.roblox.com/asset/?id=271077958";
+})
+Visuals:NewSky({
+    Name = "Blue Nebula",
+    SkyboxBk = "http://www.roblox.com/asset?id=135207744";
+    SkyboxDn = "http://www.roblox.com/asset?id=135207662";
+    SkyboxFt = "http://www.roblox.com/asset?id=135207770";
+    SkyboxLf = "http://www.roblox.com/asset?id=135207615";
+    SkyboxRt = "http://www.roblox.com/asset?id=135207695";
+    SkyboxUp = "http://www.roblox.com/asset?id=135207794";
+})
+Visuals:NewSky({
+    Name = "Blue Planet",
+    SkyboxBk = "rbxassetid://218955819";
+    SkyboxDn = "rbxassetid://218953419";
+    SkyboxFt = "rbxassetid://218954524";
+    SkyboxLf = "rbxassetid://218958493";
+    SkyboxRt = "rbxassetid://218957134";
+    SkyboxUp = "rbxassetid://218950090";
+})
+Visuals:NewSky({
+    Name = "Deep Space",
+    SkyboxBk = "http://www.roblox.com/asset/?id=159248188";
+    SkyboxDn = "http://www.roblox.com/asset/?id=159248183";
+    SkyboxFt = "http://www.roblox.com/asset/?id=159248187";
+    SkyboxLf = "http://www.roblox.com/asset/?id=159248173";
+    SkyboxRt = "http://www.roblox.com/asset/?id=159248192";
+    SkyboxUp = "http://www.roblox.com/asset/?id=159248176";
+})
+Visuals:NewSky({
+    Name = "Summer",
+    SkyboxBk = "rbxassetid://16648590964",
+    SkyboxDn = "rbxassetid://16648617436",
+    SkyboxFt = "rbxassetid://16648595424",
+    SkyboxLf = "rbxassetid://16648566370",
+    SkyboxRt = "rbxassetid://16648577071",
+    SkyboxUp = "rbxassetid://16648598180"
+})
+Visuals:NewSky({
+    Name = "Galaxy",
+    SkyboxBk = "rbxassetid://15983968922",
+    SkyboxDn = "rbxassetid://15983966825",
+    SkyboxFt = "rbxassetid://15983965025",
+    SkyboxLf = "rbxassetid://15983967420",
+    SkyboxRt = "rbxassetid://15983966246",
+    SkyboxUp = "rbxassetid://15983964246"
+})
+Visuals:NewSky({
+    Name = "Stylized",
+    SkyboxBk = "rbxassetid://18351376859",
+    SkyboxDn = "rbxassetid://18351374919",
+    SkyboxFt = "rbxassetid://18351376800",
+    SkyboxLf = "rbxassetid://18351376469",
+    SkyboxRt = "rbxassetid://18351376457",
+    SkyboxUp = "rbxassetid://18351377189"
+})
+Visuals:NewSky({
+    Name = "Minecraft",
+    SkyboxBk = "rbxassetid://8735166756",
+    SkyboxDn = "http://www.roblox.com/asset/?id=8735166707",
+    SkyboxFt = "http://www.roblox.com/asset/?id=8735231668",
+    SkyboxLf = "http://www.roblox.com/asset/?id=8735166755",
+    SkyboxRt = "http://www.roblox.com/asset/?id=8735166751",
+    SkyboxUp = "http://www.roblox.com/asset/?id=8735166729"
+})
+Visuals:NewSky({
+    Name = "Sunset",
+    SkyboxBk = "http://www.roblox.com/asset/?id=151165214",
+    SkyboxDn = "http://www.roblox.com/asset/?id=151165197",
+    SkyboxFt = "http://www.roblox.com/asset/?id=151165224",
+    SkyboxLf = "http://www.roblox.com/asset/?id=151165191",
+    SkyboxRt = "http://www.roblox.com/asset/?id=151165206",
+    SkyboxUp = "http://www.roblox.com/asset/?id=151165227"
+})
+Visuals:NewSky({
+    Name = "Cloudy Rain",
+    SkyboxBk = "http://www.roblox.com/asset/?id=4498828382",
+    SkyboxDn = "http://www.roblox.com/asset/?id=4498828812",
+    SkyboxFt = "http://www.roblox.com/asset/?id=4498829917",
+    SkyboxLf = "http://www.roblox.com/asset/?id=4498830911",
+    SkyboxRt = "http://www.roblox.com/asset/?id=4498830417",
+    SkyboxUp = "http://www.roblox.com/asset/?id=4498831746"
+})
+Visuals:NewSky({
+    Name = "Black Cloudy Rain",
+    SkyboxBk = "http://www.roblox.com/asset/?id=149679669",
+    SkyboxDn = "http://www.roblox.com/asset/?id=149681979",
+    SkyboxFt = "http://www.roblox.com/asset/?id=149679690",
+    SkyboxLf = "http://www.roblox.com/asset/?id=149679709",
+    SkyboxRt = "http://www.roblox.com/asset/?id=149679722",
+    SkyboxUp = "http://www.roblox.com/asset/?id=149680199"
+})
+local SkyboxNames = {}
+for Name, _ in pairs(Skyboxes) do
+    table.insert(SkyboxNames, Name)
+end
+getgenv().envt:AddToggle("CustomAmbient", {
+    Text = "Custom Ambient",
     Default = false,
-    Tooltip = 'ColorCorrection',
     Callback = function(Value)
-        ColorCorrection = Value
-        if Value then
-            Lighting.ColorCorrection.Enabled = true
-            Lighting.ColorCorrection.Saturation = 0.8
-        else
-            Lighting.ColorCorrection.Enabled = getgenv().originalColorCorrectionEnabled
-            Lighting.ColorCorrection.Saturation = getgenv().originalSaturation
+        CustomAmbient = Value
+        LightingService.Ambient = Value and AmbientColor or originalAmbient
+    end
+}):AddColorPicker("AmbientColor", {
+    Default = originalAmbient,
+    Callback = function(Value)
+        AmbientColor = Value
+        if CustomAmbient then
+            LightingService.Ambient = Value
         end
     end
 })
-
-envt:AddToggle('FogToggle', {
-    Text = 'Fog Changer',
+-- Custom Outdoor Ambient
+getgenv().envt:AddToggle("CustomOutdoorAmbient", {
+    Text = "Custom Outdoor Ambient",
     Default = false,
-
     Callback = function(Value)
-        if Value then
-            Lighting.FogEnd = getgenv().FogEnd or DefaultFogEnd
-            Lighting.FogStart = getgenv().FogStart or DefaultFogStart
-        else
-            Lighting.FogEnd = DefaultFogEnd
-            Lighting.FogStart = DefaultFogStart
-            Lighting.FogColor = DefaultFogColor
+        CustomOutdoorAmbient = Value
+        LightingService.OutdoorAmbient = Value and OutdoorAmbientColor or originalOutdoorAmbient
+    end
+}):AddColorPicker("OutdoorAmbientColor", {
+    Default = originalOutdoorAmbient,
+    Callback = function(Value)
+        OutdoorAmbientColor = Value
+        if CustomOutdoorAmbient then
+            LightingService.OutdoorAmbient = Value
         end
     end
-}):AddColorPicker('FogColor', {
-    Default = DefaultFogColor,
-    Title = 'Fog Color',
-
+})
+-- Custom Fog
+getgenv().envt:AddToggle("CustomFog", {
+    Text = "Custom Fog",
+    Default = false,
     Callback = function(Value)
-        Lighting.FogColor = Value
+        CustomFog = Value
+        if Value then
+            LightingService.FogColor = FogColor
+            LightingService.FogStart = FogStart
+            LightingService.FogEnd = FogEnd
+        else
+            LightingService.FogColor = originalFogColor
+            LightingService.FogStart = originalFogStart
+            LightingService.FogEnd = originalFogEnd
+        end
+    end
+}):AddColorPicker("FogColor", {
+    Default = originalFogColor,
+    Callback = function(Value)
+        FogColor = Value
+        if CustomFog then
+            LightingService.FogColor = Value
+        end
     end
 })
-
-envt:AddSlider('FogStart', {
-    Text = 'Fog Start',
-    Default = DefaultFogStart,
+getgenv().envt:AddSlider("FogStart", {
+    Text = "Fog Start",
     Min = 0,
     Max = 1000,
+    Default = originalFogStart,
     Rounding = 1,
-
     Callback = function(Value)
-        getgenv().FogStart = Value
-        Lighting.FogStart = Value
-    end
-})
-
-envt:AddSlider('FogEnd', {
-    Text = 'Fog End',
-    Default = DefaultFogEnd,
-    Min = 10,
-    Max = 10000,
-    Rounding = 1,
-
-    Callback = function(Value)
-        getgenv().FogEnd = Value
-        Lighting.FogEnd = Value
-    end
-})
-
-envt:AddToggle('AmbientToggle', {
-    Text = 'Ambient',
-    Default = false,
-
-    Callback = function(Value)
-        if Value then
-            Lighting.Ambient = getgenv().AmbientColor or DefaultAmbient
-        else
-            Lighting.Ambient = DefaultAmbient
+        FogStart = Value
+        if CustomFog then
+            LightingService.FogStart = Value
         end
     end
-}):AddColorPicker('AmbientColor', {
-    Default = DefaultAmbient,
-    Title = 'Ambient Color',
-
+})
+getgenv().envt:AddSlider("FogEnd", {
+    Text = "Fog End",
+    Min = 0,
+    Max = 1000,
+    Default = originalFogEnd,
+    Rounding = 1,
     Callback = function(Value)
-        getgenv().AmbientColor = Value
-        Lighting.Ambient = Value
+        FogEnd = Value
+        if CustomFog then
+            LightingService.FogEnd = Value
+        end
     end
 })
-
-envt:AddDropdown('LightingTech', {
-    Text = 'Technology',
-    Values = {'Voxel', 'Compatibility', 'ShadowMap', 'Future'},
-    Default = table.find({'Voxel', 'Compatibility', 'ShadowMap', 'Future'}, DefaultTechnology) or 1,
-
+-- Custom Brightness
+getgenv().envt:AddToggle("CustomBrightness", {
+    Text = "Custom Brightness",
+    Default = false,
     Callback = function(Value)
-        Lighting.Technology = Enum.Technology[Value]
+        CustomBrightness = Value
+        LightingService.Brightness = Value and BrightnessValue or originalBrightness
     end
 })
-
-local Lighting = game:GetService("Lighting")
-
--- Lưu skybox ban đầu khi script khởi động
-local defaultSkybox = {}
-local function saveDefaultSkybox()
-    local sky = Lighting:FindFirstChildOfClass("Sky")
-    if sky then
-        defaultSkybox = {
-            SkyboxBk = sky.SkyboxBk,
-            SkyboxDn = sky.SkyboxDn,
-            SkyboxFt = sky.SkyboxFt,
-            SkyboxLf = sky.SkyboxLf,
-            SkyboxRt = sky.SkyboxRt,
-            SkyboxUp = sky.SkyboxUp
-        }
-    else
-        defaultSkybox = {
-            ClockTime = 14,
-            SkyboxBk = "",
-            SkyboxDn = "",
-            SkyboxFt = "",
-            SkyboxLf = "",
-            SkyboxRt = "",
-            SkyboxUp = ""
-        }
+getgenv().envt:AddSlider("BrightnessValue", {
+    Text = "Brightness",
+    Min = 0,
+    Max = 10,
+    Default = originalBrightness,
+    Rounding = 1,
+    Callback = function(Value)
+        BrightnessValue = Value
+        if CustomBrightness then
+            LightingService.Brightness = Value
+        end
     end
-end
-
-saveDefaultSkybox()
-
--- Biến skybox
-local skyboxEnabled = false
-local skyboxType = 1
-
--- Hàm thay đổi skybox
-local function changeSkybox()
-    local sky = Lighting:FindFirstChildOfClass("Sky") or Instance.new("Sky", Lighting)
-    pcall(function()
-        if skyboxEnabled then
-            if skyboxType == 1 then
-                sky.SkyboxBk = "rbxassetid://13581437029"
-                sky.SkyboxDn = "rbxassetid://13581439832"
-                sky.SkyboxFt = "rbxassetid://13581447312"
-                sky.SkyboxLf = "rbxassetid://13581443463"
-                sky.SkyboxRt = "rbxassetid://13581452875"
-                sky.SkyboxUp = "rbxassetid://13581450222"
-            elseif skyboxType == 2 then
-                sky.SkyboxBk = "rbxassetid://2571711090"
-                sky.SkyboxDn = "rbxassetid://2571711090"
-                sky.SkyboxFt = "rbxassetid://2571711090"
-                sky.SkyboxLf = "rbxassetid://2571711090"
-                sky.SkyboxRt = "rbxassetid://2571711090"
-                sky.SkyboxUp = "rbxassetid://2571711090"
-            elseif skyboxType == 3 then
-                sky.SkyboxBk = "rbxassetid://6277563515"
-                sky.SkyboxDn = "rbxassetid://6277565742"
-                sky.SkyboxFt = "rbxassetid://6277567481"
-                sky.SkyboxLf = "rbxassetid://6277569562"
-                sky.SkyboxRt = "rbxassetid://6277583250"
-                sky.SkyboxUp = "rbxassetid://6277586065"
-            elseif skyboxType == 4 then
-                sky.SkyboxBk = "rbxassetid://6285719338"
-                sky.SkyboxDn = "rbxassetid://6285721078"
-                sky.SkyboxFt = "rbxassetid://6285722964"
-                sky.SkyboxLf = "rbxassetid://6285724682"
-                sky.SkyboxRt = "rbxassetid://6285726335"
-                sky.SkyboxUp = "rbxassetid://6285730635"
-            elseif skyboxType == 5 then
-                sky.SkyboxBk = "rbxassetid://877168885"
-                sky.SkyboxDn = "rbxassetid://877169070"
-                sky.SkyboxFt = "rbxassetid://877169154"
-                sky.SkyboxLf = "rbxassetid://877169233"
-                sky.SkyboxRt = "rbxassetid://877169317"
-                sky.SkyboxUp = "rbxassetid://877169431"
-            elseif skyboxType == 6 then
-                sky.SkyboxBk = "rbxassetid://9971120429"
-                sky.SkyboxDn = "rbxassetid://9971120429"
-                sky.SkyboxFt = "rbxassetid://9971120429"
-                sky.SkyboxLf = "rbxassetid://9971120429"
-                sky.SkyboxRt = "rbxassetid://9971120429"
-                sky.SkyboxUp = "rbxassetid://9971120429"
-            elseif skyboxType == 7 then
-                sky.SkyboxBk = "rbxassetid://8754359769"
-                sky.SkyboxDn = "rbxassetid://8754359769"
-                sky.SkyboxFt = "rbxassetid://8754359769"
-                sky.SkyboxLf = "rbxassetid://8754359769"
-                sky.SkyboxRt = "rbxassetid://8754359769"
-                sky.SkyboxUp = "rbxassetid://8754359769"
-            elseif skyboxType == 8 then -- Summer
-                sky.SkyboxBk = "rbxassetid://16648590964"
-                sky.SkyboxDn = "rbxassetid://16648617436"
-                sky.SkyboxFt = "rbxassetid://16648595424"
-                sky.SkyboxLf = "rbxassetid://16648566370"
-                sky.SkyboxRt = "rbxassetid://16648577071"
-                sky.SkyboxUp = "rbxassetid://16648598180"
-            elseif skyboxType == 9 then -- Galaxy
-                sky.SkyboxBk = "rbxassetid://15983968922"
-                sky.SkyboxDn = "rbxassetid://15983966825"
-                sky.SkyboxFt = "rbxassetid://15983965025"
-                sky.SkyboxLf = "rbxassetid://15983967420"
-                sky.SkyboxRt = "rbxassetid://15983966246"
-                sky.SkyboxUp = "rbxassetid://15983964246"
-            elseif skyboxType == 10 then -- Stylized
-                sky.SkyboxBk = "rbxassetid://18351376859"
-                sky.SkyboxDn = "rbxassetid://18351374919"
-                sky.SkyboxFt = "rbxassetid://18351376800"
-                sky.SkyboxLf = "rbxassetid://18351376469"
-                sky.SkyboxRt = "rbxassetid://18351376457"
-                sky.SkyboxUp = "rbxassetid://18351377189"
-            elseif skyboxType == 11 then -- Minecraft
-                sky.SkyboxBk = "rbxassetid://8735166756"
-                sky.SkyboxDn = "http://www.roblox.com/asset/?id=8735166707"
-                sky.SkyboxFt = "http://www.roblox.com/asset/?id=8735231668"
-                sky.SkyboxLf = "http://www.roblox.com/asset/?id=8735166755"
-                sky.SkyboxRt = "http://www.roblox.com/asset/?id=8735166751"
-                sky.SkyboxUp = "http://www.roblox.com/asset/?id=8735166729"
-            elseif skyboxType == 12 then -- Sunset
-                sky.SkyboxBk = "http://www.roblox.com/asset/?id=151165214"
-                sky.SkyboxDn = "http://www.roblox.com/asset/?id=151165197"
-                sky.SkyboxFt = "http://www.roblox.com/asset/?id=151165224"
-                sky.SkyboxLf = "http://www.roblox.com/asset/?id=151165191"
-                sky.SkyboxRt = "http://www.roblox.com/asset/?id=151165206"
-                sky.SkyboxUp = "http://www.roblox.com/asset/?id=151165227"
-            elseif skyboxType == 13 then -- Cloudy rain
-                sky.SkyboxBk = "http://www.roblox.com/asset/?id=4498828382"
-                sky.SkyboxDn = "http://www.roblox.com/asset/?id=4498828812"
-                sky.SkyboxFt = "http://www.roblox.com/asset/?id=4498829917"
-                sky.SkyboxLf = "http://www.roblox.com/asset/?id=4498830911"
-                sky.SkyboxRt = "http://www.roblox.com/asset/?id=4498830417"
-                sky.SkyboxUp = "http://www.roblox.com/asset/?id=4498831746"
-            elseif skyboxType == 14 then -- Black Cloudy Rain
-                sky.SkyboxBk = "http://www.roblox.com/asset/?id=149679669"
-                sky.SkyboxDn = "http://www.roblox.com/asset/?id=149681979"
-                sky.SkyboxFt = "http://www.roblox.com/asset/?id=149679690"
-                sky.SkyboxLf = "http://www.roblox.com/asset/?id=149679709"
-                sky.SkyboxRt = "http://www.roblox.com/asset/?id=149679722"
-                sky.SkyboxUp = "http://www.roblox.com/asset/?id=149680199"
+})
+-- Custom Clock Time
+getgenv().envt:AddToggle("CustomClockTime", {
+    Text = "Custom Clock Time",
+    Default = false,
+    Callback = function(Value)
+        CustomClockTime = Value
+        LightingService.ClockTime = Value and ClockTimeValue or originalClockTime
+    end
+})
+getgenv().envt:AddSlider("ClockTimeValue", {
+    Text = "Clock Time",
+    Min = 0,
+    Max = 24,
+    Default = originalClockTime,
+    Rounding = 1,
+    Callback = function(Value)
+        ClockTimeValue = Value
+        if CustomClockTime then
+            LightingService.ClockTime = Value
+        end
+    end
+})
+-- Global Shadows
+getgenv().envt:AddToggle("GlobalShadows", {
+    Text = "Global Shadows",
+    Default = originalGlobalShadows,
+    Callback = function(Value)
+        LightingService.GlobalShadows = Value
+    end
+})
+-- Environment Diffuse
+getgenv().envt:AddToggle("CustomEnvironmentDiffuse", {
+    Text = "Custom Environment Diffuse",
+    Default = false,
+    Callback = function(Value)
+        CustomEnvironmentDiffuse = Value
+        LightingService.EnvironmentDiffuseScale = Value and EnvironmentDiffuseValue or originalEnvironmentDiffuseScale
+    end
+})
+getgenv().envt:AddSlider("EnvironmentDiffuseValue", {
+    Text = "Environment Diffuse Scale",
+    Min = 0,
+    Max = 1,
+    Default = originalEnvironmentDiffuseScale,
+    Rounding = 2,
+    Callback = function(Value)
+        EnvironmentDiffuseValue = Value
+        if CustomEnvironmentDiffuse then
+            LightingService.EnvironmentDiffuseScale = Value
+        end
+    end
+})
+-- Environment Specular
+getgenv().envt:AddToggle("CustomEnvironmentSpecular", {
+    Text = "Custom Environment Specular",
+    Default = false,
+    Callback = function(Value)
+        CustomEnvironmentSpecular = Value
+        LightingService.EnvironmentSpecularScale = Value and EnvironmentSpecularValue or originalEnvironmentSpecularScale
+    end
+})
+getgenv().envt:AddSlider("EnvironmentSpecularValue", {
+    Text = "Environment Specular Scale",
+    Min = 0,
+    Max = 1,
+    Default = originalEnvironmentSpecularScale,
+    Rounding = 2,
+    Callback = function(Value)
+        EnvironmentSpecularValue = Value
+        if CustomEnvironmentSpecular then
+            LightingService.EnvironmentSpecularScale = Value
+        end
+    end
+})
+-- Exposure Compensation
+getgenv().envt:AddToggle("CustomExposure", {
+    Text = "Custom Exposure",
+    Default = false,
+    Callback = function(Value)
+        CustomExposure = Value
+        LightingService.ExposureCompensation = Value and ExposureValue or originalExposureCompensation
+    end
+})
+getgenv().envt:AddSlider("ExposureValue", {
+    Text = "Exposure Compensation",
+    Min = -3,
+    Max = 3,
+    Default = originalExposureCompensation,
+    Rounding = 1,
+    Callback = function(Value)
+        ExposureValue = Value
+        if CustomExposure then
+            LightingService.ExposureCompensation = Value
+        end
+    end
+})
+-- Color Shift Bottom
+getgenv().envt:AddToggle("CustomColorShiftBottom", {
+    Text = "Custom Color Shift Bottom",
+    Default = false,
+    Callback = function(Value)
+        CustomColorShiftBottom = Value
+        LightingService.ColorShift_Bottom = Value and ColorShiftBottomColor or originalColorShiftBottom
+    end
+}):AddColorPicker("ColorShiftBottomColor", {
+    Default = originalColorShiftBottom,
+    Callback = function(Value)
+        ColorShiftBottomColor = Value
+        if CustomColorShiftBottom then
+            LightingService.ColorShift_Bottom = Value
+        end
+    end
+})
+-- Color Shift Top
+getgenv().envt:AddToggle("CustomColorShiftTop", {
+    Text = "Custom Color Shift Top",
+    Default = false,
+    Callback = function(Value)
+        CustomColorShiftTop = Value
+        LightingService.ColorShift_Top = Value and ColorShiftTopColor or originalColorShiftTop
+    end
+}):AddColorPicker("ColorShiftTopColor", {
+    Default = originalColorShiftTop,
+    Callback = function(Value)
+        ColorShiftTopColor = Value
+        if CustomColorShiftTop then
+            LightingService.ColorShift_Top = Value
+        end
+    end
+})
+-- Geographic Latitude
+getgenv().envt:AddToggle("CustomGeographicLatitude", {
+    Text = "Custom Geographic Latitude",
+    Default = false,
+    Callback = function(Value)
+        CustomGeographicLatitude = Value
+        LightingService.GeographicLatitude = Value and GeographicLatitudeValue or originalGeographicLatitude
+    end
+})
+getgenv().envt:AddSlider("GeographicLatitudeValue", {
+    Text = "Geographic Latitude",
+    Min = -90,
+    Max = 90,
+    Default = originalGeographicLatitude,
+    Rounding = 1,
+    Callback = function(Value)
+        GeographicLatitudeValue = Value
+        if CustomGeographicLatitude then
+            LightingService.GeographicLatitude = Value
+        end
+    end
+})
+-- Shadow Mode
+getgenv().envt:AddDropdown("ShadowMode", {
+    Values = { "Hard", "Medium", "Soft" },
+    Default = "Medium",
+    Multi = false,
+    Text = "Shadow Mode",
+    Callback = function(Value)
+        local softness = Value == "Hard" and 0 or Value == "Medium" and 0.5 or 1
+        LightingService.ShadowSoftness = softness
+    end
+})
+--====================================================================--
+--============================== MISC =================================--
+--====================================================================--
+-- Nebula Theme
+getgenv().envt:AddToggle("NebulaTheme", {
+    Text = "Nebula Theme",
+    Default = false,
+    Callback = function(state)
+        nebulaEnabled = state
+        if state then
+            local b = Instance.new("BloomEffect", LightingService)
+            b.Intensity = 0.7
+            b.Size = 24
+            b.Threshold = 1
+            b.Name = "NebulaBloom"
+            local c = Instance.new("ColorCorrectionEffect", LightingService)
+            c.Saturation = 0.5
+            c.Contrast = 0.2
+            c.TintColor = nebulaThemeColor
+            c.Name = "NebulaColorCorrection"
+            local a = Instance.new("Atmosphere", LightingService)
+            a.Density = 0.4
+            a.Offset = 0.25
+            a.Glare = 1
+            a.Haze = 2
+            a.Color = nebulaThemeColor
+            a.Decay = Color3.fromRGB(25, 25, 112)
+            a.Name = "NebulaAtmosphere"
+            LightingService.Ambient = nebulaThemeColor
+            LightingService.OutdoorAmbient = nebulaThemeColor
+            LightingService.FogStart = 100
+            LightingService.FogEnd = 500
+            LightingService.FogColor = nebulaThemeColor
+        else
+            for _, name in pairs({"NebulaBloom", "NebulaColorCorrection", "NebulaAtmosphere"}) do
+                local obj = LightingService:FindFirstChild(name)
+                if obj then obj:Destroy() end
             end
-            Library:Notify("Skybox " .. skyboxType .. " applied", 5)
-        else
-            sky.SkyboxBk = defaultSkybox.SkyboxBk
-            sky.SkyboxDn = defaultSkybox.SkyboxDn
-            sky.SkyboxFt = defaultSkybox.SkyboxFt
-            sky.SkyboxLf = defaultSkybox.SkyboxLf
-            sky.SkyboxRt = defaultSkybox.SkyboxRt
-            sky.SkyboxUp = defaultSkybox.SkyboxUp
-            Library:Notify("Skybox restored to default", 5)
+            LightingService.Ambient = originalAmbient
+            LightingService.OutdoorAmbient = originalOutdoorAmbient
+            LightingService.FogStart = originalFogStart
+            LightingService.FogEnd = originalFogEnd
+            LightingService.FogColor = originalFogColor
         end
-    end)
-end
-
-envt:AddToggle('SkyboxToggle', {
-    Text = 'Enable Skybox',
+    end
+}):AddColorPicker("NebulaColor", {
+    Default = Color3.fromRGB(173, 216, 230),
+    Callback = function(c)
+        nebulaThemeColor = c
+        if nebulaEnabled then
+            local nc = LightingService:FindFirstChild("NebulaColorCorrection")
+            if nc then nc.TintColor = c end
+            local na = LightingService:FindFirstChild("NebulaAtmosphere")
+            if na then na.Color = c end
+            LightingService.Ambient = c
+            LightingService.OutdoorAmbient = c
+            LightingService.FogColor = c
+        end
+    end
+})
+-- Custom Skybox
+getgenv().envt:AddToggle("CustomSkybox", {
+    Text = "Custom Skybox",
     Default = false,
-    Tooltip = 'Enable or disable custom skybox',
     Callback = function(Value)
-        skyboxEnabled = Value
-        changeSkybox() -- Áp dụng hoặc khôi phục skybox
+        CustomSkybox = Value
+        Visuals:SwitchSkybox(Value and (SelectedSkybox or "Game's Default Sky") or "Game's Default Sky")
     end
 })
-
-envt:AddDropdown('SkyboxType', {
-    Text = 'Skybox Type',
-    Values = {'Sky 1', 'Sky 2', 'Sky 3', 'Sky 4', 'Sky 5', 'Sky 6', 'Sky 7', 'Summer', 'Galaxy', 'Stylized', 'Minecraft', 'Sunset' , 'Cloudy rain', 'Black Cloudy Rain'},
-    Default = 'Sky 1',
-    Tooltip = 'Select skybox style',
+getgenv().envt:AddDropdown("SelectedSkybox", {
+    Values = SkyboxNames,
+    Default = "Game's Default Sky",
+    Multi = false,
+    Text = "Skybox",
     Callback = function(Value)
-        local typeMap = {
-            ['Sky 1'] = 1, ['Sky 2'] = 2, ['Sky 3'] = 3, ['Sky 4'] = 4,
-            ['Sky 5'] = 5, ['Sky 6'] = 6, ['Sky 7'] = 7,
-            ['Summer'] = 8, ['Galaxy'] = 9, ['Stylized'] = 10, ['Minecraft'] = 11, ['Sunset'] = 12, ['Cloudy rain'] = 13, ['Black Cloudy Rain'] = 14
-        }
-        skyboxType = typeMap[Value]
+        SelectedSkybox = Value
+        if CustomSkybox then
+            Visuals:SwitchSkybox(Value)
+        end
     end
 })
-
-envt:AddButton('Apply Sky', function()
-    changeSkybox()
-end)
 
 getgenv().walkSpeedEnabled, getgenv().jumpPowerEnabled, getgenv().cframeSpeedEnabled = false, false, false
 getgenv().walkSpeedKeybindActive, getgenv().cframeSpeedKeybindActive = false, false
@@ -3058,7 +3683,7 @@ uhhh:AddToggle('CFrameSpeedToggle', {
     Text = 'Cframe',
     Mode = 'Toggle',
     Callback = function(state)
-        if game:GetService("UserInputService"):GetFocusedTextBox() then return end
+        if UserInputService:GetFocusedTextBox() then return end
         if getgenv().cframeSpeedEnabled then getgenv().cframeSpeedKeybindActive = state end
     end,
 })
@@ -3075,7 +3700,7 @@ uhhh:AddToggle('WalkSpeedToggle', {
     Text = 'Velocity',
     Mode = 'Toggle',
     Callback = function(state)
-        if game:GetService("UserInputService"):GetFocusedTextBox() then return end
+        if UserInputService:GetFocusedTextBox() then return end
         if getgenv().walkSpeedEnabled then getgenv().walkSpeedKeybindActive = state end
     end,
 })
@@ -3121,7 +3746,7 @@ uhhh:AddSlider('CFrameSpeedSlider', {
     end,
 })
 
-game:GetService('RunService').RenderStepped:Connect(function()
+RunService.RenderStepped:Connect(function()
     local player = game.Players.LocalPlayer
     local humanoid = player.Character and player.Character:FindFirstChild('Humanoid')
     if not humanoid then return end
@@ -3165,7 +3790,6 @@ end
 local function StartFly()
     if getgenv().Flying then return end
     getgenv().Flying = true
-    LocalPlayer.Character:FindFirstChildOfClass("Humanoid").PlatformStand = true
     local Core = CreateCore()
     local BV = Instance.new("BodyVelocity", Core)
     BV.MaxForce = Vector3.new(9e9, 9e9, 9e9)
@@ -3192,7 +3816,6 @@ end
 local function StopFly()
     if not getgenv().Flying then return end
     getgenv().Flying = false
-    LocalPlayer.Character:FindFirstChildOfClass("Humanoid").PlatformStand = false
     if workspace:FindFirstChild("Core") then workspace.Core:Destroy() end
 end
 
@@ -3234,7 +3857,7 @@ getgenv().SpinSpeed = 10
 local function toggleSpinbot(state)
     if state then
         if not getgenv().SpinConnection then
-            getgenv().SpinConnection = game:GetService("RunService").RenderStepped:Connect(function()
+            getgenv().SpinConnection = RunService.RenderStepped:Connect(function()
                 if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and not getgenv().Flying then
                     LocalPlayer.Character.Humanoid.AutoRotate = false
                     LocalPlayer.Character.HumanoidRootPart.CFrame = LocalPlayer.Character.HumanoidRootPart.CFrame * CFrame.Angles(0, math.rad(getgenv().SpinSpeed), 0)
@@ -3319,30 +3942,95 @@ end
 
 local stutz = Tabs.Character:AddRightGroupbox('Misc')
 
+-- Danh sách animation (có thêm "Take The L")
+local animations = {
+    ["Take The L"] = "rbxassetid://95656304023751",
+    ["Floss"] = "rbxassetid://10714340543",
+    ["Yungblud Happier Jump"] = "rbxassetid://15609995579",
+    ["Godlike"] = "rbxassetid://10714347256",
+    ["Mae Stephens - Piano Hands"] = "rbxassetid://16553163212",
+    ["Victory Dance"] = "rbxassetid://15505456446",
+    ["Elton John - Heart Skip"] = "rbxassetid://11309255148",
+    ["Sturdy Dance - Ice Spice"] = "rbxassetid://17746180844",
+    ["Old Town Road Dance - Lil Nas X (LNX)"] = "rbxassetid://10714391240",
+    ["Sidekicks"] = "rbxassetid://10370362157",
+    ["Baby Dance"] = "rbxassetid://10713983178",
+    ["Baby Queen - Bouncy Twirl"] = "rbxassetid://14352343065",
+    ["Rampage"] = "rbxassetid://139658061151500",
+    ["Rambunctious"] = "rbxassetid://85916053135662",
+    ["Griddy"] = "rbxassetid://121966805049108",
+    ["Orange Justice"] = "rbxassetid://78927657777256",
+}
+
+-- Tạo danh sách hiển thị (loại trùng nếu có)
+local animationNames = {}
+local seen = {}
+for name, _ in pairs(animations) do
+    if not seen[name] then
+        table.insert(animationNames, name)
+        seen[name] = true
+    end
+end
+
 stutz:AddDropdown("AnimationDropdown", {
-    Values = {"Take The L", "Floss", "Jump Happier"},
+    Values = {
+        "Take The L",
+        "Baby Queen - Bouncy Twirl",
+        "Floss",
+        "Yungblud Happier Jump",
+        "Godlike",
+        "Mae Stephens - Piano Hands",
+        "Victory Dance",
+        "Elton John - Heart Skip",
+        "Sturdy Dance - Ice Spice",
+        "Old Town Road Dance - Lil Nas X (LNX)",
+        "Sidekicks",
+        "Baby Dance",
+        "Rampage",
+        "Rambunctious",
+        "Griddy",
+        "Orange Justice"
+    },
     Default = "Take The L",
     Multi = false,
     Text = "Select Animation",
     Callback = function(value)
-        if value == "Take The L" then
-            getgenv().selectedAnimationId = "rbxassetid://95656304023751"
-        elseif value == "Floss" then
-            getgenv().selectedAnimationId = "rbxassetid://10714340543"
-        elseif value == "Jump Happier" then
-            getgenv().selectedAnimationId = "http://www.roblox.com/asset/?id=15609995579"
-        end
-        
-        -- Reload animation nếu đang bật
+        -- Bảng animation ID
+        local animationIds = {
+            ["Take The L"] = "rbxassetid://95656304023751",
+            ["Baby Queen - Bouncy Twirl"] = "rbxassetid://14352343065",
+            ["Floss"] = "rbxassetid://10714340543",
+            ["Yungblud Happier Jump"] = "rbxassetid://15609995579",
+            ["Godlike"] = "rbxassetid://10714347256",
+            ["Mae Stephens - Piano Hands"] = "rbxassetid://16553163212",
+            ["Victory Dance"] = "rbxassetid://15505456446",
+            ["Elton John - Heart Skip"] = "rbxassetid://11309255148",
+            ["Sturdy Dance - Ice Spice"] = "rbxassetid://17746180844",
+            ["Old Town Road Dance - Lil Nas X (LNX)"] = "rbxassetid://10714391240",
+            ["Sidekicks"] = "rbxassetid://10370362157",
+            ["Baby Dance"] = "rbxassetid://10713983178",
+            ["Rampage"] = "rbxassetid://139658061151500",
+            ["Rambunctious"] = "rbxassetid://85916053135662",
+            ["Griddy"] = "rbxassetid://121966805049108",
+            ["Orange Justice"] = "rbxassetid://78927657777256"
+        }
+
+        -- Gán animation được chọn
+        getgenv().selectedAnimationId = animationIds[value]
+
+        -- Dừng animation hiện tại (nếu có)
         if getgenv().animationTrack then
             getgenv().animationTrack:Stop()
             getgenv().animationTrack = nil
         end
+
+        -- Tải lại animation nếu đang bật
         if getgenv().playAnimationEnabled and LocalPlayer.Character then
             loadAnimationTrack(LocalPlayer.Character)
         end
     end
 })
+
 
 stutz:AddSlider("AnimationSpeedSlider", {
     Text = "Animation Speed",
@@ -3418,28 +4106,6 @@ DesyncBox = Tabs.Character:AddRightGroupbox("Anti Aim")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local LocalPlayer = game:GetService("Players").LocalPlayer
-
-AntiLock = {
-    Enabled = false,
-    Mode = "Custom",
-    Custom = { X = 0, Y = 0, Z = 0 },
-    Up = { Amount = 0 },
-    Down = { Amount = 0 },
-    VelMultiply = { Walk = 0, Jump = 0 },
-    LookVec = { Amount = 0 },
-    Reverse = { Amount = 0, Type = "CFrame" },
-    Confusion = { Amount = 0 },
-    PredBreaker = false
-}
-
-desync = {
-    enabled = false,
-    mode = "Void",
-    teleportPosition = Vector3.new(0, 0, 0),
-    old_position = nil,
-    voidSpamActive = false,
-    toggleEnabled = false
-}
 
 function resetCamera()
     if LocalPlayer.Character then
@@ -4127,8 +4793,6 @@ Modifications:AddToggle('Flashback', {
     end,
 })
 
-local isDaHood = (game.PlaceId == 2788229376)
-
 if isDaHood then
     -- === CHỈ LOAD KHI LÀ DA HOOD ===
     getgenv().XZQW_ENABLED = false
@@ -4344,7 +5008,7 @@ Modifications:AddToggle('AntiStomp', {
         end
     end,
 })
-
+task.wait(1)
 Modifications:AddDropdown('MyDropdown', {
     Values = { 'Normal', 'Rifle'},
     Default = "Normal",
@@ -4356,197 +5020,198 @@ Modifications:AddDropdown('MyDropdown', {
         reloadMethod = selected
     end
 })
-
-
-
-local AutoBuy = Tabs.Misc:AddLeftGroupbox("Shop")
-local Workspace = game:GetService("Workspace")
-
-local ShopFolder = Workspace:WaitForChild("Ignored"):WaitForChild("Shop")
-local SelectedItem, Debounce = nil, false
-local AutoBuyOnRespawn = false
-local AmmoBuyCount = 0
-
-local ShopItems = {
-    "[Taco] - $2",
-    "[Hamburger] - $5",
-    "[Revolver] - $1421",
-    "12 [Revolver Ammo] - $55",
-    "90 [AUG Ammo] - $87",
-    "[AUG] - $2131",
-    "[Rifle] - $1694",
-    "[LMG] - $4098",
-    "200 [LMG Ammo] - $328",
-}
-
-AutoBuy:AddDropdown('Shop_Dropdown', {
-    Values = ShopItems,
-    Default = 1,
-    Multi = false,
-    Text = 'Select an Item',
-    Callback = function(Value)
-        SelectedItem = Value
-    end
-})
-
-local function GetCharacterRoot()
-    local Character = LocalPlayer.Character
-    return Character and Character:FindFirstChild("HumanoidRootPart")
+if isDaHood then
+	local AutoBuy = Tabs.Misc:AddLeftGroupbox("Shop")
+	local Workspace = game:GetService("Workspace")
+	
+	local ShopFolder = Workspace:WaitForChild("Ignored"):WaitForChild("Shop")
+	local SelectedItem, Debounce = nil, false
+	local AutoBuyOnRespawn = false
+	local AmmoBuyCount = 0
+	
+	local ShopItems = {
+	    "[Taco] - $2",
+	    "[Hamburger] - $5",
+	    "[Revolver] - $1421",
+	    "12 [Revolver Ammo] - $55",
+	    "90 [AUG Ammo] - $87",
+	    "[AUG] - $2131",
+	    "[Rifle] - $1694",
+	    "[LMG] - $4098",
+	    "200 [LMG Ammo] - $328",
+	}
+	
+	AutoBuy:AddDropdown('Shop_Dropdown', {
+	    Values = ShopItems,
+	    Default = 1,
+	    Multi = false,
+	    Text = 'Select an Item',
+	    Callback = function(Value)
+	        SelectedItem = Value
+	    end
+	})
+	
+	local function GetCharacterRoot()
+	    local Character = LocalPlayer.Character
+	    return Character and Character:FindFirstChild("HumanoidRootPart")
+	end
+	
+	local function BuyItem(ItemName)
+	    if not ItemName or Debounce then return end
+	    Debounce = true
+	
+	    local wasDesyncEnabled = desync.enabled
+	    if wasDesyncEnabled then
+	        toggleDesync(false)
+	        task.wait(0.1)
+	    end
+	
+	    local RootPart = GetCharacterRoot()
+	    if not RootPart then 
+	        Library:Notify("[ERROR] No HumanoidRootPart found!", 3)
+	        Debounce = false
+	        return
+	    end
+	
+	    local ItemModel = ShopFolder:FindFirstChild(ItemName)
+	    if ItemModel then
+	        local ClickDetector = ItemModel:FindFirstChildOfClass("ClickDetector")
+	        if ClickDetector then
+	            local OriginalPosition = RootPart.CFrame
+	
+	            RootPart.CFrame = CFrame.new(ItemModel.Head.Position + Vector3.new(0, 3, 0))
+	            task.wait(0.2)
+	
+	            fireclickdetector(ClickDetector)
+	
+	            Library:Notify("Purchased: " .. ItemName, 3)
+	
+	            RootPart.CFrame = OriginalPosition
+	        else
+	            Library:Notify("[ERROR] ClickDetector not found in " .. ItemName, 3)
+	        end
+	    else
+	        Library:Notify("[ERROR] Item not found: " .. ItemName, 3)
+	    end
+	
+	    if wasDesyncEnabled then
+	        task.wait(0.2)
+	        toggleDesync(true)
+	    end
+	
+	    Debounce = false
+	end
+	
+	local function BuyAmmo()
+	    if not SelectedItem or Debounce then return end
+	
+	    local AmmoMap = {
+	        ["[Revolver] - $1421"] = "12 [Revolver Ammo] - $55",
+	        ["[AUG] - $2131"] = "90 [AUG Ammo] - $87",
+	        ["[LMG] - $4098"] = "200 [LMG Ammo] - $328",
+	        ["[Rifle] - $1694"] = "5 [Rifle Ammo] - $273",
+	    }
+	
+	    local AmmoItem = AmmoMap[SelectedItem]
+	    if AmmoItem then
+	        BuyItem(AmmoItem)
+	    else
+	        Library:Notify("[ERROR] No ammo available.", 3)
+	    end
+	end
+	
+	local function AutoBuyOnRespawnHandler()
+	    if not AutoBuyOnRespawn or not SelectedItem then return end
+	
+	    BuyItem(SelectedItem)
+	
+	    if AmmoBuyCount < 3 then
+	        for i = 1, 3 do
+	            BuyAmmo()
+	            task.wait(0.5)
+	        end
+	        AmmoBuyCount = 3
+	    end
+	end
+	
+	AutoBuy:AddToggle('AutoBuyOnRespawn', {
+	    Text = 'Auto Buy on Respawn',
+	    Default = false,
+	    Callback = function(state)
+	        AutoBuyOnRespawn = state
+	        AmmoBuyCount = 0
+	    end
+	})
+	
+	local buy = AutoBuy:AddButton({
+	    Text = 'Buy Item',
+	    Func = function()
+	        BuyItem(SelectedItem)
+	    end,
+	    DoubleClick = false,
+	    Tooltip = 'Buys the selected item'
+	})
+	
+	buy:AddButton({
+	    Text = 'Buy Ammo',
+	    Func = function()
+	        BuyAmmo()
+	    end,
+	    DoubleClick = false,
+	    Tooltip = 'Buys ammo for the selected weapon'
+	})
+	
+	LocalPlayer.CharacterAdded:Connect(function()
+	    task.wait(1)
+	    ShopFolder = Workspace:WaitForChild("Ignored"):WaitForChild("Shop")
+	    AutoBuyOnRespawnHandler()
+	end)
+	
+	getgenv().AutoKnifeEnabled = false
+	
+	AutoBuy:AddToggle('AutoKnifeToggle', {
+	    Text = 'Auto Knife',
+	    Default = false,
+	    Callback = function(state)
+	        getgenv().AutoKnifeEnabled = state
+	        if state then
+	            task.spawn(function()
+	                while getgenv().AutoKnifeEnabled do
+	                    local player = game.Players.LocalPlayer
+	                    local hasKnife = false
+	
+	                    -- Kiểm tra xem có knife trong Backpack hoặc Character không
+	                    if player.Backpack:FindFirstChild("[Knife]") or (player.Character and player.Character:FindFirstChild("[Knife]")) then
+	                        hasKnife = true
+	                    end
+	
+	                    -- Nếu không có knife, thực hiện logic mua
+	                    if not hasKnife and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+	                        local knifeShop = game.Workspace.Ignored.Shop['[Knife] - $155']
+	                        local originalPos = player.Character.HumanoidRootPart.Position
+	
+	                        -- Dịch chuyển đến vị trí shop
+	                        player.Character.HumanoidRootPart.CFrame = knifeShop.Head.CFrame + Vector3.new(0, 3, 0)
+	
+	                        -- Kiểm tra khoảng cách
+	                        if (player.Character.HumanoidRootPart.Position - knifeShop.Head.Position).Magnitude <= 50 then
+	                            wait(0.2)
+	                            fireclickdetector(knifeShop:FindFirstChild("ClickDetector"), 4)
+	                            -- Trở về vị trí ban đầu
+	                            player.Character.HumanoidRootPart.CFrame = CFrame.new(originalPos)
+	                        end
+	                    end
+	
+	                    task.wait(0.5) -- Đợi 0.5s để tránh lag
+	                end
+	            end)
+	        end
+	    end
+	})
+else
+    -- === BỎ QUA NẾU KHÔNG PHẢI DA HOOD ===
+    print("Không phải Da Hood → Bỏ qua Auto Buy")
 end
-
-local function BuyItem(ItemName)
-    if not ItemName or Debounce then return end
-    Debounce = true
-
-    local wasDesyncEnabled = desync.enabled
-    if wasDesyncEnabled then
-        toggleDesync(false)
-        task.wait(0.1)
-    end
-
-    local RootPart = GetCharacterRoot()
-    if not RootPart then 
-        Library:Notify("[ERROR] No HumanoidRootPart found!", 3)
-        Debounce = false
-        return
-    end
-
-    local ItemModel = ShopFolder:FindFirstChild(ItemName)
-    if ItemModel then
-        local ClickDetector = ItemModel:FindFirstChildOfClass("ClickDetector")
-        if ClickDetector then
-            local OriginalPosition = RootPart.CFrame
-
-            RootPart.CFrame = CFrame.new(ItemModel.Head.Position + Vector3.new(0, 3, 0))
-            task.wait(0.2)
-
-            fireclickdetector(ClickDetector)
-
-            Library:Notify("Purchased: " .. ItemName, 3)
-
-            RootPart.CFrame = OriginalPosition
-        else
-            Library:Notify("[ERROR] ClickDetector not found in " .. ItemName, 3)
-        end
-    else
-        Library:Notify("[ERROR] Item not found: " .. ItemName, 3)
-    end
-
-    if wasDesyncEnabled then
-        task.wait(0.2)
-        toggleDesync(true)
-    end
-
-    Debounce = false
-end
-
-local function BuyAmmo()
-    if not SelectedItem or Debounce then return end
-
-    local AmmoMap = {
-        ["[Revolver] - $1421"] = "12 [Revolver Ammo] - $55",
-        ["[AUG] - $2131"] = "90 [AUG Ammo] - $87",
-        ["[LMG] - $4098"] = "200 [LMG Ammo] - $328",
-        ["[Rifle] - $1694"] = "5 [Rifle Ammo] - $273",
-    }
-
-    local AmmoItem = AmmoMap[SelectedItem]
-    if AmmoItem then
-        BuyItem(AmmoItem)
-    else
-        Library:Notify("[ERROR] No ammo available.", 3)
-    end
-end
-
-local function AutoBuyOnRespawnHandler()
-    if not AutoBuyOnRespawn or not SelectedItem then return end
-
-    BuyItem(SelectedItem)
-
-    if AmmoBuyCount < 3 then
-        for i = 1, 3 do
-            BuyAmmo()
-            task.wait(0.5)
-        end
-        AmmoBuyCount = 3
-    end
-end
-
-AutoBuy:AddToggle('AutoBuyOnRespawn', {
-    Text = 'Auto Buy on Respawn',
-    Default = false,
-    Callback = function(state)
-        AutoBuyOnRespawn = state
-        AmmoBuyCount = 0
-    end
-})
-
-local buy = AutoBuy:AddButton({
-    Text = 'Buy Item',
-    Func = function()
-        BuyItem(SelectedItem)
-    end,
-    DoubleClick = false,
-    Tooltip = 'Buys the selected item'
-})
-
-buy:AddButton({
-    Text = 'Buy Ammo',
-    Func = function()
-        BuyAmmo()
-    end,
-    DoubleClick = false,
-    Tooltip = 'Buys ammo for the selected weapon'
-})
-
-LocalPlayer.CharacterAdded:Connect(function()
-    task.wait(1)
-    ShopFolder = Workspace:WaitForChild("Ignored"):WaitForChild("Shop")
-    AutoBuyOnRespawnHandler()
-end)
-
-getgenv().AutoKnifeEnabled = false
-
-AutoBuy:AddToggle('AutoKnifeToggle', {
-    Text = 'Auto Knife',
-    Default = false,
-    Callback = function(state)
-        getgenv().AutoKnifeEnabled = state
-        if state then
-            task.spawn(function()
-                while getgenv().AutoKnifeEnabled do
-                    local player = game.Players.LocalPlayer
-                    local hasKnife = false
-
-                    -- Kiểm tra xem có knife trong Backpack hoặc Character không
-                    if player.Backpack:FindFirstChild("[Knife]") or (player.Character and player.Character:FindFirstChild("[Knife]")) then
-                        hasKnife = true
-                    end
-
-                    -- Nếu không có knife, thực hiện logic mua
-                    if not hasKnife and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-                        local knifeShop = game.Workspace.Ignored.Shop['[Knife] - $155']
-                        local originalPos = player.Character.HumanoidRootPart.Position
-
-                        -- Dịch chuyển đến vị trí shop
-                        player.Character.HumanoidRootPart.CFrame = knifeShop.Head.CFrame + Vector3.new(0, 3, 0)
-
-                        -- Kiểm tra khoảng cách
-                        if (player.Character.HumanoidRootPart.Position - knifeShop.Head.Position).Magnitude <= 50 then
-                            wait(0.2)
-                            fireclickdetector(knifeShop:FindFirstChild("ClickDetector"), 4)
-                            -- Trở về vị trí ban đầu
-                            player.Character.HumanoidRootPart.CFrame = CFrame.new(originalPos)
-                        end
-                    end
-
-                    task.wait(0.5) -- Đợi 0.5s để tránh lag
-                end
-            end)
-        end
-    end
-})
-
 Modifications:AddToggle('AntiVoid', {
     Text = 'Anti Void',
     Default = false,
@@ -4764,115 +5429,121 @@ Modifications:AddToggle("AntiSitToggle", {
         end)
     end
 })
-
-getgenv().AntiRPGDesyncEnabled, getgenv().GrenadeDetectionEnabled, getgenv().AntiRPGDesyncLoop = false, false, nil
-local RunService, Workspace, LocalPlayer = game:GetService("RunService"), game.Workspace, game.Players.LocalPlayer
-
-local function IsThreatNear(threatName)
-    local Threat = Workspace:FindFirstChild("Ignored") and Workspace.Ignored:FindFirstChild(threatName)
-    local HRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-    return Threat and HRP and (Threat.Position - HRP.Position).Magnitude < 16
+if isDaHood then
+	getgenv().AntiRPGDesyncEnabled, getgenv().GrenadeDetectionEnabled, getgenv().AntiRPGDesyncLoop = false, false, nil
+	local RunService, Workspace, LocalPlayer = game:GetService("RunService"), game.Workspace, game.Players.LocalPlayer
+	
+	local function IsThreatNear(threatName)
+	    local Threat = Workspace:FindFirstChild("Ignored") and Workspace.Ignored:FindFirstChild(threatName)
+	    local HRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+	    return Threat and HRP and (Threat.Position - HRP.Position).Magnitude < 16
+	end
+	
+	local function StartThreatDetection()
+	    if getgenv().AntiRPGDesyncLoop then return end
+	
+	    getgenv().AntiRPGDesyncLoop = RunService.PostSimulation:Connect(function()
+	        local HRP, Humanoid = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart"), LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid")
+	        if not HRP or not Humanoid then return end
+	
+	        local RPGThreat = Workspace.Ignored:FindFirstChild("Model") and Workspace.Ignored.Model:FindFirstChild("Launcher")
+	        local GrenadeThreat = IsThreatNear("Handle")
+	
+	        if (getgenv().AntiRPGDesyncEnabled and RPGThreat or getgenv().GrenadeDetectionEnabled and GrenadeThreat) then
+	            local Offset = Vector3.new(math.random(-100, 100), math.random(50, 150), math.random(-100, 100))
+	            Humanoid.CameraOffset = -Offset
+	            local OldCFrame = HRP.CFrame
+	            HRP.CFrame = CFrame.new(HRP.CFrame.Position + Offset)
+	            RunService.RenderStepped:Wait()
+	            HRP.CFrame = OldCFrame
+	        end
+	    end)
+	
+	    LocalPlayer.CharacterAdded:Connect(function()
+	        task.wait(1)
+	        if getgenv().AntiRPGDesyncEnabled or getgenv().GrenadeDetectionEnabled then StartThreatDetection() end
+	    end)
+	end
+	
+	local function StopThreatDetection()
+	    if getgenv().AntiRPGDesyncLoop then
+	        getgenv().AntiRPGDesyncLoop:Disconnect()
+	        getgenv().AntiRPGDesyncLoop = nil
+	    end
+	end
+	
+	Modifications:AddToggle('RPGDetection', {
+	    Text = 'RPG detection',
+	    Default = false,
+	    Callback = function(state)
+	        getgenv().AntiRPGDesyncEnabled = state
+	        if state or getgenv().GrenadeDetectionEnabled then StartThreatDetection() else StopThreatDetection() end
+	    end,
+	})
+	
+	Modifications:AddToggle('GrenadeDetection', {
+	    Text = 'grenade detection',
+	    Default = false,
+	    Callback = function(state)
+	        getgenv().GrenadeDetectionEnabled = state
+	        if state or getgenv().AntiRPGDesyncEnabled then StartThreatDetection() else StopThreatDetection() end
+	    end,
+	})
+	
+else
+    -- === BỎ QUA NẾU KHÔNG PHẢI DA HOOD ===
+    print("Không phải Da Hood → Bỏ qua antirpg,grenade detection and redeem code")
 end
-
-local function StartThreatDetection()
-    if getgenv().AntiRPGDesyncLoop then return end
-
-    getgenv().AntiRPGDesyncLoop = RunService.PostSimulation:Connect(function()
-        local HRP, Humanoid = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart"), LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid")
-        if not HRP or not Humanoid then return end
-
-        local RPGThreat = Workspace.Ignored:FindFirstChild("Model") and Workspace.Ignored.Model:FindFirstChild("Launcher")
-        local GrenadeThreat = IsThreatNear("Handle")
-
-        if (getgenv().AntiRPGDesyncEnabled and RPGThreat or getgenv().GrenadeDetectionEnabled and GrenadeThreat) then
-            local Offset = Vector3.new(math.random(-100, 100), math.random(50, 150), math.random(-100, 100))
-            Humanoid.CameraOffset = -Offset
-            local OldCFrame = HRP.CFrame
-            HRP.CFrame = CFrame.new(HRP.CFrame.Position + Offset)
-            RunService.RenderStepped:Wait()
-            HRP.CFrame = OldCFrame
-        end
-    end)
-
-    LocalPlayer.CharacterAdded:Connect(function()
-        task.wait(1)
-        if getgenv().AntiRPGDesyncEnabled or getgenv().GrenadeDetectionEnabled then StartThreatDetection() end
-    end)
-end
-
-local function StopThreatDetection()
-    if getgenv().AntiRPGDesyncLoop then
-        getgenv().AntiRPGDesyncLoop:Disconnect()
-        getgenv().AntiRPGDesyncLoop = nil
-    end
-end
-
-Modifications:AddToggle('RPGDetection', {
-    Text = 'RPG detection',
-    Default = false,
-    Callback = function(state)
-        getgenv().AntiRPGDesyncEnabled = state
-        if state or getgenv().GrenadeDetectionEnabled then StartThreatDetection() else StopThreatDetection() end
-    end,
-})
-
-Modifications:AddToggle('GrenadeDetection', {
-    Text = 'grenade detection',
-    Default = false,
-    Callback = function(state)
-        getgenv().GrenadeDetectionEnabled = state
-        if state or getgenv().AntiRPGDesyncEnabled then StartThreatDetection() else StopThreatDetection() end
-    end,
-})
-
 local webhook = Modifications:AddButton('Redeem Codes', function()
-    local codes = {
-        "MUSIC", "KINGPIN",
-       "BUBU", "BRAINROT", "LUXE", "TURBO", "BLOSSOM", "VALENTINES24", "ShortCake", "Beary"
-   }
-   local mainEvent = game:GetService("ReplicatedStorage"):WaitForChild("MainEvent") or nil
+	local codes = {
+		"MUSIC", "KINGPIN",
+		"BUBU", "BRAINROT", "LUXE", "TURBO", "BLOSSOM", "VALENTINES24", "ShortCake", "Beary"
+	}
+	local mainEvent = game:GetService("ReplicatedStorage"):WaitForChild("MainEvent") or nil
 
-   for _, code in pairs(codes) do
-       mainEvent:FireServer("EnterPromoCode", code)
-       Library:Notify("Trying code: " .. code .. " nigga.lol | Private", 5)
-       task.wait(4.2)
-   end
+	for _, code in pairs(codes) do
+		mainEvent:FireServer("EnterPromoCode", code)
+		Library:Notify("Trying code: " .. code .. " nigga.lol | Private", 5)
+		task.wait(4.2)
+	end
 end)
-
 webhook:AddButton('Force Reset', function()
     game.Players.LocalPlayer.Character.Humanoid.Health = 0
 end)
-
-Modifications:AddButton('Unjail', function()
-    local plr = game.Players.LocalPlayer
-    if plr.DataFolder.Currency.Value >= 125 then
-        plr.Character.HumanoidRootPart.CFrame = CFrame.new(-270.94, 20.327, -242.38)--Key
-        plr.Character.HumanoidRootPart.CFrame = CFrame.new(-270.94, 20.327, -242.38)--Key(Backup)
-        wait()
-        fireclickdetector(game:GetService("Workspace").Ignored.Shop["[Key] - $125"].ClickDetector)
-        wait(.1)
-        fireclickdetector(game:GetService("Workspace").Ignored.Shop["[Key] - $125"].ClickDetector)
-        fireclickdetector(game:GetService("Workspace").Ignored.Shop["[Key] - $125"].ClickDetector)
-        repeat wait() until plr.Backpack:FindFirstChild('[Key]')
-        local Hum = plr.Character:FindFirstChildOfClass('Humanoid')
-        if Hum.Health > 0 then
-            key1 = plr.Backpack:FindFirstChild('[Key]')
-            if key1 then
-                Hum:EquipTool(key1)
-                for i,v in pairs(game:GetService'Players'.LocalPlayer.Character:GetChildren())do
-                    if v:isA("Tool") then
-                        plr.Character.Humanoid:EquipTool(key1)
-                        plr.Character.HumanoidRootPart.CFrame = CFrame.new(-485.668, 23.631, -285.169)--Bank
-                        v:Activate()
-                    end
-                end
-            end
-        end
-    elseif plr.DataFolder.Currency.Value < 125 then
-        Library:Notify('Not Enough Cash (Required 125$)', 5)
-    end
-end)
-
+if isDaHood then
+	Modifications:AddButton('Unjail', function()
+	    local plr = game.Players.LocalPlayer
+	    if plr.DataFolder.Currency.Value >= 125 then
+	        plr.Character.HumanoidRootPart.CFrame = CFrame.new(-270.94, 20.327, -242.38)--Key
+	        plr.Character.HumanoidRootPart.CFrame = CFrame.new(-270.94, 20.327, -242.38)--Key(Backup)
+	        wait()
+	        fireclickdetector(game:GetService("Workspace").Ignored.Shop["[Key] - $125"].ClickDetector)
+	        wait(.1)
+	        fireclickdetector(game:GetService("Workspace").Ignored.Shop["[Key] - $125"].ClickDetector)
+	        fireclickdetector(game:GetService("Workspace").Ignored.Shop["[Key] - $125"].ClickDetector)
+	        repeat wait() until plr.Backpack:FindFirstChild('[Key]')
+	        local Hum = plr.Character:FindFirstChildOfClass('Humanoid')
+	        if Hum.Health > 0 then
+	            key1 = plr.Backpack:FindFirstChild('[Key]')
+	            if key1 then
+	                Hum:EquipTool(key1)
+	                for i,v in pairs(game:GetService'Players'.LocalPlayer.Character:GetChildren())do
+	                    if v:isA("Tool") then
+	                        plr.Character.Humanoid:EquipTool(key1)
+	                        plr.Character.HumanoidRootPart.CFrame = CFrame.new(-485.668, 23.631, -285.169)--Bank
+	                        v:Activate()
+	                    end
+	                end
+	            end
+	        end
+	    elseif plr.DataFolder.Currency.Value < 125 then
+	        Library:Notify('Not Enough Cash (Required 125$)', 5)
+	    end
+	end)
+else
+    -- === BỎ QUA NẾU KHÔNG PHẢI DA HOOD ===
+    print("Không phải Da Hood → Bỏ qua Unjail")
+end
 local ChatEnabled = true
 if chatWindow then
     chatWindow.Enabled = ChatEnabled
@@ -4888,535 +5559,541 @@ Modifications:AddToggle('Chat Spy', {
         end
     end,
 })
-
-local flashbackBox = Tabs.Misc:AddRightGroupbox("Detection")
-local antiModEnabled, checkModFriendsEnabled, groupCheckEnabled = false, false, false
-local antiModMethod = "Notify"
-
-
-local modList = {
-    163721789, 15427717, 201454243, 822999, 63794379, 17260230, 28357488,
-    93101606, 8195210, 89473551, 16917269, 85989579, 1553950697, 476537893,
-    155627580, 31163456, 7200829, 25717070, 201454243, 15427717, 63794379,
-    16138978, 60660789, 17260230, 16138978, 1161411094, 9125623, 11319153,
-    34758833, 194109750, 35616559, 1257271138, 28885841, 23558830, 25717070,
-    4255947062, 29242182, 2395613299, 3314981799, 3390225662, 2459178,
-    2846299656, 2967502742, 7001683347, 7312775547, 328566086, 170526279,
-    99356639, 352087139, 6074834798, 2212830051, 3944434729, 5136267958,
-    84570351, 542488819, 1830168970, 3950637598, 1962396833
-}
-
-local groupIDs = {10604500, 17215700}
-
-local function detectModerators()
-    while antiModEnabled do
-        task.wait(1)
-        for _, player in ipairs(Players:GetPlayers()) do
-            if table.find(modList, player.UserId) then
-                local message = "⚠️ MODERATOR DETECTED: " .. player.DisplayName .. " (" .. player.Name .. ")"
-                if antiModMethod == "Notify" then
-                    Library:Notify(message, 3)
-                else
-                    game.Players.LocalPlayer:Kick("🚨 " .. message)
-                end
-            end
-
-            if groupCheckEnabled then
-                for _, groupID in ipairs(groupIDs) do
-                    local success, isInGroup = pcall(function() return player:IsInGroup(groupID) end)
-                    if success and isInGroup then
-                        local roleName = "Unknown Role"
-                        pcall(function()
-                            roleName = player:GetRoleInGroup(groupID)
-                        end)
-
-                        local groupMessage = "⚠️ [" .. roleName .. "] JOINED: " .. player.DisplayName .. " (" .. player.Name .. ")"
-                        if antiModMethod == "Notify" then
-                            Library:Notify(groupMessage, 3)
-                        else
-                            game.Players.LocalPlayer:Kick("🚨 " .. groupMessage)
-                        end
-                    end
-                end
-            end
-        end
-    end
+if isDaHood then
+	local flashbackBox = Tabs.Misc:AddRightGroupbox("Detection")
+	local antiModEnabled, checkModFriendsEnabled, groupCheckEnabled = false, false, false
+	local antiModMethod = "Notify"
+	
+	
+	local modList = {
+	    163721789, 15427717, 201454243, 822999, 63794379, 17260230, 28357488,
+	    93101606, 8195210, 89473551, 16917269, 85989579, 1553950697, 476537893,
+	    155627580, 31163456, 7200829, 25717070, 201454243, 15427717, 63794379,
+	    16138978, 60660789, 17260230, 16138978, 1161411094, 9125623, 11319153,
+	    34758833, 194109750, 35616559, 1257271138, 28885841, 23558830, 25717070,
+	    4255947062, 29242182, 2395613299, 3314981799, 3390225662, 2459178,
+	    2846299656, 2967502742, 7001683347, 7312775547, 328566086, 170526279,
+	    99356639, 352087139, 6074834798, 2212830051, 3944434729, 5136267958,
+	    84570351, 542488819, 1830168970, 3950637598, 1962396833
+	}
+	
+	local groupIDs = {10604500, 17215700}
+	
+	local function detectModerators()
+	    while antiModEnabled do
+	        task.wait(1)
+	        for _, player in ipairs(Players:GetPlayers()) do
+	            if table.find(modList, player.UserId) then
+	                local message = "⚠️ MODERATOR DETECTED: " .. player.DisplayName .. " (" .. player.Name .. ")"
+	                if antiModMethod == "Notify" then
+	                    Library:Notify(message, 3)
+	                else
+	                    game.Players.LocalPlayer:Kick("🚨 " .. message)
+	                end
+	            end
+	
+	            if groupCheckEnabled then
+	                for _, groupID in ipairs(groupIDs) do
+	                    local success, isInGroup = pcall(function() return player:IsInGroup(groupID) end)
+	                    if success and isInGroup then
+	                        local roleName = "Unknown Role"
+	                        pcall(function()
+	                            roleName = player:GetRoleInGroup(groupID)
+	                        end)
+	
+	                        local groupMessage = "⚠️ [" .. roleName .. "] JOINED: " .. player.DisplayName .. " (" .. player.Name .. ")"
+	                        if antiModMethod == "Notify" then
+	                            Library:Notify(groupMessage, 3)
+	                        else
+	                            game.Players.LocalPlayer:Kick("🚨 " .. groupMessage)
+	                        end
+	                    end
+	                end
+	            end
+	        end
+	    end
+	end
+	
+	local function checkFriendsWithMods()
+	    while checkModFriendsEnabled do
+	        task.wait(1)
+	        for _, player in ipairs(Players:GetPlayers()) do
+	            pcall(function()
+	                for _, friend in pairs(player:GetFriendsAsync():GetCurrentPage()) do
+	                    if table.find(modList, friend.Id) then
+	                        local friendMessage = "⚠️ " .. player.DisplayName .. " (" .. player.Name .. ") is friends with a Moderator!"
+	                        Library:Notify(friendMessage, 4)
+	                        break
+	                    end
+	                end
+	            end)
+	        end
+	    end
+	end
+	
+	local AntiModToggle = flashbackBox:AddToggle("AntiModToggle", {
+	    Text = "Mod Detection",
+	    Default = false,
+	    Callback = function(Value)
+	        antiModEnabled = Value
+	        Library:Notify(antiModEnabled and "✅ Anti-Mod Enabled" or "⚠️ Anti-Mod Disabled", 3)
+	        if antiModEnabled then task.spawn(detectModerators) end
+	    end
+	})
+	
+	local AntiModDepbox = flashbackBox:AddDependencyBox()
+	AntiModDepbox:SetupDependencies({ { AntiModToggle, true } })
+	
+	AntiModDepbox:AddDropdown("AntiModMethod", {
+	    Values = {"Notify", "Kick"},
+	    Default = "Notify",
+	    Multi = false,
+	    Text = "Anti-Mod Method",
+	    Callback = function(Value)
+	        antiModMethod = Value
+	        Library:Notify("ℹ️ Anti-Mod Method set to: " .. antiModMethod, 3)
+	    end
+	})
+	
+	AntiModDepbox:AddToggle("CheckModFriends", {
+	    Text = "Friended Checking",
+	    Tooltip = "Detects if any player is friends with a Moderator",
+	    Default = false,
+	    Callback = function(Value)
+	        checkModFriendsEnabled = Value
+	        Library:Notify(checkModFriendsEnabled and "✅ Checking for Mod Friends Enabled" or "⚠️ Checking for Mod Friends Disabled", 3)
+	        if checkModFriendsEnabled then task.spawn(checkFriendsWithMods) end
+	    end
+	})
+	
+	local GroupCheckDepbox = AntiModDepbox:AddDependencyBox()
+	GroupCheckDepbox:SetupDependencies({ { AntiModToggle, true } })
+	
+	GroupCheckDepbox:AddToggle("GroupCheck", {
+	    Text = "Group Role Checking",
+	    Tooltip = "Detects if any player is in the restricted groups",
+	    Default = false,
+	    Callback = function(Value)
+	        groupCheckEnabled = Value
+	        Library:Notify(groupCheckEnabled and "✅ Group Membership Check Enabled" or "⚠️ Group Membership Check Disabled", 3)
+	        if groupCheckEnabled then task.spawn(detectModerators) end
+	    end
+	})
+else
+    -- === BỎ QUA NẾU KHÔNG PHẢI DA HOOD ===
+    print("Không phải Da Hood → Bỏ qua antimod")
 end
-
-local function checkFriendsWithMods()
-    while checkModFriendsEnabled do
-        task.wait(1)
-        for _, player in ipairs(Players:GetPlayers()) do
-            pcall(function()
-                for _, friend in pairs(player:GetFriendsAsync():GetCurrentPage()) do
-                    if table.find(modList, friend.Id) then
-                        local friendMessage = "⚠️ " .. player.DisplayName .. " (" .. player.Name .. ") is friends with a Moderator!"
-                        Library:Notify(friendMessage, 4)
-                        break
-                    end
-                end
-            end)
-        end
-    end
+if isDaHood then
+	Modifications:AddButton('Animations Packs', function()
+	    repeat
+	        wait()
+	    until game:IsLoaded() and game.Players.LocalPlayer.Character:FindFirstChild("FULLY_LOADED_CHAR") and game.Players.LocalPlayer.PlayerGui.MainScreenGui:FindFirstChild("AnimationPack") and game.Players.LocalPlayer.PlayerGui.MainScreenGui:FindFirstChild("AnimationPlusPack")
+	    
+	    local uiLoaded = false  -- Track whether the UI has been loaded
+	    local notificationShown = false  -- Track if the notification has been shown
+	    
+	    -- Function to load UI
+	    local function loadUI()
+	        local player = game.Players.LocalPlayer
+	        local animationPack = player.PlayerGui.MainScreenGui:FindFirstChild("AnimationPack")
+	        local animationPlusPack = player.PlayerGui.MainScreenGui:FindFirstChild("AnimationPlusPack")
+	    
+	        if animationPack and not animationPack.Visible then
+	            animationPack.Visible = true
+	        end
+	    
+	        if animationPlusPack and not animationPlusPack.Visible then
+	            animationPlusPack.Visible = true
+	        end
+	    
+	        uiLoaded = true
+	    end
+	    
+	    -- Function to unload UI
+	    local function unloadUI()
+	        local player = game.Players.LocalPlayer
+	        local animationPack = player.PlayerGui.MainScreenGui:FindFirstChild("AnimationPack")
+	        local animationPlusPack = player.PlayerGui.MainScreenGui:FindFirstChild("AnimationPlusPack")
+	    
+	        if animationPack and animationPack.Visible then
+	            animationPack.Visible = false
+	        end
+	    
+	        if animationPlusPack and animationPlusPack.Visible then
+	            animationPlusPack.Visible = false
+	        end
+	    
+	        uiLoaded = false
+	    end
+	    
+	    -- Function to show notification only once
+	    local function showNotificationOnce()
+	        if not notificationShown then
+	            Library:Notify("animationpack Loaded 🎭 nigga.lol 🎭", 5)
+	            notificationShown = true
+	        end
+	    end
+	    
+	    -- Trigger notification
+	    showNotificationOnce()
+	    
+	    -- Toggle UI
+	    if uiLoaded then
+	        unloadUI()
+	    else
+	        loadUI()
+	    end
+	    
+	    -- Xóa animations cũ
+	    if game.ReplicatedStorage.ClientAnimations:FindFirstChild("Lean") then
+	        game.ReplicatedStorage.ClientAnimations.Lean:Destroy()
+	    end
+	    if game.ReplicatedStorage.ClientAnimations:FindFirstChild("Lay") then
+	        game.ReplicatedStorage.ClientAnimations.Lay:Destroy()
+	    end
+	    if game.ReplicatedStorage.ClientAnimations:FindFirstChild("Dance1") then
+	        game.ReplicatedStorage.ClientAnimations.Dance1:Destroy()
+	    end
+	    if game.ReplicatedStorage.ClientAnimations:FindFirstChild("Dance2") then
+	        game.ReplicatedStorage.ClientAnimations.Dance2:Destroy()
+	    end
+	    if game.ReplicatedStorage.ClientAnimations:FindFirstChild("Greet") then
+	        game.ReplicatedStorage.ClientAnimations.Greet:Destroy()
+	    end
+	    if game.ReplicatedStorage.ClientAnimations:FindFirstChild("Chest Pump") then
+	        game.ReplicatedStorage.ClientAnimations["Chest Pump"]:Destroy()
+	    end
+	    if game.ReplicatedStorage.ClientAnimations:FindFirstChild("Praying") then
+	        game.ReplicatedStorage.ClientAnimations.Praying:Destroy()
+	    end
+	    if game.ReplicatedStorage.ClientAnimations:FindFirstChild("TheDefault") then
+	        game.ReplicatedStorage.ClientAnimations.TheDefault:Destroy()
+	    end
+	    if game.ReplicatedStorage.ClientAnimations:FindFirstChild("Sturdy") then
+	        game.ReplicatedStorage.ClientAnimations.Sturdy:Destroy()
+	    end
+	    if game.ReplicatedStorage.ClientAnimations:FindFirstChild("Rossy") then
+	        game.ReplicatedStorage.ClientAnimations.Rossy:Destroy()
+	    end
+	    if game.ReplicatedStorage.ClientAnimations:FindFirstChild("Griddy") then
+	        game.ReplicatedStorage.ClientAnimations.Griddy:Destroy()
+	    end
+	    if game.ReplicatedStorage.ClientAnimations:FindFirstChild("TPose") then
+	        game.ReplicatedStorage.ClientAnimations.TPose:Destroy()
+	    end
+	    if game.ReplicatedStorage.ClientAnimations:FindFirstChild("SpeedBlitz") then
+	        game.ReplicatedStorage.ClientAnimations.SpeedBlitz:Destroy()
+	    end
+	    
+	    -- Thêm animations mới
+	    local Animations = game.ReplicatedStorage.ClientAnimations
+	    
+	    local LeanAnimation = Instance.new("Animation", Animations)
+	    LeanAnimation.Name = "Lean"
+	    LeanAnimation.AnimationId = "rbxassetid://3152375249"
+	    
+	    local LayAnimation = Instance.new("Animation", Animations)
+	    LayAnimation.Name = "Lay"
+	    LayAnimation.AnimationId = "rbxassetid://3152378852"
+	    
+	    local Dance1Animation = Instance.new("Animation", Animations)
+	    Dance1Animation.Name = "Dance1"
+	    Dance1Animation.AnimationId = "rbxassetid://3189773368"
+	    
+	    local Dance2Animation = Instance.new("Animation", Animations)
+	    Dance2Animation.Name = "Dance2"
+	    Dance2Animation.AnimationId = "rbxassetid://3189776546"
+	    
+	    local GreetAnimation = Instance.new("Animation", Animations)
+	    GreetAnimation.Name = "Greet"
+	    GreetAnimation.AnimationId = "rbxassetid://3189777795"
+	    
+	    local ChestPumpAnimation = Instance.new("Animation", Animations)
+	    ChestPumpAnimation.Name = "Chest Pump"
+	    ChestPumpAnimation.AnimationId = "rbxassetid://3189779152"
+	    
+	    local PrayingAnimation = Instance.new("Animation", Animations)
+	    PrayingAnimation.Name = "Praying"
+	    PrayingAnimation.AnimationId = "rbxassetid://3487719500"
+	    
+	    local TheDefaultAnimation = Instance.new("Animation", Animations)
+	    TheDefaultAnimation.Name = "TheDefault"
+	    TheDefaultAnimation.AnimationId = "rbxassetid://507771019"  -- Sửa ID chuẩn
+	    
+	    local SturdyAnimation = Instance.new("Animation", Animations)
+	    SturdyAnimation.Name = "Sturdy"
+	    SturdyAnimation.AnimationId = "rbxassetid://11710524717"
+	    
+	    local RossyAnimation = Instance.new("Animation", Animations)
+	    RossyAnimation.Name = "Rossy"
+	    RossyAnimation.AnimationId = "rbxassetid://11710527244"
+	    
+	    local GriddyAnimation = Instance.new("Animation", Animations)
+	    GriddyAnimation.Name = "Griddy"
+	    GriddyAnimation.AnimationId = "rbxassetid://11710529220"
+	    
+	    local TPoseAnimation = Instance.new("Animation", Animations)
+	    TPoseAnimation.Name = "TPose"
+	    TPoseAnimation.AnimationId = "rbxassetid://11710524200"
+	    
+	    local SpeedBlitzAnimation = Instance.new("Animation", Animations)
+	    SpeedBlitzAnimation.Name = "SpeedBlitz"
+	    SpeedBlitzAnimation.AnimationId = "rbxassetid://11710541744"
+	    
+	    -- Hàm xử lý animations
+	    local function AnimationPack(Character)
+	        Character:WaitForChild("Humanoid")
+	        repeat
+	            wait()
+	        until game.Players.LocalPlayer.Character:FindFirstChild("FULLY_LOADED_CHAR") and game.Players.LocalPlayer.PlayerGui.MainScreenGui:FindFirstChild("AnimationPack") and game.Players.LocalPlayer.PlayerGui.MainScreenGui:FindFirstChild("AnimationPlusPack")
+	    
+	        local AnimationPack = game:GetService("Players").LocalPlayer.PlayerGui.MainScreenGui.AnimationPack
+	        local AnimationPackPlus = game:GetService("Players").LocalPlayer.PlayerGui.MainScreenGui.AnimationPlusPack
+	        local ScrollingFrame = AnimationPack.ScrollingFrame
+	        local CloseButton = AnimationPack.CloseButton
+	        local ScrollingFramePlus = AnimationPackPlus.ScrollingFrame
+	        local CloseButtonPlus = AnimationPackPlus.CloseButton
+	    
+	        local Lean = game:GetService("Players").LocalPlayer.Character.Humanoid:LoadAnimation(LeanAnimation)
+	        local Lay = game:GetService("Players").LocalPlayer.Character.Humanoid:LoadAnimation(LayAnimation)
+	        local Dance1 = game:GetService("Players").LocalPlayer.Character.Humanoid:LoadAnimation(Dance1Animation)
+	        local Dance2 = game:GetService("Players").LocalPlayer.Character.Humanoid:LoadAnimation(Dance2Animation)
+	        local Greet = game:GetService("Players").LocalPlayer.Character.Humanoid:LoadAnimation(GreetAnimation)
+	        local ChestPump = game:GetService("Players").LocalPlayer.Character.Humanoid:LoadAnimation(ChestPumpAnimation)
+	        local Praying = game:GetService("Players").LocalPlayer.Character.Humanoid:LoadAnimation(PrayingAnimation)
+	        local TheDefault = game:GetService("Players").LocalPlayer.Character.Humanoid:LoadAnimation(TheDefaultAnimation)
+	        local Sturdy = game:GetService("Players").LocalPlayer.Character.Humanoid:LoadAnimation(SturdyAnimation)
+	        local Rossy = game:GetService("Players").LocalPlayer.Character.Humanoid:LoadAnimation(RossyAnimation)
+	        local Griddy = game:GetService("Players").LocalPlayer.Character.Humanoid:LoadAnimation(GriddyAnimation)
+	        local TPose = game:GetService("Players").LocalPlayer.Character.Humanoid:LoadAnimation(TPoseAnimation)
+	        local SpeedBlitz = game:GetService("Players").LocalPlayer.Character.Humanoid:LoadAnimation(SpeedBlitzAnimation)
+	    
+	        AnimationPack.Visible = true
+	        AnimationPackPlus.Visible = true
+	    
+	        ScrollingFrame.UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	        ScrollingFramePlus.UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	    
+	        for i,v in pairs(ScrollingFrame:GetChildren()) do
+	            if v.Name == "TextButton" then
+	                if v.Text == "Lean" then
+	                    v.Name = "LeanButton"
+	                end
+	            end
+	        end
+	        for i,v in pairs(ScrollingFrame:GetChildren()) do
+	            if v.Name == "TextButton" then
+	                if v.Text == "Lay" then
+	                    v.Name = "LayButton"
+	                end
+	            end
+	        end
+	        for i,v in pairs(ScrollingFrame:GetChildren()) do
+	            if v.Name == "TextButton" then
+	                if v.Text == "Dance1" then
+	                    v.Name = "Dance1Button"
+	                end
+	            end
+	        end
+	        for i,v in pairs(ScrollingFrame:GetChildren()) do
+	            if v.Name == "TextButton" then
+	                if v.Text == "Dance2" then
+	                    v.Name = "Dance2Button"
+	                end
+	            end
+	        end
+	        for i,v in pairs(ScrollingFrame:GetChildren()) do
+	            if v.Name == "TextButton" then
+	                if v.Text == "Greet" then
+	                    v.Name = "GreetButton"
+	                end
+	            end
+	        end
+	        for i,v in pairs(ScrollingFrame:GetChildren()) do
+	            if v.Name == "TextButton" then
+	                if v.Text == "Chest Pump" then
+	                    v.Name = "ChestPumpButton"
+	                end
+	            end
+	        end
+	        for i,v in pairs(ScrollingFrame:GetChildren()) do
+	            if v.Name == "TextButton" then
+	                if v.Text == "Praying" then
+	                    v.Name = "PrayingButton"
+	                end
+	            end
+	        end
+	        for i,v in pairs(ScrollingFramePlus:GetChildren()) do
+	            if v.Name == "TextButton" then
+	                if v.Text == "The Default" then
+	                    v.Name = "TheDefaultButton"
+	                end
+	            end
+	        end
+	        for i,v in pairs(ScrollingFramePlus:GetChildren()) do
+	            if v.Name == "TextButton" then
+	                if v.Text == "Sturdy" then
+	                    v.Name = "SturdyButton"
+	                end
+	            end
+	        end
+	        for i,v in pairs(ScrollingFramePlus:GetChildren()) do
+	            if v.Name == "TextButton" then
+	                if v.Text == "Rossy" then
+	                    v.Name = "RossyButton"
+	                end
+	            end
+	        end
+	        for i,v in pairs(ScrollingFramePlus:GetChildren()) do
+	            if v.Name == "TextButton" then
+	                if v.Text == "Griddy" then
+	                    v.Name = "GriddyButton"
+	                end
+	            end
+	        end
+	        for i,v in pairs(ScrollingFramePlus:GetChildren()) do
+	            if v.Name == "TextButton" then
+	                if v.Text == "T Pose" then
+	                    v.Name = "TPoseButton"
+	                end
+	            end
+	        end
+	        for i,v in pairs(ScrollingFramePlus:GetChildren()) do
+	            if v.Name == "TextButton" then
+	                if v.Text == "Speed Blitz" then
+	                    v.Name = "SpeedBlitzButton"
+	                end
+	            end
+	        end
+	    
+	        local function Stop()
+	            Lean:Stop()
+	            Lay:Stop()
+	            Dance1:Stop()
+	            Dance2:Stop()
+	            Greet:Stop()
+	            ChestPump:Stop()
+	            Praying:Stop()
+	            TheDefault:Stop()
+	            Sturdy:Stop()
+	            Rossy:Stop()
+	            Griddy:Stop()
+	            TPose:Stop()
+	            SpeedBlitz:Stop()
+	        end
+	    
+	        local LeanTextButton = ScrollingFrame.LeanButton
+	        local LayTextButton = ScrollingFrame.LayButton
+	        local Dance1TextButton = ScrollingFrame.Dance1Button
+	        local Dance2TextButton = ScrollingFrame.Dance2Button
+	        local GreetTextButton = ScrollingFrame.GreetButton
+	        local ChestPumpTextButton = ScrollingFrame.ChestPumpButton
+	        local PrayingTextButton = ScrollingFrame.PrayingButton
+	        local TheDefaultTextButton = ScrollingFramePlus.TheDefaultButton
+	        local SturdyTextButton = ScrollingFramePlus.SturdyButton
+	        local RossyTextButton = ScrollingFramePlus.RossyButton
+	        local GriddyTextButton = ScrollingFramePlus.GriddyButton
+	        local TPoseTextButton = ScrollingFramePlus.TPoseButton
+	        local SpeedBlitzTextButton = ScrollingFramePlus.SpeedBlitzButton
+	    
+	        AnimationPack.MouseButton1Click:Connect(function()
+	            if ScrollingFrame.Visible == false then
+	                ScrollingFrame.Visible = true
+	                CloseButton.Visible = true
+	                AnimationPackPlus.Visible = false
+	            end
+	        end)
+	        AnimationPackPlus.MouseButton1Click:Connect(function()
+	            if ScrollingFramePlus.Visible == false then
+	                ScrollingFramePlus.Visible = true
+	                CloseButtonPlus.Visible = true
+	                AnimationPack.Visible = false
+	            end
+	        end)
+	        CloseButton.MouseButton1Click:Connect(function()
+	            if ScrollingFrame.Visible == true then
+	                ScrollingFrame.Visible = false
+	                CloseButton.Visible = false
+	                AnimationPackPlus.Visible = true
+	            end
+	        end)
+	        CloseButtonPlus.MouseButton1Click:Connect(function()
+	            if ScrollingFramePlus.Visible == true then
+	                ScrollingFramePlus.Visible = false
+	                CloseButtonPlus.Visible = false
+	                AnimationPack.Visible = true
+	            end
+	        end)
+	    
+	        LeanTextButton.MouseButton1Click:Connect(function()
+	            Stop()
+	            Lean:Play()
+	        end)
+	        LayTextButton.MouseButton1Click:Connect(function()
+	            Stop()
+	            Lay:Play()
+	        end)
+	        Dance1TextButton.MouseButton1Click:Connect(function()
+	            Stop()
+	            Dance1:Play()
+	        end)
+	        Dance2TextButton.MouseButton1Click:Connect(function()
+	            Stop()
+	            Dance2:Play()
+	        end)
+	        GreetTextButton.MouseButton1Click:Connect(function()
+	            Stop()
+	            Greet:Play()
+	        end)
+	        ChestPumpTextButton.MouseButton1Click:Connect(function()
+	            Stop()
+	            ChestPump:Play()
+	        end)
+	        PrayingTextButton.MouseButton1Click:Connect(function()
+	            Stop()
+	            Praying:Play()
+	        end)
+	        TheDefaultTextButton.MouseButton1Click:Connect(function()
+	            Stop()
+	            TheDefault:Play()
+	        end)
+	        SturdyTextButton.MouseButton1Click:Connect(function()
+	            Stop()
+	            Sturdy:Play()
+	        end)
+	        RossyTextButton.MouseButton1Click:Connect(function()
+	            Stop()
+	            Rossy:Play()
+	        end)
+	        GriddyTextButton.MouseButton1Click:Connect(function()
+	            Stop()
+	            Griddy:Play()
+	        end)
+	        TPoseTextButton.MouseButton1Click:Connect(function()
+	            Stop()
+	            TPose:Play()
+	        end)
+	        SpeedBlitzTextButton.MouseButton1Click:Connect(function()
+	            Stop()
+	            SpeedBlitz:Play()
+	        end)
+	    
+	        game:GetService("Players").LocalPlayer.Character.Humanoid.Running:Connect(function()
+	            Stop()
+	        end)
+	    
+	        game:GetService("Players").LocalPlayer.CharacterAdded:Connect(function()
+	            Stop()
+	        end)
+	    end
+	    
+	    AnimationPack(game.Players.LocalPlayer.Character)
+	    game.Players.LocalPlayer.CharacterAdded:Connect(AnimationPack)
+	end)
+else
+    -- === BỎ QUA NẾU KHÔNG PHẢI DA HOOD ===
+    print("Không phải Da Hood → Bỏ qua Animationpack free")
 end
-
-local AntiModToggle = flashbackBox:AddToggle("AntiModToggle", {
-    Text = "Mod Detection",
-    Default = false,
-    Callback = function(Value)
-        antiModEnabled = Value
-        Library:Notify(antiModEnabled and "✅ Anti-Mod Enabled" or "⚠️ Anti-Mod Disabled", 3)
-        if antiModEnabled then task.spawn(detectModerators) end
-    end
-})
-
-local AntiModDepbox = flashbackBox:AddDependencyBox()
-AntiModDepbox:SetupDependencies({ { AntiModToggle, true } })
-
-AntiModDepbox:AddDropdown("AntiModMethod", {
-    Values = {"Notify", "Kick"},
-    Default = "Notify",
-    Multi = false,
-    Text = "Anti-Mod Method",
-    Callback = function(Value)
-        antiModMethod = Value
-        Library:Notify("ℹ️ Anti-Mod Method set to: " .. antiModMethod, 3)
-    end
-})
-
-AntiModDepbox:AddToggle("CheckModFriends", {
-    Text = "Friended Checking",
-    Tooltip = "Detects if any player is friends with a Moderator",
-    Default = false,
-    Callback = function(Value)
-        checkModFriendsEnabled = Value
-        Library:Notify(checkModFriendsEnabled and "✅ Checking for Mod Friends Enabled" or "⚠️ Checking for Mod Friends Disabled", 3)
-        if checkModFriendsEnabled then task.spawn(checkFriendsWithMods) end
-    end
-})
-
-local GroupCheckDepbox = AntiModDepbox:AddDependencyBox()
-GroupCheckDepbox:SetupDependencies({ { AntiModToggle, true } })
-
-GroupCheckDepbox:AddToggle("GroupCheck", {
-    Text = "Group Role Checking",
-    Tooltip = "Detects if any player is in the restricted groups",
-    Default = false,
-    Callback = function(Value)
-        groupCheckEnabled = Value
-        Library:Notify(groupCheckEnabled and "✅ Group Membership Check Enabled" or "⚠️ Group Membership Check Disabled", 3)
-        if groupCheckEnabled then task.spawn(detectModerators) end
-    end
-})
-
-local RightGroupBox = Tabs.Misc:AddRightGroupbox('Animations Pack')
-
-RightGroupBox:AddButton('Animations Packs', function()
-    repeat
-        wait()
-    until game:IsLoaded() and game.Players.LocalPlayer.Character:FindFirstChild("FULLY_LOADED_CHAR") and game.Players.LocalPlayer.PlayerGui.MainScreenGui:FindFirstChild("AnimationPack") and game.Players.LocalPlayer.PlayerGui.MainScreenGui:FindFirstChild("AnimationPlusPack")
-    
-    local uiLoaded = false  -- Track whether the UI has been loaded
-    local notificationShown = false  -- Track if the notification has been shown
-    
-    -- Function to load UI
-    local function loadUI()
-        local player = game.Players.LocalPlayer
-        local animationPack = player.PlayerGui.MainScreenGui:FindFirstChild("AnimationPack")
-        local animationPlusPack = player.PlayerGui.MainScreenGui:FindFirstChild("AnimationPlusPack")
-    
-        if animationPack and not animationPack.Visible then
-            animationPack.Visible = true
-        end
-    
-        if animationPlusPack and not animationPlusPack.Visible then
-            animationPlusPack.Visible = true
-        end
-    
-        uiLoaded = true
-    end
-    
-    -- Function to unload UI
-    local function unloadUI()
-        local player = game.Players.LocalPlayer
-        local animationPack = player.PlayerGui.MainScreenGui:FindFirstChild("AnimationPack")
-        local animationPlusPack = player.PlayerGui.MainScreenGui:FindFirstChild("AnimationPlusPack")
-    
-        if animationPack and animationPack.Visible then
-            animationPack.Visible = false
-        end
-    
-        if animationPlusPack and animationPlusPack.Visible then
-            animationPlusPack.Visible = false
-        end
-    
-        uiLoaded = false
-    end
-    
-    -- Function to show notification only once
-    local function showNotificationOnce()
-        if not notificationShown then
-            Library:Notify("animationpack Loaded 🎭 nigga.lol 🎭", 5)
-            notificationShown = true
-        end
-    end
-    
-    -- Trigger notification
-    showNotificationOnce()
-    
-    -- Toggle UI
-    if uiLoaded then
-        unloadUI()
-    else
-        loadUI()
-    end
-    
-    -- Xóa animations cũ
-    if game.ReplicatedStorage.ClientAnimations:FindFirstChild("Lean") then
-        game.ReplicatedStorage.ClientAnimations.Lean:Destroy()
-    end
-    if game.ReplicatedStorage.ClientAnimations:FindFirstChild("Lay") then
-        game.ReplicatedStorage.ClientAnimations.Lay:Destroy()
-    end
-    if game.ReplicatedStorage.ClientAnimations:FindFirstChild("Dance1") then
-        game.ReplicatedStorage.ClientAnimations.Dance1:Destroy()
-    end
-    if game.ReplicatedStorage.ClientAnimations:FindFirstChild("Dance2") then
-        game.ReplicatedStorage.ClientAnimations.Dance2:Destroy()
-    end
-    if game.ReplicatedStorage.ClientAnimations:FindFirstChild("Greet") then
-        game.ReplicatedStorage.ClientAnimations.Greet:Destroy()
-    end
-    if game.ReplicatedStorage.ClientAnimations:FindFirstChild("Chest Pump") then
-        game.ReplicatedStorage.ClientAnimations["Chest Pump"]:Destroy()
-    end
-    if game.ReplicatedStorage.ClientAnimations:FindFirstChild("Praying") then
-        game.ReplicatedStorage.ClientAnimations.Praying:Destroy()
-    end
-    if game.ReplicatedStorage.ClientAnimations:FindFirstChild("TheDefault") then
-        game.ReplicatedStorage.ClientAnimations.TheDefault:Destroy()
-    end
-    if game.ReplicatedStorage.ClientAnimations:FindFirstChild("Sturdy") then
-        game.ReplicatedStorage.ClientAnimations.Sturdy:Destroy()
-    end
-    if game.ReplicatedStorage.ClientAnimations:FindFirstChild("Rossy") then
-        game.ReplicatedStorage.ClientAnimations.Rossy:Destroy()
-    end
-    if game.ReplicatedStorage.ClientAnimations:FindFirstChild("Griddy") then
-        game.ReplicatedStorage.ClientAnimations.Griddy:Destroy()
-    end
-    if game.ReplicatedStorage.ClientAnimations:FindFirstChild("TPose") then
-        game.ReplicatedStorage.ClientAnimations.TPose:Destroy()
-    end
-    if game.ReplicatedStorage.ClientAnimations:FindFirstChild("SpeedBlitz") then
-        game.ReplicatedStorage.ClientAnimations.SpeedBlitz:Destroy()
-    end
-    
-    -- Thêm animations mới
-    local Animations = game.ReplicatedStorage.ClientAnimations
-    
-    local LeanAnimation = Instance.new("Animation", Animations)
-    LeanAnimation.Name = "Lean"
-    LeanAnimation.AnimationId = "rbxassetid://3152375249"
-    
-    local LayAnimation = Instance.new("Animation", Animations)
-    LayAnimation.Name = "Lay"
-    LayAnimation.AnimationId = "rbxassetid://3152378852"
-    
-    local Dance1Animation = Instance.new("Animation", Animations)
-    Dance1Animation.Name = "Dance1"
-    Dance1Animation.AnimationId = "rbxassetid://3189773368"
-    
-    local Dance2Animation = Instance.new("Animation", Animations)
-    Dance2Animation.Name = "Dance2"
-    Dance2Animation.AnimationId = "rbxassetid://3189776546"
-    
-    local GreetAnimation = Instance.new("Animation", Animations)
-    GreetAnimation.Name = "Greet"
-    GreetAnimation.AnimationId = "rbxassetid://3189777795"
-    
-    local ChestPumpAnimation = Instance.new("Animation", Animations)
-    ChestPumpAnimation.Name = "Chest Pump"
-    ChestPumpAnimation.AnimationId = "rbxassetid://3189779152"
-    
-    local PrayingAnimation = Instance.new("Animation", Animations)
-    PrayingAnimation.Name = "Praying"
-    PrayingAnimation.AnimationId = "rbxassetid://3487719500"
-    
-    local TheDefaultAnimation = Instance.new("Animation", Animations)
-    TheDefaultAnimation.Name = "TheDefault"
-    TheDefaultAnimation.AnimationId = "rbxassetid://507771019"  -- Sửa ID chuẩn
-    
-    local SturdyAnimation = Instance.new("Animation", Animations)
-    SturdyAnimation.Name = "Sturdy"
-    SturdyAnimation.AnimationId = "rbxassetid://11710524717"
-    
-    local RossyAnimation = Instance.new("Animation", Animations)
-    RossyAnimation.Name = "Rossy"
-    RossyAnimation.AnimationId = "rbxassetid://11710527244"
-    
-    local GriddyAnimation = Instance.new("Animation", Animations)
-    GriddyAnimation.Name = "Griddy"
-    GriddyAnimation.AnimationId = "rbxassetid://11710529220"
-    
-    local TPoseAnimation = Instance.new("Animation", Animations)
-    TPoseAnimation.Name = "TPose"
-    TPoseAnimation.AnimationId = "rbxassetid://11710524200"
-    
-    local SpeedBlitzAnimation = Instance.new("Animation", Animations)
-    SpeedBlitzAnimation.Name = "SpeedBlitz"
-    SpeedBlitzAnimation.AnimationId = "rbxassetid://11710541744"
-    
-    -- Hàm xử lý animations
-    local function AnimationPack(Character)
-        Character:WaitForChild("Humanoid")
-        repeat
-            wait()
-        until game.Players.LocalPlayer.Character:FindFirstChild("FULLY_LOADED_CHAR") and game.Players.LocalPlayer.PlayerGui.MainScreenGui:FindFirstChild("AnimationPack") and game.Players.LocalPlayer.PlayerGui.MainScreenGui:FindFirstChild("AnimationPlusPack")
-    
-        local AnimationPack = game:GetService("Players").LocalPlayer.PlayerGui.MainScreenGui.AnimationPack
-        local AnimationPackPlus = game:GetService("Players").LocalPlayer.PlayerGui.MainScreenGui.AnimationPlusPack
-        local ScrollingFrame = AnimationPack.ScrollingFrame
-        local CloseButton = AnimationPack.CloseButton
-        local ScrollingFramePlus = AnimationPackPlus.ScrollingFrame
-        local CloseButtonPlus = AnimationPackPlus.CloseButton
-    
-        local Lean = game:GetService("Players").LocalPlayer.Character.Humanoid:LoadAnimation(LeanAnimation)
-        local Lay = game:GetService("Players").LocalPlayer.Character.Humanoid:LoadAnimation(LayAnimation)
-        local Dance1 = game:GetService("Players").LocalPlayer.Character.Humanoid:LoadAnimation(Dance1Animation)
-        local Dance2 = game:GetService("Players").LocalPlayer.Character.Humanoid:LoadAnimation(Dance2Animation)
-        local Greet = game:GetService("Players").LocalPlayer.Character.Humanoid:LoadAnimation(GreetAnimation)
-        local ChestPump = game:GetService("Players").LocalPlayer.Character.Humanoid:LoadAnimation(ChestPumpAnimation)
-        local Praying = game:GetService("Players").LocalPlayer.Character.Humanoid:LoadAnimation(PrayingAnimation)
-        local TheDefault = game:GetService("Players").LocalPlayer.Character.Humanoid:LoadAnimation(TheDefaultAnimation)
-        local Sturdy = game:GetService("Players").LocalPlayer.Character.Humanoid:LoadAnimation(SturdyAnimation)
-        local Rossy = game:GetService("Players").LocalPlayer.Character.Humanoid:LoadAnimation(RossyAnimation)
-        local Griddy = game:GetService("Players").LocalPlayer.Character.Humanoid:LoadAnimation(GriddyAnimation)
-        local TPose = game:GetService("Players").LocalPlayer.Character.Humanoid:LoadAnimation(TPoseAnimation)
-        local SpeedBlitz = game:GetService("Players").LocalPlayer.Character.Humanoid:LoadAnimation(SpeedBlitzAnimation)
-    
-        AnimationPack.Visible = true
-        AnimationPackPlus.Visible = true
-    
-        ScrollingFrame.UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-        ScrollingFramePlus.UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-    
-        for i,v in pairs(ScrollingFrame:GetChildren()) do
-            if v.Name == "TextButton" then
-                if v.Text == "Lean" then
-                    v.Name = "LeanButton"
-                end
-            end
-        end
-        for i,v in pairs(ScrollingFrame:GetChildren()) do
-            if v.Name == "TextButton" then
-                if v.Text == "Lay" then
-                    v.Name = "LayButton"
-                end
-            end
-        end
-        for i,v in pairs(ScrollingFrame:GetChildren()) do
-            if v.Name == "TextButton" then
-                if v.Text == "Dance1" then
-                    v.Name = "Dance1Button"
-                end
-            end
-        end
-        for i,v in pairs(ScrollingFrame:GetChildren()) do
-            if v.Name == "TextButton" then
-                if v.Text == "Dance2" then
-                    v.Name = "Dance2Button"
-                end
-            end
-        end
-        for i,v in pairs(ScrollingFrame:GetChildren()) do
-            if v.Name == "TextButton" then
-                if v.Text == "Greet" then
-                    v.Name = "GreetButton"
-                end
-            end
-        end
-        for i,v in pairs(ScrollingFrame:GetChildren()) do
-            if v.Name == "TextButton" then
-                if v.Text == "Chest Pump" then
-                    v.Name = "ChestPumpButton"
-                end
-            end
-        end
-        for i,v in pairs(ScrollingFrame:GetChildren()) do
-            if v.Name == "TextButton" then
-                if v.Text == "Praying" then
-                    v.Name = "PrayingButton"
-                end
-            end
-        end
-        for i,v in pairs(ScrollingFramePlus:GetChildren()) do
-            if v.Name == "TextButton" then
-                if v.Text == "The Default" then
-                    v.Name = "TheDefaultButton"
-                end
-            end
-        end
-        for i,v in pairs(ScrollingFramePlus:GetChildren()) do
-            if v.Name == "TextButton" then
-                if v.Text == "Sturdy" then
-                    v.Name = "SturdyButton"
-                end
-            end
-        end
-        for i,v in pairs(ScrollingFramePlus:GetChildren()) do
-            if v.Name == "TextButton" then
-                if v.Text == "Rossy" then
-                    v.Name = "RossyButton"
-                end
-            end
-        end
-        for i,v in pairs(ScrollingFramePlus:GetChildren()) do
-            if v.Name == "TextButton" then
-                if v.Text == "Griddy" then
-                    v.Name = "GriddyButton"
-                end
-            end
-        end
-        for i,v in pairs(ScrollingFramePlus:GetChildren()) do
-            if v.Name == "TextButton" then
-                if v.Text == "T Pose" then
-                    v.Name = "TPoseButton"
-                end
-            end
-        end
-        for i,v in pairs(ScrollingFramePlus:GetChildren()) do
-            if v.Name == "TextButton" then
-                if v.Text == "Speed Blitz" then
-                    v.Name = "SpeedBlitzButton"
-                end
-            end
-        end
-    
-        local function Stop()
-            Lean:Stop()
-            Lay:Stop()
-            Dance1:Stop()
-            Dance2:Stop()
-            Greet:Stop()
-            ChestPump:Stop()
-            Praying:Stop()
-            TheDefault:Stop()
-            Sturdy:Stop()
-            Rossy:Stop()
-            Griddy:Stop()
-            TPose:Stop()
-            SpeedBlitz:Stop()
-        end
-    
-        local LeanTextButton = ScrollingFrame.LeanButton
-        local LayTextButton = ScrollingFrame.LayButton
-        local Dance1TextButton = ScrollingFrame.Dance1Button
-        local Dance2TextButton = ScrollingFrame.Dance2Button
-        local GreetTextButton = ScrollingFrame.GreetButton
-        local ChestPumpTextButton = ScrollingFrame.ChestPumpButton
-        local PrayingTextButton = ScrollingFrame.PrayingButton
-        local TheDefaultTextButton = ScrollingFramePlus.TheDefaultButton
-        local SturdyTextButton = ScrollingFramePlus.SturdyButton
-        local RossyTextButton = ScrollingFramePlus.RossyButton
-        local GriddyTextButton = ScrollingFramePlus.GriddyButton
-        local TPoseTextButton = ScrollingFramePlus.TPoseButton
-        local SpeedBlitzTextButton = ScrollingFramePlus.SpeedBlitzButton
-    
-        AnimationPack.MouseButton1Click:Connect(function()
-            if ScrollingFrame.Visible == false then
-                ScrollingFrame.Visible = true
-                CloseButton.Visible = true
-                AnimationPackPlus.Visible = false
-            end
-        end)
-        AnimationPackPlus.MouseButton1Click:Connect(function()
-            if ScrollingFramePlus.Visible == false then
-                ScrollingFramePlus.Visible = true
-                CloseButtonPlus.Visible = true
-                AnimationPack.Visible = false
-            end
-        end)
-        CloseButton.MouseButton1Click:Connect(function()
-            if ScrollingFrame.Visible == true then
-                ScrollingFrame.Visible = false
-                CloseButton.Visible = false
-                AnimationPackPlus.Visible = true
-            end
-        end)
-        CloseButtonPlus.MouseButton1Click:Connect(function()
-            if ScrollingFramePlus.Visible == true then
-                ScrollingFramePlus.Visible = false
-                CloseButtonPlus.Visible = false
-                AnimationPack.Visible = true
-            end
-        end)
-    
-        LeanTextButton.MouseButton1Click:Connect(function()
-            Stop()
-            Lean:Play()
-        end)
-        LayTextButton.MouseButton1Click:Connect(function()
-            Stop()
-            Lay:Play()
-        end)
-        Dance1TextButton.MouseButton1Click:Connect(function()
-            Stop()
-            Dance1:Play()
-        end)
-        Dance2TextButton.MouseButton1Click:Connect(function()
-            Stop()
-            Dance2:Play()
-        end)
-        GreetTextButton.MouseButton1Click:Connect(function()
-            Stop()
-            Greet:Play()
-        end)
-        ChestPumpTextButton.MouseButton1Click:Connect(function()
-            Stop()
-            ChestPump:Play()
-        end)
-        PrayingTextButton.MouseButton1Click:Connect(function()
-            Stop()
-            Praying:Play()
-        end)
-        TheDefaultTextButton.MouseButton1Click:Connect(function()
-            Stop()
-            TheDefault:Play()
-        end)
-        SturdyTextButton.MouseButton1Click:Connect(function()
-            Stop()
-            Sturdy:Play()
-        end)
-        RossyTextButton.MouseButton1Click:Connect(function()
-            Stop()
-            Rossy:Play()
-        end)
-        GriddyTextButton.MouseButton1Click:Connect(function()
-            Stop()
-            Griddy:Play()
-        end)
-        TPoseTextButton.MouseButton1Click:Connect(function()
-            Stop()
-            TPose:Play()
-        end)
-        SpeedBlitzTextButton.MouseButton1Click:Connect(function()
-            Stop()
-            SpeedBlitz:Play()
-        end)
-    
-        game:GetService("Players").LocalPlayer.Character.Humanoid.Running:Connect(function()
-            Stop()
-        end)
-    
-        game:GetService("Players").LocalPlayer.CharacterAdded:Connect(function()
-            Stop()
-        end)
-    end
-    
-    AnimationPack(game.Players.LocalPlayer.Character)
-    game.Players.LocalPlayer.CharacterAdded:Connect(AnimationPack)
-end)
 
 local LeftGroupBox = Tabs.Misc:AddLeftGroupbox("Animation")
 
@@ -5563,12 +6240,9 @@ local AnimationSets = {
 
 local function applyCustomAnimations(character)
     if not character then return end
-
     local Animate = character:FindFirstChild("Animate")
     if not Animate then return end
-
     local ClonedAnimate = Animate:Clone()
-
     ClonedAnimate.idle.Animation1.AnimationId = AnimationOptions["Idle1"]
     ClonedAnimate.idle.Animation2.AnimationId = AnimationOptions["Idle2"]
     ClonedAnimate.walk.WalkAnim.AnimationId = AnimationOptions["Walk"]
@@ -5576,18 +6250,16 @@ local function applyCustomAnimations(character)
     ClonedAnimate.jump.JumpAnim.AnimationId = AnimationOptions["Jump"]
     ClonedAnimate.climb.ClimbAnim.AnimationId = AnimationOptions["Climb"]
     ClonedAnimate.fall.FallAnim.AnimationId = AnimationOptions["Fall"]
-
     Animate:Destroy()
     ClonedAnimate.Parent = character
+    Library:Notify("Animations applied successfully!", 2)  -- Notify để debug
 end
-
 LocalPlayer.CharacterAdded:Connect(function(character)
     if KeepOnDeath then
         task.wait(1)
         applyCustomAnimations(character)
     end
 end)
-
 local animationNames = {"Default", "Ninja", "Superhero", "Robot", "Cartoon", "Catwalk", "Zombie", "Mage", "Pirate", "Knight", "Vampire", "Bubbly", "Elder", "Toy"}
 
 LeftGroupBox:AddDropdown("Idle1Dropdown", {
@@ -5603,67 +6275,78 @@ LeftGroupBox:AddDropdown("Idle1Dropdown", {
 
 LeftGroupBox:AddDropdown("Idle2Dropdown", {
     Values = animationNames,
-    Default = 0,
+    Default = 1,  -- Sửa: 1
     Multi = false,
     Text = "Idle2",
     Callback = function(Value)
-        AnimationOptions["Idle2"] = AnimationSets[Value].idle2
-        applyCustomAnimations(LocalPlayer.Character)
+        if Value and AnimationSets[Value] then
+            AnimationOptions["Idle2"] = AnimationSets[Value].idle2
+            applyCustomAnimations(LocalPlayer.Character)
+        end
     end
 })
-
 LeftGroupBox:AddDropdown("WalkDropdown", {
     Values = animationNames,
-    Default = 0,
+    Default = 1,  -- Sửa: 1
     Multi = false,
     Text = "Walk",
     Callback = function(Value)
-        AnimationOptions["Walk"] = AnimationSets[Value].walk
-        applyCustomAnimations(LocalPlayer.Character)
+        if Value and AnimationSets[Value] then
+            AnimationOptions["Walk"] = AnimationSets[Value].walk
+            applyCustomAnimations(LocalPlayer.Character)
+        end
     end
 })
 
 LeftGroupBox:AddDropdown("RunDropdown", {
     Values = animationNames,
-    Default = 0,
+    Default = 1,
     Multi = false,
     Text = "Run",
     Callback = function(Value)
-        AnimationOptions["Run"] = AnimationSets[Value].run
-        applyCustomAnimations(LocalPlayer.Character)
+        if Value and AnimationSets[Value] then
+            AnimationOptions["Run"] = AnimationSets[Value].run
+            applyCustomAnimations(LocalPlayer.Character)
+        end
     end
 })
 
 LeftGroupBox:AddDropdown("JumpDropdown", {
     Values = animationNames,
-    Default = 0,
+    Default = 1,
     Multi = false,
     Text = "Jump",
     Callback = function(Value)
-        AnimationOptions["Jump"] = AnimationSets[Value].jump
-        applyCustomAnimations(LocalPlayer.Character)
+        if Value and AnimationSets[Value] then
+            AnimationOptions["Jump"] = AnimationSets[Value].run
+            applyCustomAnimations(LocalPlayer.Character)
+        end
     end
 })
 
 LeftGroupBox:AddDropdown("ClimbDropdown", {
     Values = animationNames,
-    Default = 0,
+    Default = 1,
     Multi = false,
     Text = "Climb",
     Callback = function(Value)
-        AnimationOptions["Climb"] = AnimationSets[Value].climb
-        applyCustomAnimations(LocalPlayer.Character)
+        if Value and AnimationSets[Value] then
+            AnimationOptions["Climb"] = AnimationSets[Value].run
+            applyCustomAnimations(LocalPlayer.Character)
+        end
     end
 })
 
 LeftGroupBox:AddDropdown("FallDropdown", {
     Values = animationNames,
-    Default = 0,
+    Default = 1,
     Multi = false,
     Text = "Fall",
     Callback = function(Value)
-        AnimationOptions["Fall"] = AnimationSets[Value].fall
-        applyCustomAnimations(LocalPlayer.Character)
+        if Value and AnimationSets[Value] then
+            AnimationOptions["Fall"] = AnimationSets[Value].run
+            applyCustomAnimations(LocalPlayer.Character)
+        end
     end
 })
 
@@ -5802,7 +6485,7 @@ function stompTarget(targetPlayer)
     end
     
     getgenv().oldPosition = LocalPlayer.Character.HumanoidRootPart.Position
-    
+    task.wait(1)
     task.spawn(function()
         while not getgenv().koValue.Value and getgenv().isActionRunning do
             getgenv().targetPosition = getgenv().character.HumanoidRootPart.Position
@@ -5938,121 +6621,168 @@ PlayerInfo:AddDropdown('teleportType', {
         getgenv().SelectedTeleportType = value
     end,
 })
-
+--[[ MÀU CHỦ ĐẠO
+local MATCHA = Color3.fromRGB(152, 251, 152)
+local DARK_BG = Color3.fromRGB(25, 25, 25)
+local DARK_BORDER = Color3.fromRGB(15, 15, 15)
+local TEXT_WHITE = Color3.fromRGB(230, 255, 230)
+local HOVER_BG = Color3.fromRGB(40, 40, 40)
 --------------------------------------------------------------
--- PLAYER LIST GUI – MÀU MATCHA TƯƠI + ĐEN (CỐ ĐỊNH)
+-- HÀM KÉO MƯỢT
 --------------------------------------------------------------
-local CoreGui = game:GetService("CoreGui")
-local Players = game:GetService("Players")
-local TweenService = game:GetService("TweenService")
-local UIS = game:GetService("UserInputService")
-local LocalPlayer = Players.LocalPlayer
--- ==================== MÀU CỐ ĐỊNH ====================
-local MATCHA = Color3.fromRGB(152, 251, 152) -- xanh lá tươi (AccentColor)
-local DARK_BG = Color3.fromRGB(30, 30, 30) -- nền đen tối (MainColor)
-local DARK_BORDER = Color3.fromRGB(20, 20, 20) -- viền đen (OutlineColor)
-local TEXT_WHITE = Color3.fromRGB(224, 255, 255) -- chữ (FontColor, gần light cyan)
-local HOVER_BG = Color3.fromRGB(35, 35, 35) -- hover nhẹ (BackgroundColor)
--- ==================== GUI SETUP ====================
+local function makeSmoothDraggable(frame, speed)
+    speed = speed or 0.15
+    local dragging, dragInput, dragStart, startPos
+    local function update(input)
+        local delta = input.Position - dragStart
+        local goal = UDim2.new(
+            startPos.X.Scale,
+            startPos.X.Offset + delta.X,
+            startPos.Y.Scale,
+            startPos.Y.Offset + delta.Y
+        )
+        TweenService:Create(
+            frame,
+            TweenInfo.new(speed, Enum.EasingStyle.Sine, Enum.EasingDirection.Out),
+            { Position = goal }
+        ):Play()
+    end
+    frame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            dragStart = input.Position
+            startPos = frame.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end)
+    frame.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement then
+            dragInput = input
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            update(input)
+        end
+    end)
+end
+--------------------------------------------------------------
+-- GUI KHỞI TẠO
+--------------------------------------------------------------
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "MatchaPlayerList_"..tostring(math.random(1e6,1e7))
+ScreenGui.Name = "MatchaPlayerList_" .. tostring(math.random(1e6, 1e7))
 ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = CoreGui
-ScreenGui.Enabled = true
 local Frame = Instance.new("Frame")
-Frame.Size = UDim2.new(0, 160, 0, 220)
-Frame.Position = UDim2.new(0.07, 0, 0.25, 0)
+Frame.Size = UDim2.new(0, 180, 0, 260)
+Frame.Position = UDim2.new(0.05, 0, 0.25, 0)
 Frame.BackgroundColor3 = DARK_BG
 Frame.BorderColor3 = DARK_BORDER
-Frame.Active = true
-Frame.Draggable = true
-Frame.Visible = false
+Frame.BackgroundTransparency = 0
+Frame.Visible = true
 Frame.Parent = ScreenGui
-Instance.new("UICorner", Frame).CornerRadius = UDim.new(0,10)
--- Gradient (Matcha → đen)
+Instance.new("UICorner", Frame).CornerRadius = UDim.new(0, 10)
+makeSmoothDraggable(Frame, 0.15)
+-- Đổ bóng nhẹ
+local Shadow = Instance.new("ImageLabel")
+Shadow.Name = "Shadow"
+Shadow.Image = "rbxassetid://1316045217"
+Shadow.ImageColor3 = Color3.fromRGB(0, 0, 0)
+Shadow.ImageTransparency = 0.6
+Shadow.Size = UDim2.new(1, 20, 1, 20)
+Shadow.Position = UDim2.new(0, -10, 0, -10)
+Shadow.ScaleType = Enum.ScaleType.Slice
+Shadow.SliceCenter = Rect.new(10, 10, 118, 118)
+Shadow.ZIndex = 0
+Shadow.Parent = Frame
+-- Gradient matcha
 local Grad = Instance.new("UIGradient")
-Grad.Color = ColorSequence.new{
+Grad.Color = ColorSequence.new({
     ColorSequenceKeypoint.new(0, MATCHA),
     ColorSequenceKeypoint.new(1, DARK_BG)
-}
+})
+Grad.Rotation = 270
 Grad.Parent = Frame
+--------------------------------------------------------------
+-- TIÊU ĐỀ
+--------------------------------------------------------------
 local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1,0,0,28)
+Title.Size = UDim2.new(1, -10, 0, 28)
+Title.Position = UDim2.new(0, 5, 0, 4)
 Title.BackgroundTransparency = 1
-Title.Text = "Player List"
-Title.TextColor3 = TEXT_WHITE
+Title.Text = "🌿 Matcha Player List"
+Title.TextColor3 = MATCHA
 Title.Font = Enum.Font.GothamBold
 Title.TextSize = 15
+Title.TextXAlignment = Enum.TextXAlignment.Center
 Title.Parent = Frame
-Instance.new("UICorner", Title).CornerRadius = UDim.new(0,10)
+--------------------------------------------------------------
+-- KHUNG DANH SÁCH
+--------------------------------------------------------------
 local Scroller = Instance.new("ScrollingFrame")
-Scroller.Size = UDim2.new(1,-6,1,-34)
-Scroller.Position = UDim2.new(0,3,0,31)
+Scroller.Size = UDim2.new(1, -8, 1, -70)
+Scroller.Position = UDim2.new(0, 4, 0, 35)
 Scroller.BackgroundTransparency = 1
 Scroller.ScrollBarThickness = 4
-Scroller.CanvasSize = UDim2.new(0,0,0,0)
+Scroller.CanvasSize = UDim2.new(0, 0, 0, 0)
 Scroller.Parent = Frame
 local Layout = Instance.new("UIListLayout")
-Layout.Padding = UDim.new(0,4)
+Layout.Padding = UDim.new(0, 5)
 Layout.SortOrder = Enum.SortOrder.LayoutOrder
 Layout.Parent = Scroller
 Layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-    Scroller.CanvasSize = UDim2.new(0,0,0, Layout.AbsoluteContentSize.Y + 10)
+    Scroller.CanvasSize = UDim2.new(0, 0, 0, Layout.AbsoluteContentSize.Y + 10)
 end)
--- ==================== ANIMATION ====================
-local function showGUI(show)
-    local tween = TweenService:Create(Frame,
-        TweenInfo.new(0.25, Enum.EasingStyle.Quint),
-        {BackgroundTransparency = show and 0 or 1})
-    Frame.Visible = true
-    tween:Play()
-    tween.Completed:Connect(function()
-        if not show then Frame.Visible = false end
-    end)
-end
--- ==================== UPDATE LIST ====================
+--------------------------------------------------------------
+-- CẬP NHẬT DANH SÁCH NGƯỜI CHƠI
+--------------------------------------------------------------
 local function UpdateList()
     for _, c in pairs(Scroller:GetChildren()) do
-        if c:IsA("TextButton") then c:Destroy() end
+        if c:IsA("TextButton") then
+            c:Destroy()
+        end
     end
     for _, p in ipairs(Players:GetPlayers()) do
         if p ~= LocalPlayer then
             local btn = Instance.new("TextButton")
-            btn.Size = UDim2.new(1, -4, 0, 26)
+            btn.Size = UDim2.new(1, -4, 0, 28)
             btn.BackgroundColor3 = DARK_BG
-            btn.BackgroundTransparency = 0.3
+            btn.BackgroundTransparency = 0.25
             btn.TextColor3 = TEXT_WHITE
             btn.Font = Enum.Font.Gotham
             btn.TextSize = 13
             btn.AutoButtonColor = false
+            btn.TextXAlignment = Enum.TextXAlignment.Center
             btn.Parent = Scroller
-            Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
             btn.BorderSizePixel = 0
+            Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
             local function refresh()
                 local mark = ""
                 if getgenv().SelectedTarget == p.Name then
                     mark = " ✓"
-                elseif table.find(getgenv().whitelist, p.Name) then
+                elseif table.find(getgenv().whitelist or {}, p.Name) then
                     mark = " ✩"
                 end
                 btn.Text = p.DisplayName .. " (@" .. p.Name .. ")" .. mark
             end
             refresh()
-            -- Hover
             btn.MouseEnter:Connect(function()
-                TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundTransparency = 0}):Play()
+                TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundTransparency = 0.05}):Play()
             end)
             btn.MouseLeave:Connect(function()
-                TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundTransparency = 0.3}):Play()
+                TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundTransparency = 0.25}):Play()
             end)
-            -- Click → select / unselect
             btn.MouseButton1Click:Connect(function()
                 if getgenv().SelectedTarget == p.Name then
                     getgenv().SelectedTarget = nil
-                    Library:Notify("Đã untarget.", 2)
+                    Library:Notify("Untargeted.", 2)
                 else
                     getgenv().SelectedTarget = p.Name
-                    Library:Notify("Selected target: " .. p.DisplayName .. " (@" .. p.Name .. ")", 3)
+                    Library:Notify("Selected: " .. p.DisplayName .. " (@" .. p.Name .. ")", 2.5)
                 end
                 UpdateList()
             end)
@@ -6062,21 +6792,29 @@ end
 UpdateList()
 Players.PlayerAdded:Connect(UpdateList)
 Players.PlayerRemoving:Connect(UpdateList)
-
--- Thêm nút Add Whitelist dưới list
+--------------------------------------------------------------
+-- NÚT WHITELIST
+--------------------------------------------------------------
 local addWhitelistBtn = Instance.new("TextButton")
-addWhitelistBtn.Text = "Add Whitelist"
-addWhitelistBtn.Font = Enum.Font.Gotham
-addWhitelistBtn.TextSize = 12
+addWhitelistBtn.Text = "+ Add Whitelist"
+addWhitelistBtn.Font = Enum.Font.GothamBold
+addWhitelistBtn.TextSize = 13
 addWhitelistBtn.BackgroundColor3 = MATCHA
 addWhitelistBtn.TextColor3 = DARK_BG
-addWhitelistBtn.Position = UDim2.new(0, 10, 1, -30)  -- Dưới Scroller
-addWhitelistBtn.Size = UDim2.new(1, -20, 0, 20)
+addWhitelistBtn.Position = UDim2.new(0, 10, 1, -32)
+addWhitelistBtn.Size = UDim2.new(1, -20, 0, 24)
 addWhitelistBtn.Parent = Frame
 Instance.new("UICorner", addWhitelistBtn).CornerRadius = UDim.new(0, 6)
+addWhitelistBtn.MouseEnter:Connect(function()
+    TweenService:Create(addWhitelistBtn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(180, 255, 180)}):Play()
+end)
+addWhitelistBtn.MouseLeave:Connect(function()
+    TweenService:Create(addWhitelistBtn, TweenInfo.new(0.15), {BackgroundColor3 = MATCHA}):Play()
+end)
 addWhitelistBtn.MouseButton1Click:Connect(function()
     if getgenv().SelectedTarget then
         local targetName = getgenv().SelectedTarget
+        getgenv().whitelist = getgenv().whitelist or {}
         local idx = table.find(getgenv().whitelist, targetName)
         if idx then
             table.remove(getgenv().whitelist, idx)
@@ -6085,12 +6823,12 @@ addWhitelistBtn.MouseButton1Click:Connect(function()
             table.insert(getgenv().whitelist, targetName)
             Library:Notify(targetName .. " added to whitelist", 3)
         end
-        getgenv().SelectedTarget = nil  -- Unselect SelectedTarget
+        getgenv().SelectedTarget = nil
         UpdateList()
     else
-		Library:Notify("Select a player first to add to whitelist!", 3)
+        Library:Notify("Select a player first!", 2.5)
     end
-end)
+end)]]
 PlayerInfo:AddToggle('ShowPlayerListToggle', {
     Text = 'Show Player List',
     Default = false,
@@ -6102,7 +6840,7 @@ PlayerInfo:AddToggle('ShowPlayerListToggle', {
     Mode = 'Toggle',
     Tooltip = 'Chọn nhanh target gần nhất / untarget',
     Callback = function()
-        if UIS:GetFocusedTextBox() then return end
+        if UserInputService:GetFocusedTextBox() then return end
         if getgenv().SelectedTarget then
             getgenv().SelectedTarget = nil
             Library:Notify("Đã untarget.", 2)
@@ -6110,7 +6848,7 @@ PlayerInfo:AddToggle('ShowPlayerListToggle', {
             return
         end
         local cam = workspace.CurrentCamera
-        local ref = UIS.TouchEnabled and (cam.ViewportSize/2) or UIS:GetMouseLocation()
+        local ref = UserInputService.TouchEnabled and (cam.ViewportSize/2) or UserInputService:GetMouseLocation()
         local best, bestDist = nil, math.huge
         for _, p in ipairs(Players:GetPlayers()) do
             if p ~= LocalPlayer 
@@ -6582,8 +7320,6 @@ function autoEquipTool()
     if bestTool then
         bestTool.Parent = player.Character -- Equip the tool
         Library:Notify("Equipped tool: " .. bestTool.Name, 3)
-        
-        -- Wait until the tool is fully equipped
         repeat task.wait() until player.Character:FindFirstChildOfClass("Tool") == bestTool
 
         return bestTool
@@ -6654,7 +7390,6 @@ getgenv().autoShootToggle = AllPlayerActions:AddToggle('AutoShootToggle', {
         end
     end
 })
-
 
 MenuGroup:AddButton({
     Text = 'Unload',
@@ -6769,9 +7504,32 @@ SaveManager:SetFolder('Nigga/configs')
 SaveManager:BuildConfigSection(Tabs['UI Settings'])
 ThemeManager:ApplyToTab(Tabs['UI Settings'])
 SaveManager:LoadAutoloadConfig()
-Library:SetWatermarkVisibility(false)
+Library:SetWatermarkVisibility(true)
+MenuGroup:AddToggle('WatermarkToggle', {
+    Text = 'Show Watermark',
+    Default = true,  -- Bắt đầu bật
+    Tooltip = 'Toggle the watermark visibility',
+    Callback = function(Value)
+        Library:SetWatermarkVisibility(Value)
+    end
+})
+local FrameTimer = tick()
+local FrameCounter = 0
+local FPS = 60
 
+local WatermarkConnection = RunService.RenderStepped:Connect(function()
+    FrameCounter += 1
+    if (tick() - FrameTimer) >= 1 then
+        FPS = FrameCounter
+        FrameTimer = tick()
+        FrameCounter = 0
+    end
 
+    local Ping = math.floor(StatsService.Network.ServerStatsItem["Data Ping"]:GetValue())
+
+    Library:SetWatermark(("nigga.lol | FPS: %d | %d ms"):format(FPS, Ping))
+end)
+task.wait(1)
 Library:OnUnload(function()
     WatermarkConnection:Disconnect()
     print('Unloaded!')
