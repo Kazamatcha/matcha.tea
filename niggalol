@@ -5317,7 +5317,7 @@ if isDaHood then
 	        ["[LMG] - $4098"] = "200 [LMG Ammo] - $328",
 	        ["[Rifle] - $1694"] = "5 [Rifle Ammo] - $273",
             ["[GrenadeLauncher] - $10927"] = "12 [GrenadeLauncher Ammo] - $3278",
-	        ["["Double-Barrel SG] - $1530"] = "18 [Double-Barrel SG Ammo] - $66",
+	        ["[Double-Barrel SG] - $1530"] = "18 [Double-Barrel SG Ammo] - $66",
 	    }
 	
 	    local AmmoItem = AmmoMap[SelectedItem]
