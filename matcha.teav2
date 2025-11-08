@@ -968,10 +968,10 @@ local Watermark = Library:Watermark("matcha.tea")
 
 local KeybindList = Library:KeybindList()
 local MainPage = Window:Page({Name = "Main", SubPages = true})
-local ClientPage = Window:Page({Name = "Client", SubPages = true})
+--local ClientPage = Window:Page({Name = "Client", SubPages = true})
 local SettingsPage = Library:CreateSettingsPage(Window, Watermark, KeybindList) 
 local CombatTab = MainPage:SubPage({Name = "Combat", Columns = 2})
-local CharacterSubPage = ClientPage:SubPage({Name = "Character", Columns = 2})
+--local CharacterSubPage = ClientPage:SubPage({Name = "Character", Columns = 2})
 local AimbotSection = CombatTab:Section({Name = "Aimbot", Side = 1})
 local TriggerbotSection = CombatTab:Section({Name = "Triggerbot", Side = 1})
 local AimbotSettings = CombatTab:Section({Name = "Aimbot Settings", Side = 2})
@@ -1498,9 +1498,8 @@ FOVSection:Slider({
     end
 })
 
-local MovementSelection = CharacterSubPage:Section({Name = "Movement", Side = 1})
+--[[local MovementSelection = CharacterSubPage:Section({Name = "Movement", Side = 1})
 
--- Thêm vào MovementSelection (thay thế Fly V2 cũ)
 local flyV1Toggle = MovementSelection:Toggle({
     Name = "Fly V1 (CFrame)",
     Flag = "FlyV1Enabled",
@@ -1947,7 +1946,7 @@ LocalPlayer.CharacterAdded:Connect(function()
         toggleAntiSlow(true)
     end
 end)
-local MiscSelection = CharacterSubPage:Section({Name = "Misc", Side = 2})
+--local MiscSelection = CharacterSubPage:Section({Name = "Misc", Side = 2})
 
 -- Toggle + Keybind (dưới Fly V1)
 local noclipToggle = MiscSelection:Toggle({
@@ -2048,7 +2047,7 @@ MiscSelection:Slider({
     end
 })
 
-local WorldSubPage = ClientPage:SubPage({Name = "World"})
+--local WorldSubPage = ClientPage:SubPage({Name = "World"})
 local Lighting = WorldSubPage:Section({Name = "Lighting", Side = 1})
 local Misc = WorldSubPage:Section({Name = "Misc", Side = 2})
 local WorldFx = WorldSubPage:Section({Name = "World Fx", Side = 2})
@@ -2784,7 +2783,7 @@ local function resetCamera()
 end
 
 -- === TẠO SUBPAGE + SECTIONS ===
-local AntiAimSubPage = ClientPage:SubPage({Name = "Anti Aim", Columns = 2})
+--local AntiAimSubPage = ClientPage:SubPage({Name = "Anti Aim", Columns = 2})
 local AntiAimSection = AntiAimSubPage:Section({Name = "Anti Aim", Side = 1})
 local AntiAimSection2 = AntiAimSubPage:Section({Name = "Anti Aim 2", Side = 2})
 
@@ -2944,7 +2943,7 @@ spawn(function()
             resetCamera()
         end
     end
-end)
+end)]]
 --[[local rs = game:GetService("RunService")
 local uis = game:GetService("UserInputService")
 local lp = game.Players.LocalPlayer
