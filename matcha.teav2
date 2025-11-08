@@ -957,8 +957,12 @@ local function createMatchaToggle()
         if input == dragInput and dragging then updateDrag(input) end
     end)
 end
-
-createMatchaToggle()
+local UserInputService = game:GetService("UserInputService")
+if UserInputService.TouchEnabled then
+    createMatchaToggle()
+else
+    print("❌ Not mobile, skip Matcha Toggle")
+end
 
 local Watermark = Library:Watermark("matcha.tea")
 
