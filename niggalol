@@ -10,10 +10,9 @@ Library.ForceCheckbox = false
 Library.ShowToggleFrameInKeybinds = true
 local Window = Library:CreateWindow({
 	Title = "Nigga.lol",
-	Footer = "Nigga.lol | Anhchangm52 | Free",
+	Footer = "Nigga.lol | Free",
 	Icon = 77218680285262,
 	NotifySide = "Left",
-	ShowCustomCursor = true,
     Compact = true,
 })
 task.wait(1)
