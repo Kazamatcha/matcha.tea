@@ -52,12 +52,6 @@ local targetToMouseTracer = true
 local grabCheckEnabled = true
 local koCheckEnabled = true
 local friendCheckEnabled = false
-local strafeEnabled = false
-local strafeMode = "Orbit"
-local strafeSpeed = 5
-local strafeXOffset = 5
-local strafeyOffset = 0
-local predictMovementEnabled = false
 getgenv().switchWhenDie = false
 local stompTargetEnabled = false
 local lastPosition = nil
@@ -66,9 +60,7 @@ local Core = nil
 local BodyVelocity = nil
 local PredicTvalue = 1
 local hiddenBulletsEnabled = false
-local spectateStrafeEnabled = false
 local AutoAmmoEnabled = false
-local strafeWasEnabledBeforeAmmoBuy = false
 local possibleRemotes = {
     "MAINEVENT",
     "MainEvent",
@@ -89,6 +81,14 @@ desync_setback.Size = Vector3.new(2, 2, 1)
 desync_setback.CanCollide = false
 desync_setback.Anchored = true
 desync_setback.Transparency = 1
+local targetHighlight = Instance.new("Highlight")
+targetHighlight.Name = "TargetHighlight"
+targetHighlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+targetHighlight.FillColor = Color3.fromRGB(255, 0, 0)  -- Màu mặc định, sẽ thay đổi qua color picker
+targetHighlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+targetHighlight.OutlineTransparency = 0
+targetHighlight.FillTransparency = 0.5
+targetHighlight.Parent = game.CoreGui  -- Để highlight hiển thị
 AntiLock = {
     Enabled = false,
     Mode = "Custom",
@@ -252,6 +252,11 @@ TargetingGroup:AddToggle("StickyAim", {
             lockedTarget = nil
             workspace.CurrentCamera.CameraSubject = LocalPlayer.Character:FindFirstChild("Humanoid")
             tracer.Visible = false
+            targetHighlight.Adornee = nil  -- Xóa highlight khi tắt
+        end
+        -- Cập nhật visibility ImageButton nếu mobile
+        if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled then
+            Sigmaballs:FindFirstChild("ImageButton").Visible = Value
         end
     end
 }):AddKeyPicker("StickyAimKeybind", {
@@ -267,6 +272,7 @@ TargetingGroup:AddToggle("StickyAim", {
                 lockedTarget = nil
                 workspace.CurrentCamera.CameraSubject = LocalPlayer.Character:FindFirstChild("Humanoid")
                 tracer.Visible = false
+                targetHighlight.Adornee = nil  -- Xóa highlight khi unlock
                 Library:Notify("Sticky Aim: Unlocked", 2)
             else
                 selectClosestTarget()
@@ -309,6 +315,28 @@ TargetingGroup:AddDropdown("TracerMode", {
     Callback = function(Value)
         targetToMouseTracer = (Value == "Mouse")
     end
+})
+TargetingGroup:AddToggle("HighlightToggle", {
+    Text = "Highlight Target",
+    Default = false,
+    Callback = function(Value)
+        HighlightEnabled = Value
+        if not Value then
+            targetHighlight.Adornee = nil
+        end
+    end
+}):AddColorPicker('HighlightColorPicker', {
+    Text = '',
+    Default = Color3.fromRGB(255, 0, 0),
+    Callback = function(color)
+        targetHighlight.FillColor = color
+    end,
+}):AddColorPicker('HighlightOutlineColorPicker', {   -- <-- THÊM DÒNG NÀY
+    Text = '',
+    Default = Color3.fromRGB(255, 255, 255),        -- Màu viền mặc định (trắng)
+    Callback = function(color)
+        targetHighlight.OutlineColor = color
+    end,
 })
 local function autoStompTarget()
     if getgenv().stompTargetEnabled and lockedTarget and lockedTarget ~= LocalPlayer then
@@ -402,7 +430,7 @@ TargetingGroup:AddDropdown("hp", {
         targetHitPart = Value
     end
 })
-local silentAimEnabled = false
+local silentAimFakeEnabled = false
 local targetLockEnabled = false
 local fovEnabled = false
 local fovColor = Color3.fromRGB(255, 255, 255)
@@ -458,7 +486,7 @@ RunService.RenderStepped:Connect(function()
     end
     
     if targetLockEnabled then return end
-    if silentAimEnabled then
+    if silentAimFakeEnabled then
         local newTarget = getClosestPlayer(true)
         if newTarget then
             currentTarget = newTarget
@@ -506,7 +534,7 @@ FakeSilentAim:AddToggle('SilentAimToggle', {
     Text = 'Silent Aim',
     Default = false,
     Callback = function(Value)
-        silentAimEnabled = Value
+        silentAimFakeEnabled = Value
         if not Value then
             currentTarget = nil
         end
@@ -566,123 +594,6 @@ FakeSilentAim:AddSlider('FOVSizeSlider', {
     Rounding = 0,
     Callback = function(Value)
         fovSize = Value
-    end
-})
-Target:AddToggle("StrafeToggle", {
-    Text = "Target Strafe",
-    Default = false,
-    Callback = function(Value)
-        strafeEnabled = Value
-        if not Value then
-            if Core then
-                Core:Destroy()
-                Core = nil
-            end
-            if BodyVelocity then
-                BodyVelocity:Destroy()
-                BodyVelocity = nil
-            end
-            if oldPosition then
-                LocalPlayer.Character.HumanoidRootPart.CFrame = oldPosition
-                oldPosition = nil
-            end
-            workspace.CurrentCamera.CameraSubject = LocalPlayer.Character:FindFirstChild("Humanoid")
-        end
-    end
-}):AddKeyPicker("StrafeKeybind", {
-    Default = "N",
-    NoUI = false,
-    Text = "Strafe",
-    Mode = "Toggle",
-    Callback = function()
-        if UserInputService:GetFocusedTextBox() then return end
-        strafeEnabled = not strafeEnabled
-        if not strafeEnabled then
-            if Core then
-                Core:Destroy()
-                Core = nil
-            end
-            if BodyVelocity then
-                BodyVelocity:Destroy()
-                BodyVelocity = nil
-            end
-            if oldPosition then
-                LocalPlayer.Character.HumanoidRootPart.CFrame = oldPosition
-                oldPosition = nil
-            end
-            workspace.CurrentCamera.CameraSubject = LocalPlayer.Character:FindFirstChild("Humanoid")
-        end
-    end
-})
-Target:AddToggle("SpectateStrafe", {
-    Text = "Spectate Strafe",
-    Default = false,
-    Callback = function(Value)
-        spectateStrafeEnabled = Value
-        if not Value then
-            workspace.CurrentCamera.CameraSubject = LocalPlayer.Character:FindFirstChild("Humanoid")
-        end
-    end
-})
-
-Target:AddDropdown("StrafeMode", {
-    Text = "Strafe Mode",
-    Values = {"Orbit", "Random"},
-    Default = "Orbit",
-    Callback = function(Value)
-        strafeMode = Value
-    end
-})
-
-Target:AddSlider("StrafeSpeed", {
-    Text = "Speed units",
-    Default = 5,
-    Min = 1,
-    Max = 20,
-    Rounding = 1,
-    Callback = function(Value)
-        strafeSpeed = Value
-    end
-})
-
-Target:AddSlider("StrafeYOffset", {
-    Text = "Y offset",
-    Default = 0,
-    Min = 1,
-    Max = 100,
-    Rounding = 1,
-    Callback = function(Value)
-        strafeyOffset = Value
-    end
-})
-
-Target:AddSlider("StrafeXOffset", {
-    Text = "x offset",
-    Default = 5,
-    Min = 1,
-    Max = 100,
-    Rounding = 1,
-    Callback = function(Value)
-        strafeXOffset = Value
-    end
-})
-
-Target:AddToggle("PredictMovement", {
-    Text = "predict movement",
-    Default = false,
-    Callback = function(Value)
-        predictMovementEnabled = Value
-    end
-})
-
-Target:AddSlider("StrafePredictionDistance", {
-    Text = "movement prediction",
-    Default = 0.3,
-    Min = 0.1,
-    Max = 10,
-    Rounding = 1,
-    Callback = function(Value)
-        PredicTvalue = Value
     end
 })
 
@@ -766,8 +677,6 @@ local function checkAmmoAndBuy()
 
     local ammoCount = getAmmoCount(gunName)
     if ammoCount <= 0 then
-        strafeWasEnabledBeforeAmmoBuy = strafeEnabled
-        strafeEnabled = false
         if Core then
             Core:Destroy()
             Core = nil
@@ -779,9 +688,6 @@ local function checkAmmoAndBuy()
 
         buyAmmo(gunName)
 
-        if strafeWasEnabledBeforeAmmoBuy then
-            strafeEnabled = true
-        end
     end
 end
 
@@ -894,63 +800,6 @@ RunService.RenderStepped:Connect(function()
         local isKO = bodyEffects and bodyEffects:FindFirstChild("K.O") and bodyEffects["K.O"].Value
         local isGrabbed = lockedTarget.Character:FindFirstChild("GRABBING_CONSTRAINT")
         
-        -- Nếu target bị KO hoặc Grab -> trả về chỗ cũ
-        if isKO or isGrabbed then
-            if oldPosition then
-                local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-                if root then
-                    root.CFrame = oldPosition
-                end
-                oldPosition = nil
-            end
-            workspace.CurrentCamera.CameraSubject = LocalPlayer.Character:FindFirstChild("Humanoid")
-            tracer.Visible = false
-            return
-        end
-        
-        -- Camera spectate
-        if ViewTargetEnabled then
-            workspace.CurrentCamera.CameraSubject = lockedTarget.Character
-        elseif spectateStrafeEnabled and strafeEnabled then
-            workspace.CurrentCamera.CameraSubject = lockedTarget.Character:FindFirstChild("Head")
-        end
-        
-        if strafeEnabled and targetPart and not isGrabbed then
-            local targetRoot = lockedTarget.Character:FindFirstChild("HumanoidRootPart")
-            local targetPosition = targetRoot.Position
-
-            if predictMovementEnabled then
-                targetPosition = predictPosition(targetRoot, PredicTvalue)
-            end
-
-            local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-            local pos = root.CFrame
-            if strafeMode == "Orbit" then
-                local angle = tick() * strafeSpeed
-                local offset = Vector3.new(math.cos(angle) * strafeXOffset, strafeXOffset, math.sin(angle) * strafeXOffset)
-                pos = CFrame.new(targetPosition + offset, targetPosition)
-            elseif strafeMode == "Random" then
-                local offset = Vector3.new(math.random(-20, 20), math.random(-10, 10), math.random(-20, 20))
-                local randomrotation = CFrame.Angles(
-                    math.rad(math.random(0, 360)),
-                    math.rad(math.random(0, 360)),
-                    math.rad(math.random(0, 360))
-                )
-                pos = CFrame.new(targetPosition + offset) * randomrotation
-            end
-			if root then
-			    root.CFrame = pos
-			end
-        else
-			if oldPosition then
-				local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-				if root then
-					root.CFrame = oldPosition
-				end
-				oldPosition = nil
-				workspace.CurrentCamera.CameraSubject = LocalPlayer.Character:FindFirstChild("Humanoid")
-			end
-        end
 
         local bodyEffects = lockedTarget.Character:FindFirstChild("BodyEffects")
         local isSDeath = bodyEffects and bodyEffects:FindFirstChild("SDeath") and bodyEffects["SDeath"].Value
@@ -1352,324 +1201,606 @@ RunService.Heartbeat:Connect(function()
         end
     end
 end)
+local LegitBox = Tabs.Main:AddRightTabbox()
+local Camlock = LegitBox:AddTab("Camlock")
+local SilentAim = LegitBox:AddTab("SilentAim")
+local Triggerbot = LegitBox:AddTab("Triggerbot")
 
-local LegitBox = Tabs.Main:AddRightGroupbox('Legit')
+-- ===== CAMLOCK TAB (SỬA SMOOTH + JUMP OFFSET THÀNH INPUT) =====
+local camlockEnabled = false
+local camlockFOVVisible = false
+local camlockFOVSize = 150
+local camlockSmooth = 1
+local camlockAimPart = "Head"
+local camlockJumpOffset = 0
+local camlockFOVColor = Color3.fromRGB(255, 255, 255)
+local camlockOutlineColor = Color3.fromRGB(255, 0, 0)
 
-local predictionTable = {
-    {0, 0.1332},
-    {10, 0.1234555},
-    {20, 0.12435},
-    {30, 0.124123},
-    {40, 0.12766},
-    {50, 0.128643},
-    {60, 0.1264236},
-    {70, 0.12533},
-    {80, 0.1321042},
-    {90, 0.1421951},
-    {100, 0.134143},
-    {105, 0.141199},
-    {110, 0.142199},
-    {125, 0.15465},
-    {130, 0.12399},
-    {135, 0.1659921},
-    {140, 0.1659921},
-    {145, 0.129934},
-    {150, 0.1652131},
-    {155, 0.125333},
-    {160, 0.1223333},
-    {165, 0.1652131},
-    {170, 0.16863},
-    {175, 0.16312},
-    {180, 0.1632},
-    {185, 0.16823},
-    {190, 0.18659},
-    {205, 0.17782},
-    {215, 0.16937},
-    {225, 0.176332},
-}
+-- FOV Circle
+local camlockFOVCircle = Drawing.new("Circle")
+camlockFOVCircle.Thickness = 1
+camlockFOVCircle.NumSides = 100
+camlockFOVCircle.Radius = camlockFOVSize
+camlockFOVCircle.Visible = false
+camlockFOVCircle.Color = camlockFOVColor
+camlockFOVCircle.Filled = false
+camlockFOVCircle.Transparency = 1
 
-local Blatant = {
-    {50, 0.12758545757236864},
-    {60, 0.12593338424986178},
-    {70, 0.1416310605747206},
-    {80, 0.1441481061236737},
-    {90, 0.14306050263254388},
-    {100, 0.14698413210558095},
-    {110, 0.14528324362031425},
-    {120, 0.14556534594403},
-    {130, 0.14614337395777216},
-    {140, 0.14645603036905414},
-    {150, 0.14736848095666674},
-    {160, 0.14696985547996216},
-    {170, 0.14718530231216217},
-    {180, 0.1471532933015037},
-    {190, 0.1471212842908452},
-    {200, 0.14708927528018672},
-    {210, 0.14705726626952823},
-    {220, 0.14702525725886974},
-    {230, 0.14699324824821125},
-    {240, 0.14696123923755276},
-    {250, 0.14692923022689427},
-    {260, 0.14689722121623578},
-    {270, 0.1468652122055773},
-    {280, 0.1468332031949188},
-    {290, 0.1468011941842603},
-    {300, 0.1467691851736018},
-}
+-- Outline Circle
+local camlockOutlineCircle = Drawing.new("Circle")
+camlockOutlineCircle.Thickness = 2
+camlockOutlineCircle.NumSides = 100
+camlockOutlineCircle.Radius = camlockFOVSize + 1
+camlockOutlineCircle.Visible = false
+camlockOutlineCircle.Color = camlockOutlineColor
+camlockOutlineCircle.Filled = false
+camlockOutlineCircle.Transparency = 1
 
-getgenv().CamLock = {
-    Enabled = false,
-    AutoPrediction = true,
-    AutoPredMode = "PingBased",
-    HorizontalPrediction = 0.1,
-    VerticalPrediction = 0.1,
-    JumpOffset = -1,
-    NoGroundShot = true,
-    Resolver = false,
-    HitPart = "Head",
-    Smoothness = 1
-}
-
-local function calculateAdvancePrediction(target, cameraPosition, pingBase)
-    local character = target.Character
-    if character then
-        local hrp = character:FindFirstChild("HumanoidRootPart")
-        if hrp then
-            local vel = hrp.Velocity
-            local dist = (cameraPosition - hrp.Position).Magnitude
-            local advancePrediction = pingBase + (dist / 1000) * (vel.Magnitude / 50)
-            return advancePrediction
-        end
+-- isAlive function
+local function isAlive(plr)
+    if not plr or not plr.Character then return false end
+    local hum = plr.Character:FindFirstChildOfClass("Humanoid")
+    if not hum or hum.Health <= 0 then return false end
+    local be = plr.Character:FindFirstChild("BodyEffects")
+    if be then
+        local ko = be:FindFirstChild("K.O")
+        local grabbed = plr.Character:FindFirstChild("GRABBING_CONSTRAINT")
+        if (ko and ko.Value) or grabbed then return false end
     end
-    return pingBase
+    return true
 end
 
-local function updatePredictionValue()
-    if getgenv().CamLock.AutoPrediction then
-        local pingValue = game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValueString()
-        local split = string.split(pingValue, '(')
-        local ping = tonumber(split[1])
-        if ping then
-            if getgenv().CamLock.AutoPredMode == "PingBased" then
-                for i = 1, #predictionTable do
-                    if ping < predictionTable[i][1] then
-                        local value = predictionTable[i][2]
-                        getgenv().CamLock.HorizontalPrediction = value
-                        getgenv().CamLock.VerticalPrediction = value
-                        break
-                    end
-                end
-            elseif getgenv().CamLock.AutoPredMode == "Calculation" then
-                local calculatedValue = 0.1 + (ping / 1000) * 0.32
-                getgenv().CamLock.HorizontalPrediction = calculatedValue
-                getgenv().CamLock.VerticalPrediction = calculatedValue
-            elseif getgenv().CamLock.AutoPredMode == "AdvanceCalculation" then
-                for i = 1, #predictionTable do
-                    if ping < predictionTable[i][1] then
-                        local pingBase = predictionTable[i][2]
-                        local advancePredictionValue = calculateAdvancePrediction(camLockTarget, workspace.CurrentCamera.CFrame.Position, pingBase)
-                        getgenv().CamLock.HorizontalPrediction = advancePredictionValue
-                        getgenv().CamLock.VerticalPrediction = advancePredictionValue
-                        break
-                    end
-                end
-            elseif getgenv().CamLock.AutoPredMode == "Blatant" then
-                for i = 1, #Blatant do
-                    if ping < Blatant[i][1] then
-                        local value = Blatant[i][2]
-                        getgenv().CamLock.HorizontalPrediction = value
-                        getgenv().CamLock.VerticalPrediction = value
-                        break
-                    end
-                end
-            end
-        end
-    end
-end
-
-local function ApplyAntiGround(character)
-    if not getgenv().CamLock.NoGroundShot then return end
-    local hrp = character and character:FindFirstChild("HumanoidRootPart")
-    if hrp then
-        local velocity = hrp.Velocity
-        local SigmaAir = hrp.Position.Y > 2
-        if not SigmaAir and velocity.Y < -3 then
-            hrp.Velocity = Vector3.new(velocity.X, 0, velocity.Z)
-        end
-    end
-end
-
-LegitBox:AddToggle('CamLockToggle', {
-    Text = 'CamLock',
+-- Toggle + Keybind
+Camlock:AddToggle("CamlockToggle", {
+    Text = "Camlock",
     Default = false,
-    Callback = function(state)
-        getgenv().CamLock.Enabled = state
-        if not state then
-            camLockTarget = nil
-        end
-    end,
-}):AddKeyPicker('CamLockKeybind', {
-    Default = 'Q',
-    Text = 'CamLock',
-    Mode = 'Toggle',
-    Callback = function()
-        if UserInputService:GetFocusedTextBox() then return end
-        if not getgenv().CamLock.Enabled then return end
-        if camLockTarget then
-            camLockTarget = nil
+    Callback = function(Value)
+        camlockEnabled = Value
+    end
+})
+
+-- FOV Visible + 2 ColorPicker
+Camlock:AddToggle("CamlockFOVToggle", {
+    Text = "FOV Visible",
+    Default = false,
+    Callback = function(Value)
+        camlockFOVVisible = Value
+        camlockFOVCircle.Visible = Value
+        camlockOutlineCircle.Visible = Value
+    end
+}):AddColorPicker("CamlockFOVColor", {
+    Default = Color3.fromRGB(255, 255, 255),
+    Callback = function(color)
+        camlockFOVColor = color
+        camlockFOVCircle.Color = color
+    end
+}):AddColorPicker("CamlockOutlineColor", {
+    Default = Color3.fromRGB(255, 0, 0),
+    Callback = function(color)
+        camlockOutlineColor = color
+        camlockOutlineCircle.Color = color
+    end
+})
+
+-- FOV Size Slider
+Camlock:AddSlider("CamlockFOVSize", {
+    Text = "FOV Size",
+    Default = 150,
+    Min = 1,
+    Max = 1000,
+    Rounding = 0,
+    Callback = function(Value)
+        camlockFOVSize = Value
+        camlockFOVCircle.Radius = Value
+        camlockOutlineCircle.Radius = Value + 1
+    end
+})
+
+-- Smooth → Input (thay Slider)
+Camlock:AddInput("CamlockSmoothInput", {
+    Default = "1",
+    Numeric = true,
+    Finished = true,
+    Text = "Smooth",
+    Placeholder = "0.01 - 1.00",
+    Callback = function(Value)
+        local num = tonumber(Value)
+        if num and num >= 0 and num <= 1 then
+            camlockSmooth = num
         else
-            local closestPlayer = nil
-            local closestDistance = math.huge
-            local mousePos = UserInputService:GetMouseLocation()
-
-            for _, Player in pairs(Players:GetPlayers()) do
-                if Player == LocalPlayer then continue end
-                local character = Player.Character
-                if character and not table.find(getgenv().whitelist, Player.Name) then
-                    local screenPart = character:FindFirstChild("Head")
-                    if screenPart then
-                        local screenPos, onScreen = workspace.CurrentCamera:WorldToViewportPoint(screenPart.Position)
-                        if onScreen then
-                            local distance = (Vector2.new(mousePos.X, mousePos.Y) - Vector2.new(screenPos.X, screenPos.Y)).Magnitude
-                            if distance < closestDistance then
-                                closestDistance = distance
-                                closestPlayer = Player
-                            end
-                        end
-                    end
-                end
-            end
-
-            camLockTarget = closestPlayer
-        end
-    end,
-})
-
-LegitBox:AddInput('SmoothnessInput', {
-    Default = '1',
-    Numeric = true,
-    Finished = false,
-    Text = 'Smoothness',
-    Tooltip = 'Controls how smoothly the camera follows the target (0 = instant)',
-    Placeholder = 'Enter smoothness value...',
-    Callback = function(Value)
-        getgenv().CamLock.Smoothness = tonumber(Value) or 1
-    end
-})
-
-LegitBox:AddToggle('AutoPrediction', {
-    Text = 'Auto Prediction',
-    Default = getgenv().CamLock.AutoPrediction,
-    Callback = function(Value)
-        getgenv().CamLock.AutoPrediction = Value
-    end
-})
-
-LegitBox:AddDropdown('AutoPredMode', {
-    Values = { 'AdvanceCalculation', 'PingBased', 'Calculation', 'Blatant' },
-    Default = getgenv().CamLock.AutoPredMode,
-    Text = 'Auto Prediction Mode',
-    Callback = function(Value)
-        getgenv().CamLock.AutoPredMode = Value
-    end
-})
-
-LegitBox:AddInput('HorizontalPrediction', {
-    Default = tostring(getgenv().CamLock.HorizontalPrediction),
-    Numeric = true,
-    Text = 'Horizontal Prediction',
-    Callback = function(Value)
-        if not getgenv().CamLock.AutoPrediction then
-            getgenv().CamLock.HorizontalPrediction = tonumber(Value)
+            Options.CamlockSmoothInput:SetValue(tostring(camlockSmooth))
         end
     end
 })
 
-LegitBox:AddInput('VerticalPrediction', {
-    Default = tostring(getgenv().CamLock.VerticalPrediction),
+-- Jump Offset → Input
+Camlock:AddInput("CamlockJumpOffsetInput", {
+    Default = "0",
     Numeric = true,
-    Text = 'Vertical Prediction',
+    Finished = true,
+    Text = "Jump Offset",
+    Placeholder = "0 - 50",
     Callback = function(Value)
-        if not getgenv().CamLock.AutoPrediction then
-            getgenv().CamLock.VerticalPrediction = tonumber(Value)
+        local num = tonumber(Value)
+        if num and num >= 0 and num <= 50 then
+            camlockJumpOffset = num
+        else
+            Options.CamlockJumpOffsetInput:SetValue(tostring(camlockJumpOffset))
         end
     end
 })
 
-LegitBox:AddInput('JumpOffset', {
-    Default = tostring(getgenv().CamLock.JumpOffset),
-    Numeric = true,
-    Text = 'Jump Offset',
+-- Aim Part Dropdown
+Camlock:AddDropdown("CamlockAimPart", {
+    Text = "Aim Part",
+    Values = {"Head", "HumanoidRootPart"},
+    Default = "Head",
     Callback = function(Value)
-        getgenv().CamLock.JumpOffset = tonumber(Value)
-    end
-})
-
-LegitBox:AddToggle('NoGroundShot', {
-    Text = 'No Ground Shot',
-    Default = getgenv().CamLock.NoGroundShot,
-    Callback = function(Value)
-        getgenv().CamLock.NoGroundShot = Value
-    end
-})
-
-LegitBox:AddToggle('Resolver', {
-    Text = 'Resolver',
-    Default = getgenv().CamLock.Resolver,
-    Callback = function(Value)
-        getgenv().CamLock.Resolver = Value
-    end
-})
-
-LegitBox:AddDropdown('HitPart', {
-    Values = { 'Head', 'Torso', 'UpperTorso', 'LowerTorso', 'HumanoidRootPart' },
-    Default = getgenv().CamLock.HitPart,
-    Text = 'Hit Part',
-    Callback = function(Value)
-        getgenv().CamLock.HitPart = Value
+        camlockAimPart = Value
     end
 })
 
 RunService.RenderStepped:Connect(function()
-    if getgenv().CamLock.Enabled and camLockTarget then
-        updatePredictionValue()
-        local character = camLockTarget.Character
-        if character then
-            ApplyAntiGround(character)
-            local targetPart = character:FindFirstChild(getgenv().CamLock.HitPart) or character:FindFirstChild("Head") or character:FindFirstChild("Torso")
-            if targetPart then
-                local velocity
-                if getgenv().CamLock.Resolver then
-                    local humanoid = character:FindFirstChildOfClass("Humanoid")
-                    velocity = humanoid and (humanoid.MoveDirection * humanoid.WalkSpeed) or targetPart.Velocity
-                else
-                    velocity = targetPart.Velocity
+    -- Cập nhật FOV
+    if camlockFOVVisible then
+        local mousePos = UserInputService:GetMouseLocation()
+        camlockFOVCircle.Position = mousePos
+        camlockOutlineCircle.Position = mousePos
+    end
+
+    if camlockEnabled and lockedTarget and isAlive(lockedTarget) then
+        local targetPart = lockedTarget.Character:FindFirstChild(camlockAimPart == "HumanoidRootPart" and "HumanoidRootPart" or "Head")
+        if targetPart then
+            local camera = workspace.CurrentCamera
+            local mousePos = UserInputService:GetMouseLocation()
+            local screenPos, onScreen = camera:WorldToViewportPoint(targetPart.Position)
+            
+            -- CHECK FOV: Nếu target KHÔNG trong FOV thì bỏ qua
+            if onScreen then
+                local dist = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
+                if dist > camlockFOVSize then
+                    return  -- Không aim nếu ngoài FOV
                 end
-
-                local appliedVerticalOffset = 0
-                if velocity.Y > 0 then
-                    appliedVerticalOffset = getgenv().CamLock.JumpOffset
-                end
-
-                local horizontalPrediction = getgenv().CamLock.HorizontalPrediction
-                local verticalPrediction = getgenv().CamLock.VerticalPrediction
-
-                local targetPosition = Vector3.new(
-                    targetPart.Position.X + (velocity.X * horizontalPrediction),
-                    targetPart.Position.Y + (velocity.Y * verticalPrediction) + appliedVerticalOffset,
-                    targetPart.Position.Z + (velocity.Z * horizontalPrediction)
-                )
-
-                local camera = workspace.CurrentCamera
-                local goalCFrame = CFrame.new(camera.CFrame.Position, targetPosition)
-
-                -- ✅ Smooth trực tiếp trên CFrame thay vì LookVector
-                camera.CFrame = camera.CFrame:Lerp(goalCFrame, getgenv().CamLock.Smoothness)
+            else
+                return  -- Không aim nếu ngoài màn hình
             end
+
+            local targetPos = targetPart.Position
+            
+            -- Jump offset
+            local humanoid = lockedTarget.Character:FindFirstChildOfClass("Humanoid")
+            if humanoid and humanoid:GetState() == Enum.HumanoidStateType.Freefall then
+                targetPos += Vector3.new(0, camlockJumpOffset, 0)
+            end
+
+            local targetCFrame = CFrame.lookAt(camera.CFrame.Position, targetPos)
+            camera.CFrame = camera.CFrame:lerp(targetCFrame, camlockSmooth)
         end
     end
 end)
 
+-- ===== SILENT AIM TAB =====
+-- Check metatable hook support
+local mtSupport = pcall(function()
+    local mt = getrawmetatable(game)
+    setreadonly(mt, false)
+    local old = mt.__index
+    mt.__index = old  -- Test restore
+    setreadonly(mt, true)
+end)
+
+if not mtSupport then
+    Library:Notify("Your executor does not support Silent Aim", 5)
+    SilentAim:AddLabel("Your executor does not support Silent Aim")
+else
+    local silentAimEnabled = false
+    local silentPrediction = 0
+    local silentHitPart = "Head"
+    local silentFOVEnabled = false
+    local silentFOVSize = 100
+    local silentFOVColor = Color3.fromRGB(255, 255, 255)
+    local silentOutlineColor = Color3.fromRGB(255, 0, 0)
+    local silentMousePos = Vector2.new()
+    local silentWallCheck = false
+
+    -- FOV Circles
+    local silentFOVCircle = Drawing.new("Circle")
+    silentFOVCircle.Thickness = 1
+    silentFOVCircle.NumSides = 100
+    silentFOVCircle.Radius = silentFOVSize
+    silentFOVCircle.Visible = false
+    silentFOVCircle.Color = silentFOVColor
+    silentFOVCircle.Filled = false
+    silentFOVCircle.Transparency = 1
+
+    local silentOutlineCircle = Drawing.new("Circle")
+    silentOutlineCircle.Thickness = 2
+    silentOutlineCircle.NumSides = 100
+    silentOutlineCircle.Radius = silentFOVSize + 1
+    silentOutlineCircle.Visible = false
+    silentOutlineCircle.Color = silentOutlineColor
+    silentOutlineCircle.Filled = false
+    silentOutlineCircle.Transparency = 1
+
+    -- isAlive (dùng chung)
+    local function isAlive(plr)
+        if not plr or not plr.Character then return false end
+        local hum = plr.Character:FindFirstChildOfClass("Humanoid")
+        if not hum or hum.Health <= 0 then return false end
+        local be = plr.Character:FindFirstChild("BodyEffects")
+        if be then
+            local ko = be:FindFirstChild("K.O")
+            local grabbed = plr.Character:FindFirstChild("GRABBING_CONSTRAINT")
+            if (ko and ko.Value) or grabbed then return false end
+        end
+        return true
+    end
+
+    -- Detect ADS
+    local function isADS()
+        local lp = LocalPlayer
+        if lp.Character then
+            local tool = lp.Character:FindFirstChildOfClass("Tool")
+            if tool and tool:FindFirstChild("Ammo") then return true end
+        end
+        local pg = lp:FindFirstChildOfClass("PlayerGui")
+        if pg then
+            local aim = pg:FindFirstChild("Aim")
+            if aim and aim.Visible then return true end
+        end
+        local mouse = lp:GetMouse()
+        if mouse and mouse.Icon == "rbxasset://SystemCursors/Cross" then return true end
+        return false
+    end
+
+    -- Get aim pos
+    local function getAimPos()
+        if UserInputService.TouchEnabled or isADS() then
+            return Vector2.new(workspace.CurrentCamera.ViewportSize.X / 2, workspace.CurrentCamera.ViewportSize.Y / 2)
+        end
+        return UserInputService:GetMouseLocation()
+    end
+
+	local function getClosestTarget()
+	    local camera = workspace.CurrentCamera
+	    local aimPos = getAimPos()
+	    local closest, closestDist = nil, math.huge
+	
+	    for _, plr in ipairs(Players:GetPlayers()) do
+	        if plr ~= LocalPlayer and isAlive(plr) and not table.find(getgenv().whitelist, plr.Name) then
+	            local partName = silentHitPart == "Torso" and "UpperTorso" or silentHitPart
+	            local targetPart = plr.Character:FindFirstChild(partName)
+	            if targetPart then
+	                local screenPos, onScreen = camera:WorldToViewportPoint(targetPart.Position)
+	                if onScreen then
+	                    local dist = (Vector2.new(screenPos.X, screenPos.Y) - aimPos).Magnitude
+	                    
+	                    -- WALL CHECK
+	                    local visible = true
+	                    if silentWallCheck then
+	                        local rayParams = RaycastParams.new()
+	                        rayParams.FilterType = Enum.RaycastFilterType.Exclude
+	                        rayParams.FilterDescendantsInstances = {LocalPlayer.Character}
+	                        local ray = workspace:Raycast(camera.CFrame.Position, (targetPart.Position - camera.CFrame.Position).Unit * 1000, rayParams)
+	                        if ray and not ray.Instance:IsDescendantOf(plr.Character) then
+	                            visible = false
+	                        end
+	                    end
+	                    
+	                    if visible and (not silentFOVEnabled or dist <= silentFOVSize) then
+	                        if dist < closestDist then
+	                            closestDist = dist
+	                            closest = targetPart
+	                        end
+	                    end
+	                end
+	            end
+	        end
+	    end
+	    return closest
+	end
+
+    -- UI chỉ load nếu support
+    SilentAim:AddToggle("SilentAimToggle", {
+        Text = "Silent Aim",
+        Default = false,
+        Callback = function(Value)
+            silentAimEnabled = Value
+            if not Value then
+                lockedTarget = nil
+            end
+        end
+    })
+
+    SilentAim:AddInput("SilentPredictionInput", {
+        Default = "0",
+        Numeric = true,
+        Finished = true,
+        Text = "Prediction",
+        Placeholder = "0 - 0.2",
+        Callback = function(Value)
+            local num = tonumber(Value)
+            if num and num >= 0 and num <= 0.2 then
+                silentPrediction = num
+            else
+                Options.SilentPredictionInput:SetValue(tostring(silentPrediction))
+            end
+        end
+    })
+
+    SilentAim:AddDropdown("SilentHitPart", {
+        Text = "Hit Part",
+        Values = {"Head", "HumanoidRootPart", "UpperTorso", "LowerTorso", "Torso"},
+        Default = "Head",
+        Callback = function(Value)
+            silentHitPart = Value
+        end
+    })
+
+    SilentAim:AddToggle("SilentFOVToggle", {
+        Text = "FOV Circle",
+        Default = false,
+        Callback = function(Value)
+            silentFOVEnabled = Value
+            silentFOVCircle.Visible = Value
+            silentOutlineCircle.Visible = Value
+        end
+    }):AddColorPicker("SilentFOVColor", {
+        Default = Color3.fromRGB(255, 255, 255),
+        Callback = function(color)
+            silentFOVColor = color
+            silentFOVCircle.Color = color
+        end
+    }):AddColorPicker("SilentOutlineColor", {
+        Default = Color3.fromRGB(255, 0, 0),
+        Callback = function(color)
+            silentOutlineColor = color
+            silentOutlineCircle.Color = color
+        end
+    })
+
+    SilentAim:AddSlider("SilentFOVSize", {
+        Text = "FOV Size",
+        Default = 100,
+        Min = 1,
+        Max = 1000,
+        Rounding = 0,
+        Callback = function(Value)
+            silentFOVSize = Value
+            silentFOVCircle.Radius = Value
+            silentOutlineCircle.Radius = Value + 1
+        end
+    })
+	SilentAim:AddToggle("SilentWallCheck", {
+	    Text = "Check Wall",
+	    Default = false,
+	    Callback = function(Value)
+	        silentWallCheck = Value
+	    end
+	})
+    -- Hook metatable
+    local oldIndex
+    local mouse = LocalPlayer:GetMouse()
+    local mt = getrawmetatable(game)
+    setreadonly(mt, false)
+    oldIndex = mt.__index
+    mt.__index = newcclosure(function(self, idx)
+        if silentAimEnabled and self == mouse and (idx == "Hit" or idx == "Target") and lockedTarget then
+            if idx == "Hit" then
+                local predPos = lockedTarget.Position + (lockedTarget.Velocity * silentPrediction)
+                return CFrame.new(lockedTarget.Position, predPos)
+            elseif idx == "Target" then
+                return lockedTarget
+            end
+        end
+        return oldIndex(self, idx)
+    end)
+    setreadonly(mt, true)
+
+    -- Update loop
+    RunService.Heartbeat:Connect(function()
+        silentMousePos = getAimPos()
+        
+        -- Update FOV pos
+        if silentFOVEnabled then
+            silentFOVCircle.Position = silentMousePos
+            silentOutlineCircle.Position = silentMousePos
+        end
+        
+        -- Find target
+        if not silentAimEnabled then return end
+        lockedTarget = getClosestTarget()
+    end)
+end
+pcall(function()
+	local function isHoldingKnife()
+	    local char = LocalPlayer.Character
+	    if char then
+	        local tool = char:FindFirstChildWhichIsA("Tool")
+	        if tool and tool.Name:lower():find("knife") then return true end
+	    end
+	    return false
+	end
+	local function isKO(plr)
+	    return not isAlive(plr)
+	end
+	local function canSeeThroughWall(origin, targetPart)
+	    local direction = (targetPart.Position - origin).Unit * 1000
+	    local rayParams = RaycastParams.new()
+	    rayParams.FilterType = Enum.RaycastFilterType.Exclude
+	    rayParams.FilterDescendantsInstances = {LocalPlayer.Character}
+	    local ray = workspace:Raycast(origin, direction, rayParams)
+	    return not ray or ray.Instance:IsDescendantOf(targetPart.Parent)
+	end
+	-- ===== TRIGGERBOT TAB =====
+	local triggerEnabled = false
+	local triggerFOV = 20
+	local triggerDelay = 0
+	local triggerOnlyTarget = false
+	local triggerChecks = {
+	    Team = false,
+	    Friend = false,
+	    KO = true,
+	    Grab = true,
+	    Wall = true,
+	    Knife = true
+	}
+	local HitParts = {"Head", "HumanoidRootPart", "UpperTorso", "LowerTorso"}
+	
+	local function isValidTriggerTarget(plr)
+	    if plr == LocalPlayer then return false end
+	    if table.find(getgenv().whitelist or {}, plr.Name) then return false end
+	    if triggerChecks.Team and plr.Team == LocalPlayer.Team then return false end
+	    if triggerChecks.Friend and LocalPlayer:IsFriendsWith(plr.UserId) then return false end
+	    if triggerChecks.KO and isKO(plr) then return false end
+	    local be = plr.Character and plr.Character:FindFirstChild("BodyEffects")
+	    if triggerChecks.Grab and be and be:FindFirstChild("GRABBING_CONSTRAINT") then return false end
+	    if triggerChecks.Knife and isHoldingKnife() then return false end
+	    return isAlive(plr)
+	end
+	
+	local function distToCursor(part)
+	    local camera = workspace.CurrentCamera
+	    local v, vis = camera:WorldToViewportPoint(part.Position)
+	    if not vis then return math.huge end
+	    local m = UserInputService.TouchEnabled and Vector2.new(camera.ViewportSize.X / 2, camera.ViewportSize.Y / 2) or UserInputService:GetMouseLocation()
+	    return (Vector2.new(v.X, v.Y) - m).Magnitude
+	end
+	
+	local function toolActivate(tool)
+	    pcall(function()
+	        tool:Activate()
+	        task.wait(triggerDelay)
+	    end)
+	end
+	
+	local function click()
+	    if UserInputService.TouchEnabled then
+	        local touchPos = UserInputService:GetMouseLocation()
+	        game:GetService("VirtualInputManager"):SendTouchEvent(0, Enum.UserInputState.Begin, touchPos)
+	        task.wait(triggerDelay)
+	        game:GetService("VirtualInputManager"):SendTouchEvent(0, Enum.UserInputState.End, touchPos)
+	    else
+	        if mouse1press and mouse1release then
+	            mouse1press()
+	            task.wait(triggerDelay)
+	            mouse1release()
+	        else
+	            local vim = game:GetService("VirtualInputManager")
+	            vim:SendMouseButtonEvent(0, 0, 0, true, game, 0)
+	            task.wait(triggerDelay)
+	            vim:SendMouseButtonEvent(0, 0, 0, false, game, 0)
+	        end
+	    end
+	end
+	
+	local function GetBestTargetPart()
+	    local bestPart, bestDist = nil, triggerFOV
+	    local playersToCheck = triggerOnlyTarget and lockedTarget and {lockedTarget} or Players:GetPlayers()
+	    for _, plr in pairs(playersToCheck) do
+	        if isValidTriggerTarget(plr) and plr.Character then
+	            for _, partName in ipairs(HitParts) do
+	                local part = plr.Character:FindFirstChild(partName)
+	                if part and part:IsA("BasePart") then
+	                    local dist = distToCursor(part)
+	                    if dist < bestDist then
+	                        bestDist = dist
+	                        bestPart = part
+	                    end
+	                end
+	            end
+	        end
+	    end
+	    return bestPart
+	end
+	
+	Triggerbot:AddToggle("TriggerbotToggle", {
+	    Text = "Triggerbot",
+	    Default = false,
+	    Callback = function(Value)
+	        triggerEnabled = Value
+	    end
+	}):AddKeyPicker("TriggerbotKeybind", {
+	    Default = "V",
+	    Text = "Triggerbot",
+	    Mode = "Toggle",
+	    Callback = function()
+	        triggerEnabled = not triggerEnabled
+	    end
+	})
+	
+	Triggerbot:AddToggle("TriggerOnlyTarget", {
+	    Text = "Only Target",
+	    Default = false,
+	    Callback = function(Value)
+	        triggerOnlyTarget = Value
+	    end
+	})
+	
+	Triggerbot:AddSlider("TriggerFOV", {
+	    Text = "FOV",
+	    Default = 20,
+	    Min = 1,
+	    Max = 200,
+	    Rounding = 0,
+	    Callback = function(Value)
+	        triggerFOV = Value
+	    end
+	})
+	
+	Triggerbot:AddSlider("TriggerDelay", {
+	    Text = "Delay",
+	    Default = 0,
+	    Min = 0,
+	    Max = 0.5,
+	    Rounding = 2,
+	    Callback = function(Value)
+	        triggerDelay = Value
+	    end
+	})
+	
+	Triggerbot:AddDropdown("TriggerChecks", {
+	    Text = "Checks",
+	    Values = {"Team", "Friend", "KO", "Grab", "Wall", "Knife"},
+	    Default = {"KO", "Grab", "Wall", "Knife"},
+	    Multi = true,
+	    Callback = function(Value)
+	        -- Reset all
+	        for k, _ in pairs(triggerChecks) do triggerChecks[k] = false end
+	        -- Set selected
+	        for _, v in ipairs(Value) do
+	            triggerChecks[v] = true
+	        end
+	    end
+	})
+	
+	-- Main Loop (giữ nguyên)
+	RunService.RenderStepped:Connect(function()
+	    if triggerEnabled then
+	        local part = GetBestTargetPart()
+	        if part and distToCursor(part) <= triggerFOV then
+	            local camera = workspace.CurrentCamera
+	            local origin = camera.CFrame.Position
+	            local direction = (part.Position - origin)
+	            local rayParams = RaycastParams.new()
+	            rayParams.FilterType = Enum.RaycastFilterType.Exclude
+	            rayParams.FilterDescendantsInstances = {LocalPlayer.Character}
+	            local result = workspace:Raycast(origin, direction, rayParams)
+	            
+	            if not result or result.Instance:IsDescendantOf(part.Parent) then
+	                local char = LocalPlayer.Character
+	                local tool = char and char:FindFirstChildWhichIsA("Tool")
+	                local ammo = tool and tool:FindFirstChild("Ammo")
+	                if tool and ammo then
+	                    task.spawn(function() toolActivate(tool) end)
+	                else
+	                    task.spawn(click)
+	                end
+	            end
+	        end
+	    end
+	end)
+end)
 local function gettargetsticky()
     if lockedTarget then
         lockedTarget = nil
@@ -1709,6 +1840,7 @@ local function gettargetsticky()
         end
     end
 end
+
 local Sigmaballs = Instance.new("ScreenGui")
 Sigmaballs.Name = "Sigmaballs"
 Sigmaballs.Parent = game.CoreGui
@@ -1726,11 +1858,10 @@ if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled then
     ImageButton.Size = UDim2.new(0, 90, 0, 90)
     ImageButton.Image = "http://www.roblox.com/asset/?id=11351620343"
     ImageButton.Position = UDim2.new(0.5, -25, 0.5, -25)
-
+    ImageButton.Visible = false  -- Ẩn mặc định
     local Ui2corner = Instance.new("UICorner")
     Ui2corner.CornerRadius = UDim.new(0.2, 0)
     Ui2corner.Parent = ImageButton
-
     ImageButton.MouseButton1Click:Connect(function()
         if StickyAimEnabled then
             gettargetsticky()
@@ -1741,7 +1872,6 @@ end
 getgenv().range = 250
 
 getgenv().whitelist = {}
-
 
 getgenv().tracer = Instance.new("Part")
 getgenv().tracer.Size = Vector3.new(0.2, 0.2, 0.2)
@@ -3747,6 +3877,11 @@ uhhh:AddSlider('CFrameSpeedSlider', {
 })
 
 RunService.RenderStepped:Connect(function()
+    if HighlightEnabled and lockedTarget and lockedTarget.Character then
+        targetHighlight.Adornee = lockedTarget.Character
+    else
+        targetHighlight.Adornee = nil
+    end
     local player = game.Players.LocalPlayer
     local humanoid = player.Character and player.Character:FindFirstChild('Humanoid')
     if not humanoid then return end
@@ -3754,7 +3889,12 @@ RunService.RenderStepped:Connect(function()
     humanoid.WalkSpeed = getgenv().walkSpeedEnabled and getgenv().walkSpeedKeybindActive and getgenv().walkSpeed or 16
     humanoid.JumpPower = getgenv().jumpPowerEnabled and getgenv().jumpPower or 50
 end)
-
+Players.PlayerRemoving:Connect(function(player)
+    if lockedTarget and lockedTarget == player then
+        lockedTarget = nil
+        targetHighlight.Adornee = nil
+    end
+end)
 task.spawn(function()
     while task.wait(0) do
         local player = game.Players.LocalPlayer
@@ -3790,6 +3930,7 @@ end
 local function StartFly()
     if getgenv().Flying then return end
     getgenv().Flying = true
+    LocalPlayer.Character:FindFirstChildOfClass("Humanoid").PlatformStand = true
     local Core = CreateCore()
     local BV = Instance.new("BodyVelocity", Core)
     BV.MaxForce = Vector3.new(9e9, 9e9, 9e9)
@@ -3816,6 +3957,7 @@ end
 local function StopFly()
     if not getgenv().Flying then return end
     getgenv().Flying = false
+    LocalPlayer.Character:FindFirstChildOfClass("Humanoid").PlatformStand = false
     if workspace:FindFirstChild("Core") then workspace.Core:Destroy() end
 end
 
@@ -5374,47 +5516,6 @@ if isDaHood then
 	    AutoBuyOnRespawnHandler()
 	end)
 	
-	getgenv().AutoKnifeEnabled = false
-	
-	AutoBuy:AddToggle('AutoKnifeToggle', {
-	    Text = 'Auto Knife',
-	    Default = false,
-	    Callback = function(state)
-	        getgenv().AutoKnifeEnabled = state
-	        if state then
-	            task.spawn(function()
-	                while getgenv().AutoKnifeEnabled do
-	                    local player = game.Players.LocalPlayer
-	                    local hasKnife = false
-	
-	                    -- Kiểm tra xem có knife trong Backpack hoặc Character không
-	                    if player.Backpack:FindFirstChild("[Knife]") or (player.Character and player.Character:FindFirstChild("[Knife]")) then
-	                        hasKnife = true
-	                    end
-	
-	                    -- Nếu không có knife, thực hiện logic mua
-	                    if not hasKnife and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-	                        local knifeShop = game.Workspace.Ignored.Shop['[Knife] - $155']
-	                        local originalPos = player.Character.HumanoidRootPart.Position
-	
-	                        -- Dịch chuyển đến vị trí shop
-	                        player.Character.HumanoidRootPart.CFrame = knifeShop.Head.CFrame + Vector3.new(0, 3, 0)
-	
-	                        -- Kiểm tra khoảng cách
-	                        if (player.Character.HumanoidRootPart.Position - knifeShop.Head.Position).Magnitude <= 50 then
-	                            wait(0.2)
-	                            fireclickdetector(knifeShop:FindFirstChild("ClickDetector"), 4)
-	                            -- Trở về vị trí ban đầu
-	                            player.Character.HumanoidRootPart.CFrame = CFrame.new(originalPos)
-	                        end
-	                    end
-	
-	                    task.wait(0.5) -- Đợi 0.5s để tránh lag
-	                end
-	            end)
-	        end
-	    end
-	})
 else
     -- === BỎ QUA NẾU KHÔNG PHẢI DA HOOD ===
     print("Không phải Da Hood → Bỏ qua Auto Buy")
@@ -6571,7 +6672,7 @@ getgenv().strafeEnabled = false
 getgenv().AutoAmmoEnabled = false
 getgenv().oldPosition = nil
 getgenv().invisiblePart = nil
-getgenv().isActionRunning = false -- To track if an action is running
+getgenv().isActionRunning = false
 getgenv().stompTargetEnabled = false
 
 function knockTarget(targetPlayer)
