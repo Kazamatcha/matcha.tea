@@ -1379,7 +1379,7 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- ===== SILENT AIM TAB =====
+
 -- Check metatable hook support
 local mtSupport = pcall(function()
     local mt = getrawmetatable(game)
@@ -1402,7 +1402,9 @@ else
     local silentOutlineColor = Color3.fromRGB(255, 0, 0)
     local silentMousePos = Vector2.new()
     local silentWallCheck = false
-
+    local silentJumpOffset = 0
+    local useAirPart = false
+    local silentAirPart = "Head"
     -- FOV Circles
     local silentFOVCircle = Drawing.new("Circle")
     silentFOVCircle.Thickness = 1
@@ -1412,7 +1414,6 @@ else
     silentFOVCircle.Color = silentFOVColor
     silentFOVCircle.Filled = false
     silentFOVCircle.Transparency = 1
-
     local silentOutlineCircle = Drawing.new("Circle")
     silentOutlineCircle.Thickness = 2
     silentOutlineCircle.NumSides = 100
@@ -1421,22 +1422,6 @@ else
     silentOutlineCircle.Color = silentOutlineColor
     silentOutlineCircle.Filled = false
     silentOutlineCircle.Transparency = 1
-
-    -- isAlive (dùng chung)
-    local function isAlive(plr)
-        if not plr or not plr.Character then return false end
-        local hum = plr.Character:FindFirstChildOfClass("Humanoid")
-        if not hum or hum.Health <= 0 then return false end
-        local be = plr.Character:FindFirstChild("BodyEffects")
-        if be then
-            local ko = be:FindFirstChild("K.O")
-            local grabbed = plr.Character:FindFirstChild("GRABBING_CONSTRAINT")
-            if (ko and ko.Value) or grabbed then return false end
-        end
-        return true
-    end
-
-    -- Detect ADS
     local function isADS()
         local lp = LocalPlayer
         if lp.Character then
@@ -1452,54 +1437,50 @@ else
         if mouse and mouse.Icon == "rbxasset://SystemCursors/Cross" then return true end
         return false
     end
-
     -- Get aim pos
     local function getAimPos()
-        if UserInputService.TouchEnabled or isADS() then
+        if UserInputService.TouchEnabled then
             return Vector2.new(workspace.CurrentCamera.ViewportSize.X / 2, workspace.CurrentCamera.ViewportSize.Y / 2)
         end
         return UserInputService:GetMouseLocation()
     end
-
-	local function getClosestTarget()
-	    local camera = workspace.CurrentCamera
-	    local aimPos = getAimPos()
-	    local closest, closestDist = nil, math.huge
-	
-	    for _, plr in ipairs(Players:GetPlayers()) do
-	        if plr ~= LocalPlayer and isAlive(plr) and not table.find(getgenv().whitelist, plr.Name) then
-	            local partName = silentHitPart == "Torso" and "UpperTorso" or silentHitPart
-	            local targetPart = plr.Character:FindFirstChild(partName)
-	            if targetPart then
-	                local screenPos, onScreen = camera:WorldToViewportPoint(targetPart.Position)
-	                if onScreen then
-	                    local dist = (Vector2.new(screenPos.X, screenPos.Y) - aimPos).Magnitude
-	                    
-	                    -- WALL CHECK
-	                    local visible = true
-	                    if silentWallCheck then
-	                        local rayParams = RaycastParams.new()
-	                        rayParams.FilterType = Enum.RaycastFilterType.Exclude
-	                        rayParams.FilterDescendantsInstances = {LocalPlayer.Character}
-	                        local ray = workspace:Raycast(camera.CFrame.Position, (targetPart.Position - camera.CFrame.Position).Unit * 1000, rayParams)
-	                        if ray and not ray.Instance:IsDescendantOf(plr.Character) then
-	                            visible = false
-	                        end
-	                    end
-	                    
-	                    if visible and (not silentFOVEnabled or dist <= silentFOVSize) then
-	                        if dist < closestDist then
-	                            closestDist = dist
-	                            closest = targetPart
-	                        end
-	                    end
-	                end
-	            end
-	        end
-	    end
-	    return closest
-	end
-
+    local function getClosestTarget()
+        local camera = workspace.CurrentCamera
+        local aimPos = getAimPos()
+        local closest, closestDist = nil, math.huge
+        for _, plr in ipairs(Players:GetPlayers()) do
+            if plr ~= LocalPlayer and isAlive(plr) and not table.find(getgenv().whitelist, plr.Name) then
+                local partName = silentHitPart == "Torso" and "UpperTorso" or silentHitPart
+                local targetPart = plr.Character:FindFirstChild(partName)
+                if targetPart then
+                    local screenPos, onScreen = camera:WorldToViewportPoint(targetPart.Position)
+                    if onScreen then
+                        local dist = (Vector2.new(screenPos.X, screenPos.Y) - aimPos).Magnitude
+                       
+                        -- WALL CHECK
+                        local visible = true
+                        if silentWallCheck then
+                            local rayParams = RaycastParams.new()
+                            rayParams.FilterType = Enum.RaycastFilterType.Exclude
+                            rayParams.FilterDescendantsInstances = {LocalPlayer.Character}
+                            local ray = workspace:Raycast(camera.CFrame.Position, (targetPart.Position - camera.CFrame.Position).Unit * 1000, rayParams)
+                            if ray and not ray.Instance:IsDescendantOf(plr.Character) then
+                                visible = false
+                            end
+                        end
+                       
+                        if visible and (not silentFOVEnabled or dist <= silentFOVSize) then
+                            if dist < closestDist then
+                                closestDist = dist
+                                closest = plr
+                            end
+                        end
+                    end
+                end
+            end
+        end
+        return closest
+    end
     -- UI chỉ load nếu support
     SilentAim:AddToggle("SilentAimToggle", {
         Text = "Silent Aim",
@@ -1511,7 +1492,6 @@ else
             end
         end
     })
-
     SilentAim:AddInput("SilentPredictionInput", {
         Default = "0",
         Numeric = true,
@@ -1527,7 +1507,6 @@ else
             end
         end
     })
-
     SilentAim:AddDropdown("SilentHitPart", {
         Text = "Hit Part",
         Values = {"Head", "HumanoidRootPart", "UpperTorso", "LowerTorso", "Torso"},
@@ -1536,7 +1515,6 @@ else
             silentHitPart = Value
         end
     })
-
     SilentAim:AddToggle("SilentFOVToggle", {
         Text = "FOV Circle",
         Default = false,
@@ -1558,7 +1536,6 @@ else
             silentOutlineCircle.Color = color
         end
     })
-
     SilentAim:AddSlider("SilentFOVSize", {
         Text = "FOV Size",
         Default = 100,
@@ -1571,13 +1548,38 @@ else
             silentOutlineCircle.Radius = Value + 1
         end
     })
-	SilentAim:AddToggle("SilentWallCheck", {
-	    Text = "Check Wall",
-	    Default = false,
-	    Callback = function(Value)
-	        silentWallCheck = Value
-	    end
-	})
+    SilentAim:AddToggle("SilentWallCheck", {
+        Text = "Check Wall",
+        Default = false,
+        Callback = function(Value)
+            silentWallCheck = Value
+        end
+    })
+    SilentAim:AddInput("SilentJumpOffset", {
+        Default = "0",
+        Numeric = true,
+        Finished = true,
+        Text = "Jump Offset",
+        Placeholder = "0 - 5",
+        Callback = function(Value)
+            silentJumpOffset = tonumber(Value) or 0
+        end
+    })
+    SilentAim:AddToggle("UseAirPart", {
+        Text = "Use Air Part",
+        Default = false,
+        Callback = function(Value)
+            useAirPart = Value
+        end
+    })
+    SilentAim:AddDropdown("SilentAirPart", {
+        Text = "Air Hit Part",
+        Values = {"Head", "HumanoidRootPart", "UpperTorso", "LowerTorso", "Torso"},
+        Default = "Head",
+        Callback = function(Value)
+            silentAirPart = Value
+        end
+    })
     -- Hook metatable
     local oldIndex
     local mouse = LocalPlayer:GetMouse()
@@ -1586,27 +1588,44 @@ else
     oldIndex = mt.__index
     mt.__index = newcclosure(function(self, idx)
         if silentAimEnabled and self == mouse and (idx == "Hit" or idx == "Target") and lockedTarget then
+            local char = lockedTarget.Character
+            if not char then return oldIndex(self, idx) end
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            if not hum or hum.Health <= 0 then return oldIndex(self, idx) end
+            local isTargetFreefall = hum:GetState() == Enum.HumanoidStateType.Freefall
+            local localChar = LocalPlayer.Character
+            local localHum = localChar and localChar:FindFirstChildOfClass("Humanoid")
+            local isLocalFreefall = localHum and localHum:GetState() == Enum.HumanoidStateType.Freefall or false
+            local freefall = isTargetFreefall or isLocalFreefall
+            local currentHitPart = (freefall and useAirPart) and silentAirPart or silentHitPart
+            local partName = currentHitPart == "Torso" and "UpperTorso" or currentHitPart
+            local targetPart = char:FindFirstChild(partName)
+            if not targetPart then return oldIndex(self, idx) end
+            local root = char:FindFirstChild("HumanoidRootPart")
+            if not root then return oldIndex(self, idx) end
+            local predPos = targetPart.Position + root.Velocity * silentPrediction
+            if freefall and silentJumpOffset ~= 0 then
+                predPos = predPos + Vector3.new(0, silentJumpOffset, 0)
+            end
             if idx == "Hit" then
-                local predPos = lockedTarget.Position + (lockedTarget.Velocity * silentPrediction)
-                return CFrame.new(lockedTarget.Position, predPos)
+                return CFrame.new(targetPart.Position, predPos)
             elseif idx == "Target" then
-                return lockedTarget
+                return targetPart
             end
         end
         return oldIndex(self, idx)
     end)
     setreadonly(mt, true)
-
     -- Update loop
     RunService.Heartbeat:Connect(function()
         silentMousePos = getAimPos()
-        
+       
         -- Update FOV pos
         if silentFOVEnabled then
             silentFOVCircle.Position = silentMousePos
             silentOutlineCircle.Position = silentMousePos
         end
-        
+       
         -- Find target
         if not silentAimEnabled then return end
         lockedTarget = getClosestTarget()
