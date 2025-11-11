@@ -49,12 +49,13 @@ do
     ThemeManager.BuiltInThemes = {
         ["Default"] = {
             1,
-            { FontColor = "e0ffff", MainColor = "1e1e1e", AccentColor = "98fb98", BackgroundColor = "232323", OutlineColor = "141414" },
+            { FontColor = "ddefff", MainColor = "1b1f29", AccentColor = "fffff", BackgroundColor = "2a3340", OutlineColor = "10141a" },
         },
-        ["BBot"] = {
+        ["WinterChristmas"] = {
             2,
-            { FontColor = "ffffff", MainColor = "1e1e1e", AccentColor = "7e48a3", BackgroundColor = "232323", OutlineColor = "141414" },
+            { FontColor = "eaf6ff", MainColor = "1c1f26", AccentColor = "b3e5fc", BackgroundColor = "243447", OutlineColor = "0d1117" },
         },
+        
         ["Fatality"] = {
             3,
             { FontColor = "ffffff", MainColor = "1e1842", AccentColor = "c50754", BackgroundColor = "191335", OutlineColor = "3c355d" },
