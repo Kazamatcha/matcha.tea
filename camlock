@@ -171,7 +171,6 @@ local function toggleTarget()
             Storage.BodyParts.Camlock = getgenv().Matcha.Legit.HitPart
             Storage.BodyParts.Silent = getgenv().Matcha.Legit.HitPart
             if target ~= Storage.LastNotifiedTarget then
-                Library:Notification("Selected Target: " .. target.DisplayName .. " (@" .. target.Name .. ")", 3, Library.Accent, flags["Notification Position"])
                 Storage.LastNotifiedTarget = target
             end
         else
@@ -861,10 +860,8 @@ end
 local function toggleDesync()
     if getgenv().Matcha.Desync.Enabled then
         workspace.CurrentCamera.CameraSubject = desync_setback
-        Library:Notification("Desync: ON [" .. getgenv().Matcha.Desync.Mode .. "]", 2)
     else
         resetCamera()
-        Library:Notification("Desync: OFF", 2)
     end
 end
 NewConnection(RunService.Heartbeat, function()
