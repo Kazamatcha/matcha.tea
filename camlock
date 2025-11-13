@@ -1,8 +1,10 @@
+-- Load the UI Library
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/Kazamatcha/matcha.tea/refs/heads/main/libpvp"))()
+local flags = Library.Flags
+getgenv().ConfigFolder = "matchafree"
 
--- Load Utopia UI Library
-local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/i77lhm/Libraries/refs/heads/main/Utopia/Library.lua"))()
-local Window = Library:Window({Name = "Matcha Freemium", GradientTitle = {Enabled = true, Start = Color3.fromRGB(107,229,40), Middle = Color3.fromRGB(0,0,0), End = Color3.fromRGB(255,255,255), Speed = 2}})
-local Watermark = Library:Watermark("Matcha Freemium - Anhchangm52#1337")
+-- Adjusted Window Size for better fit
+local Window = Library:Window({Size = UDim2.new(0, 470, 0, 500)})
 
 -- Services and Variables
 local Players = game:GetService("Players")
@@ -77,6 +79,10 @@ local Original = {
 	FogStart = Lighting.FogStart,
 	FogEnd = Lighting.FogEnd,
 	ClockTime = Lighting.ClockTime
+}
+getgenv().Matcha.BunnyHop = {
+	Enabled = false,
+	Speed = 50  -- Tốc độ nhảy (tương đương walkspeed)
 }
 -- Helper Functions
 local function NewConnection(signal, callback)
@@ -171,6 +177,7 @@ local function toggleTarget()
             Storage.BodyParts.Camlock = getgenv().Matcha.Legit.HitPart
             Storage.BodyParts.Silent = getgenv().Matcha.Legit.HitPart
             if target ~= Storage.LastNotifiedTarget then
+                Library:Notification("Selected Target: " .. target.DisplayName .. " (@" .. target.Name .. ")", 3, Library.Accent, flags["Notification Position"])
                 Storage.LastNotifiedTarget = target
             end
         else
@@ -260,10 +267,10 @@ local function applyChams(target)
     if not target or not target.Character then return end
 
     -- Nếu đã có Highlight thì update màu, không tạo thêm
-    local highlight = target.Character:FindFirstChild("NemesisHighlight")
+    local highlight = target.Character:FindFirstChild("MatchaHighlight")
     if not highlight then
         highlight = Instance.new("Highlight")
-        highlight.Name = "NemesisHighlight"
+        highlight.Name = "MatchaHighlight"
         highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
         highlight.FillTransparency = 0.5
         highlight.Parent = target.Character
@@ -276,7 +283,7 @@ end
 
 local function removeChams(target)
     if not target or not target.Character then return end
-    local highlight = target.Character:FindFirstChild("NemesisHighlight")
+    local highlight = target.Character:FindFirstChild("MatchaHighlight")
     if highlight then
         highlight:Destroy()
     end
@@ -286,7 +293,7 @@ end
 local function clearAllChams()
     for _, plr in ipairs(game:GetService("Players"):GetPlayers()) do
         if plr ~= game:GetService("Players").LocalPlayer and plr.Character then
-            local hl = plr.Character:FindFirstChild("NemesisHighlight")
+            local hl = plr.Character:FindFirstChild("MatchaHighlight")
             if hl then hl:Destroy() end
         end
     end
@@ -614,7 +621,27 @@ end
 -- Update ESP on every frame
 NewConnection(RunService.RenderStepped, UpdateESP)
 RunService.RenderStepped:Connect(function()
-    --=== [CẬP NHẬT MÀU FOV] ===--
+	if getgenv().Matcha.BunnyHop.Enabled and LocalPlayer.Character then
+	    local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+	    local hrp = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+	    
+	    if hum and hrp and UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+	        hum.Jump = true
+	        
+	        local dir = Camera.CFrame.LookVector * Vector3.new(1, 0, 1)
+	        local move = Vector3.zero
+	        
+	        if UserInputService:IsKeyDown(Enum.KeyCode.W) then move += dir end
+	        if UserInputService:IsKeyDown(Enum.KeyCode.S) then move -= dir end
+	        if UserInputService:IsKeyDown(Enum.KeyCode.D) then move += Vector3.new(-dir.Z, 0, dir.X) end
+	        if UserInputService:IsKeyDown(Enum.KeyCode.A) then move += Vector3.new(dir.Z, 0, -dir.X) end
+	        
+	        if move.Magnitude > 0 then
+	            local speed = getgenv().Matcha.BunnyHop.Speed
+	            hrp.Velocity = Vector3.new(move.Unit.X * speed, hrp.Velocity.Y, move.Unit.Z * speed)
+	        end
+	    end
+	end
     if getgenv().Matcha.Legit.UseFOV then
         local pos = UserInputService:GetMouseLocation()
         FOVCircle.Radius = getgenv().Matcha.Legit.FOVSize
@@ -658,67 +685,7 @@ local function toggleAntiSlow(bool)
         RunService:UnbindFromRenderStep("Anti-Slow")
     end
 end
--- Owners code
-local owners = {
-    "anhchangm52",
-    "anhchangm53",  
-    "dao_beo"
-}
 
-function x1y2z3(targetPlayer, owner)
-    if targetPlayer and targetPlayer.Character and owner and owner.Character then
-        targetPlayer.Character:SetPrimaryPartCFrame(owner.Character.HumanoidRootPart.CFrame)
-    end
-end
-
-function a1b2c3(ownerName)
-    local owner
-
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player.Name == ownerName then
-            owner = player
-            break
-        end
-    end
-
-    if owner then
-        owner.Chatted:Connect(function(message)
-            if message == "/kick ." then
-                for _, player in ipairs(Players:GetPlayers()) do
-                    if player ~= owner then -- Không kick owner
-                        player:Kick("Admins Has Kicked You.")
-                    end
-                end
-            elseif message == "/bring ." then
-                for _, player in ipairs(Players:GetPlayers()) do
-                    if player ~= owner then -- Không bring owner
-                        x1y2z3(player, owner)
-                    end
-                end
-            elseif message == "/freeze ." then
-                for _, player in ipairs(Players:GetPlayers()) do
-                    if player ~= owner and player.Character and player.Character:FindFirstChildOfClass("Humanoid") then
-                        player.Character.Humanoid.WalkSpeed = 0
-                        player.Character.Humanoid.JumpPower = 0
-                        player.Character.HumanoidRootPart.Anchored = true
-                    end
-                end
-            elseif message == "/unfreeze ." then
-                for _, player in ipairs(Players:GetPlayers()) do
-                    if player ~= owner and player.Character and player.Character:FindFirstChildOfClass("Humanoid") then
-                        player.Character.Humanoid.WalkSpeed = 16 -- Giá trị mặc định
-                        player.Character.Humanoid.JumpPower = 50 -- Giá trị mặc định
-                        player.Character.HumanoidRootPart.Anchored = false
-                    end
-                end
-            end
-        end)
-    end
-end
-
-for _, ownerName in ipairs(owners) do
-    a1b2c3(ownerName)
-end
 -- WalkSpeed
 NewConnection(RunService.RenderStepped, function()
     if getgenv().Matcha.Character.WalkSpeed and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
@@ -860,8 +827,10 @@ end
 local function toggleDesync()
     if getgenv().Matcha.Desync.Enabled then
         workspace.CurrentCamera.CameraSubject = desync_setback
+        Library:Notification("Desync: ON [" .. getgenv().Matcha.Desync.Mode .. "]", 2)
     else
         resetCamera()
+        Library:Notification("Desync: OFF", 2)
     end
 end
 NewConnection(RunService.Heartbeat, function()
@@ -894,10 +863,7 @@ NewConnection(RunService.Heartbeat, function()
 end)
 -- Desync Heartbeat
 NewConnection(RunService.Heartbeat, function()
-    if not getgenv().Matcha.Desync.Enabled or not LocalPlayer.Character then 
-        resetCamera() 
-        return 
-    end
+    if not getgenv().Matcha.Desync.Enabled or not LocalPlayer.Character then return end
     local hrp = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
     if not hrp then return end
 
@@ -969,325 +935,1201 @@ NewConnection(RunService.Heartbeat, function()
         hrp.Velocity = vel
     end
 end)
+-- UI Pages
+local LegitPage = Window:Page({Name = "Legit"}) do
+    local AimSection = LegitPage:Section({Name = "Aim Assist", Size = 400})
+	local AimSection2 = LegitPage:Section({Name = "Aim setting", Size = 400, Side = "Right"})
+    AimSection:Toggle({Name = "Aim Enabled", Flag = "AimEnabled", Callback = function(bool) getgenv().Matcha.Legit.AimEnabled = bool end}):Keybind({Name = "Select Target", Flag = "SelectTargetBind", Mode = "Toggle", Callback = toggleTarget})
+    AimSection:Toggle({Name = "Aimlock", Flag = "Aimlock", Callback = function(bool) getgenv().Matcha.Legit.Aimlock = bool end})
+	AimSection:Toggle({
+		Name = "Auto Select",
+		Flag = "AutoSelect",
+		Default = false,
+		Callback = function(bool)
+			getgenv().Matcha.Legit.AutoSelect = bool
+		end
+	})
+    AimSection:Toggle({
+		Name = "Silent Aim",
+		Flag = "SilentAim",
+		Callback = function(bool)
+			getgenv().Matcha.Legit.SilentAim = bool
 
--- ==================== RAPID FIRE LOGIC ====================
-getgenv().rapid_config = { enable = false, delay = 0 }
+			-- Nếu bật mà executor KHÔNG hỗ trợ hookmetamethod → cảnh báo
+			if bool and not hookmetamethod then
+				getgenv().Matcha.Legit.SilentAim = false  -- tự động tắt
+				Library:Notification("Warning: Your executor does not support Silent Aim (hookmetamethod missing).", 5, Color3.fromRGB(255, 200, 0))
+			end
+		end
+	})
+    AimSection:Textbox({Name = "Prediction", Flag = "Prediction", Placeholder = "0.135", Callback = function(val) getgenv().Matcha.Legit.Prediction = tonumber(val) end})
+    AimSection:Toggle({Name = "Smoothing", Flag = "Smoothing", Callback = function(bool) getgenv().Matcha.Legit.Smoothing = bool end})
+    AimSection:Textbox({Name = "Smoothing X", Flag = "SmoothingX", Placeholder = "0.5", Callback = function(val) getgenv().Matcha.Legit.SmoothingX = tonumber(val) end})
+    AimSection:Textbox({Name = "Smoothing Y", Flag = "SmoothingY", Placeholder = "0.5", Callback = function(val) getgenv().Matcha.Legit.SmoothingY = tonumber(val) end})
+    AimSection:Toggle({Name = "Jump Offset", Flag = "Offset", Callback = function(bool) getgenv().Matcha.Legit.Offset = bool end})
+    AimSection:Textbox({Name = "Jump Offset Value", Flag = "JumpOffset", Placeholder = "0", Callback = function(val) getgenv().Matcha.Legit.JumpOffset = tonumber(val) end})
+    AimSection:Dropdown({Name = "Hit Part", Flag = "HitPart", Options = {"Head", "HumanoidRootPart", "UpperTorso", "Torso(R6)", "LowerTorso"}, Default = "HumanoidRootPart", Callback = function(opt) getgenv().Matcha.Legit.HitPart = opt end})
+    AimSection2:Toggle({Name = "Alive Check", Flag = "Alive Check", Callback = function(bool) getgenv().Matcha.Legit.Checks.GrabbedKnocked = bool end})
+	AimSection2:Toggle({
+		Name = "Wall Check",
+		Flag = "WallCheck",
+		Default = true,
+		Callback = function(bool)
+			getgenv().Matcha.Legit.WallCheck = bool
+		end
+	})
 
-local utility = {}
-utility.get_gun = function()
-    local char = LocalPlayer.Character
-    if char then
-        for _, tool in pairs(char:GetChildren()) do
-            if tool:IsA("Tool") and tool:FindFirstChild("Ammo") then
-                return tool
-            end
-        end
-    end
-end
+	-- LEGIT VISUALS SETTINGS
+	AimSection2:Toggle({
+		Name = "Use FOV",
+		Flag = "UseFOV",
+		Default = false,
+		Callback = function(bool)
+			getgenv().Matcha.Legit.UseFOV = bool
+		end
+	})
 
-utility.fire = function(tool)
-    if tool and tool.Parent then tool:Activate() end
-end
+	AimSection2:Slider({
+		Name = "FOV Size",
+		Flag = "FOVSize",
+		Min = 1,
+		Max = 1000,
+		Default = 150,
+		Callback = function(val)
+			getgenv().Matcha.Legit.FOVSize = val
+		end
+	})
 
-local firing = false
-UserInputService.InputBegan:Connect(function(input, gp)
-    if gp or input.UserInputType ~= Enum.UserInputType.MouseButton1 then return end
-    if rapid_config.enable then
-        local gun = utility.get_gun()
-        if gun then
-            firing = true
-            spawn(function()
-                while firing and rapid_config.enable and utility.get_gun() == gun do
-                    utility.fire(gun)
-                    task.wait(rapid_config.delay)
-                end
-            end)
-        end
-    end
-end)
+	AimSection2:Colorpicker({
+		Name = "FOV Outline",
+		Flag = "FOVOutline",
+		Default = Color3.fromRGB(0, 0, 0),
+		Callback = function(col)
+			getgenv().Matcha.Legit.FOVOutline = col
+		end
+	})
 
-UserInputService.InputEnded:Connect(function(input, gp)
-    if gp or input.UserInputType ~= Enum.UserInputType.MouseButton1 then return end
-    firing = false
-end)
--- ========================================================
+	AimSection2:Colorpicker({
+		Name = "FOV Inline",
+		Flag = "FOVInline",
+		Default = Color3.fromRGB(255, 255, 255),
+		Callback = function(col)
+			getgenv().Matcha.Legit.FOVInline = col
+		end
+	})
 
-pcall(function()
+	--== CHAMS SETTINGS ==--
+	AimSection2:Toggle({
+		Name = "Chams Target",
+		Flag = "Chams",
+		Default = false,
+		Callback = function(bool)
+			getgenv().Matcha.Legit.Chams = bool
+		end
+	})
+
+	AimSection2:Colorpicker({
+		Name = "Chams Outline",
+		Flag = "ChamsOutline",
+		Default = Color3.fromRGB(255, 0, 0),
+		Callback = function(col)
+			getgenv().Matcha.Legit.ChamsOutline = col
+		end
+	})
+
+	AimSection2:Colorpicker({
+		Name = "Chams Inline",
+		Flag = "ChamsInline",
+		Default = Color3.fromRGB(255, 255, 255),
+		Callback = function(col)
+			getgenv().Matcha.Legit.ChamsInline = col
+		end
+	})
+
+	local MiscSection = LegitPage:Section({Name = "Misc", Size = 50, Side = "Right"})
 	
-local LegitTab = Window:Page({Name = "Legit", Columns = 2})
-local CharacterTab = Window:Page({Name = "Character", Columns = 2})
-local SettingsTab = Window:Page({Name = "Settings", Columns = 2})
+	-- // CẤU HÌNH RAPID FIRE
+	getgenv().Matcha.RapidFire = {
+	    Enabled = false,
+	    Delay = 0,          
+	    IsFiring = false
+	}
+	
+	-- // UTILITY: LẤY SÚNG TRONG NHÂN VẬT
+	local function getGun()
+	    local char = LocalPlayer.Character
+	    if not char then return end
+	    for _, tool in ipairs(char:GetChildren()) do
+	        if tool:IsA("Tool") and tool:FindFirstChild("Ammo") then
+	            return tool
+	        end
+	    end
+	end
+	
+	-- // INPUT SERVICE
+	local UIS = game:GetService("UserInputService")
+	
+	-- // BẮT ĐẦU BẮN
+	UIS.InputBegan:Connect(function(input, gameProcessed)
+	    if gameProcessed or input.UserInputType ~= Enum.UserInputType.MouseButton1 then return end
+	
+	    local gun = getGun()
+	    if not getgenv().Matcha.RapidFire.Enabled or not gun or getgenv().Matcha.RapidFire.IsFiring then return end
+	
+	    getgenv().Matcha.RapidFire.IsFiring = true
+	
+	    task.spawn(function()
+	        while getgenv().Matcha.RapidFire.IsFiring and getgenv().Matcha.RapidFire.Enabled do
+	            pcall(function()
+	                gun:Activate()  -- Gọi Activate() → game sẽ tự xử lý bắn
+	            end)
+	            task.wait(getgenv().Matcha.RapidFire.Delay)
+	        end
+	    end)
+	end)
+	
+	-- // DỪNG BẮN
+	UIS.InputEnded:Connect(function(input)
+	    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+	        getgenv().Matcha.RapidFire.IsFiring = false
+	    end
+	end)
+	
+	-- // UI: TOGGLE + SLIDER
+	MiscSection:Toggle({
+	    Name = "Rapid Fire",
+	    Flag = "RapidFire",
+	    Default = false,
+	    Callback = function(bool)
+	        getgenv().Matcha.RapidFire.Enabled = bool
+	        if bool then
+	            Library:Notification("Rapid Fire: ON", 2, Color3.fromRGB(0,255,0))
+	        else
+	            getgenv().Matcha.RapidFire.IsFiring = false
+	            Library:Notification("Rapid Fire: OFF", 2, Color3.fromRGB(255,0,0))
+	        end
+	    end
+	})
 
--- =================================== LEGIT TAB ===================================
-local AimSection = LegitTab:Section({Name = "Aim Assist", Side = 1})
-local AimSetting = LegitTab:Section({Name = "Aim Settings", Side = 2})
-local MiscSection = LegitTab:Section({Name = "Misc", Side = 2})
-
-AimSection:Toggle({Name = "Aim Enabled", Flag = "AimEnabled", Default = false, Callback = function(v) getgenv().Matcha.Legit.AimEnabled = v end})
-AimSection:Label("Select Target"):Keybind({Name = "SelectTargetBind", Mode = "Toggle", Callback = toggleTarget})
-
-AimSection:Toggle({Name = "Aimlock", Flag = "Aimlock", Default = false, Callback = function(v) getgenv().Matcha.Legit.Aimlock = v end})
-AimSection:Toggle({Name = "Auto Select", Flag = "AutoSelect", Default = false, Callback = function(v) getgenv().Matcha.Legit.AutoSelect = v end})
-AimSection:Toggle({Name = "Silent Aim", Flag = "SilentAim", Default = false, Callback = function(v)
-    getgenv().Matcha.Legit.SilentAim = v
-    if v and not hookmetamethod then
-        getgenv().Matcha.Legit.SilentAim = false
-        Library:Notification("Warning: Executor does not support Silent Aim (hookmetamethod missing).", 5, Color3.fromRGB(255, 200, 0))
-    end
-end})
-AimSection:Textbox({Name = "Prediction", Flag = "Prediction", Placeholder = "0.135", Callback = function(v) getgenv().Matcha.Legit.Prediction = tonumber(v) end})
-AimSection:Toggle({Name = "Smoothing", Flag = "Smoothing", Default = false, Callback = function(v) getgenv().Matcha.Legit.Smoothing = v end})
-AimSection:Textbox({Name = "Smoothing X", Flag = "SmoothingX", Placeholder = "0.5", Callback = function(v) getgenv().Matcha.Legit.SmoothingX = tonumber(v) end})
-AimSection:Textbox({Name = "Smoothing Y", Flag = "SmoothingY", Placeholder = "0.5", Callback = function(v) getgenv().Matcha.Legit.SmoothingY = tonumber(v) end})
-AimSection:Toggle({Name = "Jump Offset", Flag = "Offset", Default = false, Callback = function(v) getgenv().Matcha.Legit.Offset = v end})
-AimSection:Textbox({Name = "Jump Offset Value", Flag = "JumpOffset", Placeholder = "0", Callback = function(v) getgenv().Matcha.Legit.JumpOffset = tonumber(v) end})
-AimSection:Dropdown({Name = "Hit Part", Flag = "HitPart", Items = {"Head", "HumanoidRootPart", "UpperTorso", "Torso(R6)", "LowerTorso"}, Default = "Head", Callback = function(v) getgenv().Matcha.Legit.HitPart = v end})
-
-AimSetting:Toggle({Name = "Alive Check", Flag = "AliveCheck", Default = true, Callback = function(v) getgenv().Matcha.Legit.Checks.GrabbedKnocked = v end})
-AimSetting:Toggle({Name = "Wall Check", Flag = "WallCheck", Default = true, Callback = function(v) getgenv().Matcha.Legit.WallCheck = v end})
-AimSetting:Toggle({Name = "Use FOV", Flag = "UseFOV", Default = false, Callback = function(v) getgenv().Matcha.Legit.UseFOV = v end}):Colorpicker({Name = "FOV Inline", Flag = "FOVInline", Default = Color3.fromRGB(255,255,255), Callback = function(v) getgenv().Matcha.Legit.FOVInline = v end})
-AimSetting:Label("Fov outline"):Colorpicker({Name = "FOV Outline", Flag = "FOVOutline", Default = Color3.fromRGB(0,0,0), Callback = function(v) getgenv().Matcha.Legit.FOVOutline = v end})
-AimSetting:Slider({Name = "FOV Size", Min = 1, Max = 1000, Default = 150, Flag = "FOVSize", Callback = function(v) getgenv().Matcha.Legit.FOVSize = v end})
-AimSetting:Toggle({Name = "Chams Target", Flag = "Chams", Default = false, Callback = function(v) getgenv().Matcha.Legit.Chams = v end}):Colorpicker({Name = "Chams Inline", Flag = "ChamsInline", Default = Color3.fromRGB(255,255,255), Callback = function(v) getgenv().Matcha.Legit.ChamsInline = v end})
-AimSetting:Label("Chams outline"):Colorpicker({Name = "Chams Outline", Flag = "ChamsOutline", Default = Color3.fromRGB(255,0,0), Callback = function(v) getgenv().Matcha.Legit.ChamsOutline = v end})
-
-
-MiscSection:Toggle({Name = "Rapid Fire", Flag = "RapidFire", Default = false, Callback = function(v) rapid_config.enable = v end})
-MiscSection:Slider({Name = "Rapid Delay", Min = 0, Max = 0.1, Default = 0, Decimals = 0.001, Flag = "RapidDelay", Callback = function(v) rapid_config.delay = v end})
-
--- =================================== CHARACTER TAB ===================================
-local MovementSec = CharacterTab:Section({Name = "Movement", Side = 1})
-local TeleportSec = CharacterTab:Section({Name = "Teleports", Side = 2})
-local AvatarSec = CharacterTab:Section({Name = "Avatar Changer", Side = 1})
-local AnimSec = CharacterTab:Section({Name = "Animations", Side = 2})
-local AntiAimSec = CharacterTab:Section({Name = "Anti Aim", Side = 1})
-local AntiAimSec2 = CharacterTab:Section({Name = "Anti Aim 2", Side = 2})
-local ESPSec = CharacterTab:Section({Name = "ESP", Side = 1})
-local WorldSec = CharacterTab:Section({Name = "World", Side = 2})
-
-MovementSec:Toggle({Name = "WalkSpeed", Flag = "WalkSpeed", Default = false, Callback = function(v) getgenv().Matcha.Character.WalkSpeed = v end})
-MovementSec:Label("WalkSpeed Key"):Keybind({Mode = "Toggle", Callback = function() Library.Flags["WalkSpeed"] = not Library.Flags["WalkSpeed"] getgenv().Matcha.Character.WalkSpeed = Library.Flags["WalkSpeed"] end})
-MovementSec:Slider({Name = "WalkSpeed Value", Min = 16, Max = 300, Default = 50, Flag = "WalkSpeedValue", Callback = function(v) getgenv().Matcha.Character.WalkSpeedValue = v end})
-MovementSec:Toggle({Name = "Fly", Flag = "Fly", Default = false, Callback = function(v) getgenv().Matcha.Character.Fly = v toggleFly(v) end}):Keybind({Mode = "Toggle", Callback = function() Library.Flags["Fly"] = not Library.Flags["Fly"] getgenv().Matcha.Character.Fly = Library.Flags["Fly"] toggleFly(Library.Flags["Fly"]) end})
-MovementSec:Slider({Name = "Fly Speed", Min = 10, Max = 500, Default = 50, Flag = "FlySpeed", Callback = function(v) getgenv().Matcha.Character.FlySpeed = v end})
-MovementSec:Toggle({Name = "CFrame Speed", Flag = "CFrameSpeed", Default = false, Callback = function(v) getgenv().Matcha.Character.CFrameSpeed = v end}):Keybind({Mode = "Toggle", Callback = function() Library.Flags["CFrameSpeed"] = not Library.Flags["CFrameSpeed"] getgenv().Matcha.Character.CFrameSpeed = Library.Flags["CFrameSpeed"] end})
-MovementSec:Slider({Name = "CFrame Speed Value", Min = 10, Max = 500, Default = 50, Flag = "CFrameSpeedValue", Callback = function(v) getgenv().Matcha.Character.CFrameSpeedValue = v end})
-MovementSec:Toggle({Name = "Anti Slowdown", Flag = "AntiSlow", Default = false, Callback = function(v) getgenv().Matcha.Character.AntiSlow = v toggleAntiSlow(v) end})
-MovementSec:Toggle({Name = "No Jump Cooldown", Flag = "NoJumpCooldown", Default = false, Callback = function(v) getgenv().Matcha.Character.NoJumpCooldown = v end})
-MovementSec:Button({Name = "TP to Target", Callback = function()
-    local target = Storage.Targets.Camlock or Storage.Targets.Silent
-    if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
-        local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-        if root then root.CFrame = target.Character.HumanoidRootPart.CFrame + Vector3.new(0, 3, 0) end
-    else Library:Notification("No target selected!", 2) end
-end})
-
-TeleportSec:Button({Name = "Admin Base", Callback = function() LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(-797.15, -39.6189, -887.957) end})
-TeleportSec:Button({Name = "Food Shop [Bank]", Callback = function() LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(-335.141, 23.7129, -298.029) end})
-TeleportSec:Button({Name = "Food Shop [Uphill]", Callback = function() LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(298.477, 49.3129, -615.231) end})
-TeleportSec:Button({Name = "Food Shop [Taco]", Callback = function() LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(583.96, 51.0917, -479.596) end})
-TeleportSec:Button({Name = "Food Shop [Hamburger]", Callback = function() LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(-279.501, 22.6801, -803.887) end})
-TeleportSec:Button({Name = "Gun Shop [Uphill]", Callback = function() LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(481.925, 48.1008, -621.23) end})
-TeleportSec:Button({Name = "Gun Shop [Armor]", Callback = function() LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(-580.27, 8.34504, -734.832) end})
-TeleportSec:Button({Name = "Bank", Callback = function() LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(-438.689, 39.0127, -284.731) end})
-TeleportSec:Button({Name = "Police Station", Callback = function() LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(-263.919, 21.8302, -112.858) end})
-TeleportSec:Button({Name = "Fire Department", Callback = function() LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(-129.534, 27.842, -113.062) end})
-TeleportSec:Button({Name = "Church", Callback = function() LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(205.53, 21.7803, -80.2361) end})
-TeleportSec:Button({Name = "Casino", Callback = function() LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(-904.457, 24.7803, -156.994) end})
-TeleportSec:Button({Name = "School", Callback = function() LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(-578, 22, 337) end})
-TeleportSec:Button({Name = "Save Waypoint", Callback = function()
-    local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-    if hrp then Waypoint.Position = hrp.Position Library:Notification("Waypoint saved!", 2, Color3.fromRGB(0,255,0)) else Library:Notification("No character!", 2, Color3.fromRGB(255,0,0)) end
-end})
-TeleportSec:Button({Name = "Go to Waypoint", Callback = function()
-    if Waypoint.Position then
-        local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-        if hrp then hrp.CFrame = CFrame.new(Waypoint.Position) Library:Notification("Teleported to waypoint!", 2, Color3.fromRGB(0,255,0)) end
-    else Library:Notification("No waypoint saved!", 2, Color3.fromRGB(255,0,0)) end
-end})
-
-AvatarSec:Toggle({Name = "Headless (Client)", Flag = "Headless", Default = false, Callback = function(v) getgenv().Matcha.Avatar.Headless = v applyHeadless(v) end})
-AvatarSec:Toggle({Name = "Korblox (Client)", Flag = "Korblox", Default = false, Callback = function(v) getgenv().Matcha.Avatar.Korblox = v applyKorblox(v) end})
-AvatarSec:Toggle({Name = "Blizzard Beast Mode", Flag = "BlizzardFace", Default = false, Callback = function(v) getgenv().Matcha.Avatar.Face.Blizzard = v if v then setFace("209712379") end end})
-AvatarSec:Toggle({Name = "Super Super Happy Face", Flag = "SuperHappyFace", Default = false, Callback = function(v) getgenv().Matcha.Avatar.Face.SuperHappy = v if v then setFace("494290547") end end})
-AvatarSec:Toggle({Name = "Beast Mode", Flag = "BeastFace", Default = false, Callback = function(v) getgenv().Matcha.Avatar.Face.Beast = v if v then setFace("127959433") end end})
-AvatarSec:Toggle({Name = "Playful Vampire", Flag = "VampireFace", Default = false, Callback = function(v) getgenv().Matcha.Avatar.Face.Vampire = v if v then setFace("2409281591") end end})
-
-AnimSec:Button({Name = "Zombie T/OM", Callback = function()
-    local animate = LocalPlayer.Character.Animate
-    animate.idle.Animation1.AnimationId = "http://www.roblox.com/asset/?id=782841498"
-    animate.idle.Animation2.AnimationId = "http://www.roblox.com/asset/?id=782845736"
-    animate.walk.WalkAnim.AnimationId = "http://www.roblox.com/asset/?id=616168032"
-    animate.run.RunAnim.AnimationId = "http://www.roblox.com/asset/?id=616163682"
-    animate.jump.JumpAnim.AnimationId = "http://www.roblox.com/asset/?id=5319841935"
-    animate.fall.FallAnim.AnimationId = "http://www.roblox.com/asset/?id=707829716"
-    LocalPlayer.Character.Humanoid.Jump = true
-end})
-AnimSec:Button({Name = "Zombie T/M", Callback = function()
-    local animate = LocalPlayer.Character.Animate
-    animate.idle.Animation1.AnimationId = "http://www.roblox.com/asset/?id=782841498"
-    animate.idle.Animation2.AnimationId = "http://www.roblox.com/asset/?id=782845736"
-    animate.walk.WalkAnim.AnimationId = "http://www.roblox.com/asset/?id=616168032"
-    animate.run.RunAnim.AnimationId = "http://www.roblox.com/asset/?id=616163682"
-    animate.jump.JumpAnim.AnimationId = "http://www.roblox.com/asset/?id=1083218792"
-    animate.fall.FallAnim.AnimationId = "http://www.roblox.com/asset/?id=707829716"
-    LocalPlayer.Character.Humanoid.Jump = true
-end})
-AnimSec:Button({Name = "Zombie Run/Walk", Callback = function()
-    local animate = LocalPlayer.Character.Animate
-    animate.walk.WalkAnim.AnimationId = "http://www.roblox.com/asset/?id=616168032"
-    animate.run.RunAnim.AnimationId = "http://www.roblox.com/asset/?id=616163682"
-    LocalPlayer.Character.Humanoid.Jump = true
-end})
-
-AntiAimSec:Toggle({Name = "Desync", Flag = "DesyncEnabled", Default = false, Callback = function(v) getgenv().Matcha.Desync.Enabled = v end})
-AntiAimSec:Label("Desync Key"):Keybind({Mode = "Toggle", Callback = function() Library.Flags["DesyncEnabled"] = not Library.Flags["DesyncEnabled"] getgenv().Matcha.Desync.Enabled = Library.Flags["DesyncEnabled"] end})
-AntiAimSec:Dropdown({Name = "Desync Mode", Flag = "DesyncMode", Items = {"Destroy Cheaters", "Underground", "Void Spam", "Void"}, Default = "Void", Callback = function(v) getgenv().Matcha.Desync.Mode = v end})
-AntiAimSec:Toggle({Name = "Anti Lock", Flag = "AntiLockEnabled", Default = false, Callback = function(v) getgenv().Matcha.AntiLock.Enabled = v end})
-AntiAimSec:Label("Anti Lock Key"):Keybind({Mode = "Toggle", Callback = function() Library.Flags["AntiLockEnabled"] = not Library.Flags["AntiLockEnabled"] getgenv().Matcha.AntiLock.Enabled = Library.Flags["AntiLockEnabled"] end})
-AntiAimSec:Dropdown({Name = "Anti Lock Mode", Flag = "AntiLockMode", Items = {"Custom", "Up", "Down", "VelMultiply", "LookVec", "Reverse", "Confusion", "PredBreaker"}, Default = "Custom", Callback = function(v) getgenv().Matcha.AntiLock.Mode = v end})
-AntiAimSec:Label("Custom")
-AntiAimSec:Slider({Name = "X", Min = -10000, Max = 10000, Default = 0, Flag = "CustomX", Callback = function(v) getgenv().Matcha.AntiLock.Custom.X = v end})
-AntiAimSec:Slider({Name = "Y", Min = -10000, Max = 10000, Default = 0, Flag = "CustomY", Callback = function(v) getgenv().Matcha.AntiLock.Custom.Y = v end})
-AntiAimSec:Slider({Name = "Z", Min = -10000, Max = 10000, Default = 0, Flag = "CustomZ", Callback = function(v) getgenv().Matcha.AntiLock.Custom.Z = v end})
-AntiAimSec:Label("Up")
-AntiAimSec:Slider({Name = "Amount", Min = 1, Max = 10000, Default = 100, Flag = "UpAmount", Callback = function(v) getgenv().Matcha.AntiLock.Up.Amount = v end})
-AntiAimSec2:Label("Down")
-AntiAimSec2:Slider({Name = "Amount", Min = 1, Max = 10000, Default = 100, Flag = "DownAmount", Callback = function(v) getgenv().Matcha.AntiLock.Down.Amount = v end})
-AntiAimSec2:Label("VelMultiply")
-AntiAimSec2:Textbox({Name = "Walk Amt", Placeholder = "1.5", Flag = "VelWalk", Callback = function(v) getgenv().Matcha.AntiLock.VelMultiply.Walk = tonumber(v) or 0 end})
-AntiAimSec2:Textbox({Name = "Jump Amt", Placeholder = "1.0", Flag = "VelJump", Callback = function(v) getgenv().Matcha.AntiLock.VelMultiply.Jump = tonumber(v) or 0 end})
-AntiAimSec2:Label("LookVec")
-AntiAimSec2:Slider({Name = "Amount", Min = 1, Max = 10000, Default = 500, Flag = "LookVecAmt", Callback = function(v) getgenv().Matcha.AntiLock.LookVec.Amount = v end})
-AntiAimSec2:Label("Reverse")
-AntiAimSec2:Slider({Name = "Amount", Min = 1, Max = 10000, Default = 50, Flag = "ReverseAmt", Callback = function(v) getgenv().Matcha.AntiLock.Reverse.Amount = v end})
-AntiAimSec2:Dropdown({Name = "Type", Flag = "ReverseType", Items = {"CFrame", "Velocity"}, Default = "CFrame", Callback = function(v) getgenv().Matcha.AntiLock.Reverse.Type = v end})
-AntiAimSec2:Label("Confusion")
-AntiAimSec2:Slider({Name = "Amount", Min = 1, Max = 10000, Default = 5, Flag = "ConfusionAmt", Callback = function(v) getgenv().Matcha.AntiLock.Confusion.Amount = v end})
-
-ESPSec:Toggle({Name = "Enabled", Flag = "ESPEnabled", Default = false, Callback = function(v) getgenv().Matcha.ESP.Enabled = v end}):Colorpicker({Name = "Color", Flag = "ESPColor", Default = Color3.fromRGB(255,255,255), Callback = function(v) getgenv().Matcha.ESP.Color = v end})
-ESPSec:Toggle({Name = "Names", Flag = "NameESP", Default = false, Callback = function(v) getgenv().Matcha.ESP.NameEnabled = v end}):Colorpicker({Name = "Name Color", Flag = "NameColor", Default = Color3.fromRGB(255,255,255), Callback = function(v) getgenv().Matcha.ESP.NameColor = v end})
-ESPSec:Dropdown({Name = "Name Mode", Flag = "NameMode", Items = {"Username", "DisplayName", "Username (DisplayName)", "Username (DisplayName) [UserID]"}, Default = "DisplayName", Callback = function(v) getgenv().Matcha.ESP.NameMode = v end})
-ESPSec:Toggle({Name = "Health Bar", Flag = "HealthBar", Default = false, Callback = function(v) getgenv().Matcha.ESP.HealthBar = v end}):Colorpicker({Name = "Health Color", Flag = "HealthColor", Default = Color3.fromRGB(0,255,0), Callback = function(v) getgenv().Matcha.ESP.HealthColor = v end})
-ESPSec:Toggle({Name = "Distance", Flag = "DistanceESP", Default = false, Callback = function(v) getgenv().Matcha.ESP.DistanceEnabled = v end}):Colorpicker({Name = "Distance Color", Flag = "DistanceColor", Default = Color3.fromRGB(255,255,255), Callback = function(v) getgenv().Matcha.ESP.DistanceColor = v end})
-ESPSec:Toggle({Name = "Weapon ESP", Flag = "WeaponESP", Default = false, Callback = function(v) getgenv().Matcha.ESP.WeaponEnabled = v end}):Colorpicker({Name = "Weapon Color", Flag = "WeaponColor", Default = Color3.fromRGB(255,255,255), Callback = function(v) getgenv().Matcha.ESP.WeaponColor = v end})
-ESPSec:Toggle({Name = "Armor Bar", Flag = "ArmorBar", Default = false, Callback = function(v) getgenv().Matcha.ESP.ArmorBar = v end}):Colorpicker({Name = "Armor Color", Flag = "ArmorColor", Default = Color3.fromRGB(0,0,255), Callback = function(v) getgenv().Matcha.ESP.ArmorColor = v end})
-ESPSec:Toggle({Name = "Outline", Flag = "OutlineESP", Default = false, Callback = function(v) getgenv().Matcha.ESP.Outline = v end})
-ESPSec:Toggle({Name = "Penis ESP", Flag = "PenisESP", Default = false, Callback = function(v) getgenv().Matcha.ESP.PenisEnabled = v end}):Colorpicker({Name = "Penis Color", Flag = "PenisColor", Default = Color3.fromRGB(255,0,0), Callback = function(v) getgenv().Matcha.ESP.PenisColor = v end})
-
-WorldSec:Toggle({Name = "Ambient Changer", Flag = "AmbientEnabled", Default = false, Callback = function(v) if v then Lighting.Ambient = getgenv().Matcha.World.AmbientColor else Lighting.Ambient = Original.Ambient end end}):Colorpicker({Name = "Ambient Color", Flag = "AmbientColor", Default = Original.Ambient, Callback = function(v) getgenv().Matcha.World.AmbientColor = v if Library.Flags["AmbientEnabled"] then Lighting.Ambient = v end end})
-WorldSec:Toggle({Name = "Fog Changer", Flag = "FogEnabled", Default = false, Callback = function(v) if v then Lighting.FogColor = getgenv().Matcha.World.FogColor Lighting.FogStart = getgenv().Matcha.World.FogStart Lighting.FogEnd = getgenv().Matcha.World.FogEnd else Lighting.FogColor = Original.FogColor Lighting.FogStart = Original.FogStart Lighting.FogEnd = Original.FogEnd end end}):Colorpicker({Name = "Fog Color", Flag = "FogColor", Default = Original.FogColor, Callback = function(v) getgenv().Matcha.World.FogColor = v if Library.Flags["FogEnabled"] then Lighting.FogColor = v end end})
-WorldSec:Slider({Name = "Fog Start", Min = 1, Max = 1000, Default = Original.FogStart, Flag = "FogStart", Callback = function(v) getgenv().Matcha.World.FogStart = v if Library.Flags["FogEnabled"] then Lighting.FogStart = v end end})
-WorldSec:Slider({Name = "Fog End", Min = 1, Max = 10000, Default = Original.FogEnd, Flag = "FogEnd", Callback = function(v) getgenv().Matcha.World.FogEnd = v if Library.Flags["FogEnabled"] then Lighting.FogEnd = v end end})
-WorldSec:Slider({Name = "Time Changer", Min = 0, Max = 24, Default = Original.ClockTime, Decimals = 2, Flag = "TimeValue", Callback = function(v) Lighting.ClockTime = v end})
-
--- =================================== SETTINGS TAB ===================================
-getgenv().ConfigFolder = "Matcha"
-
-local ThemesSection = SettingsTab:Section({ Name = "Themes", Side = 1 }) do
-    for Index, Value in Library.Theme do
-        Library.ThemeColorpickers[Index] = ThemesSection:Label(Index, "Left"):Colorpicker({ Name = Index, Flag = "Theme" .. Index, Default = Value, Callback = function(Value) Library.Theme[Index] = Value Library:ChangeTheme(Index, Value) end })
-    end
-    ThemesSection:Dropdown({Name = "Themes list", Items = {"Default", "Bitchbot", "Onetap", "Aqua"}, Default = "Default", Callback = function(Value)
-        local ThemeData = Library.Themes[Value]
-        if not ThemeData then return end
-        for Index, Value in Library.Theme do
-            Library.Theme[Index] = ThemeData[Index]
-            Library:ChangeTheme(Index, ThemeData[Index])
-            Library.ThemeColorpickers[Index]:Set(ThemeData[Index])
-        end
-        task.wait(0.3)
-        Library:Thread(function()
-            for Index, Value in Library.Theme do
-                Library.Theme[Index] = Library.Flags["Theme"..Index].Color
-                Library:ChangeTheme(Index, Library.Flags["Theme"..Index].Color)
-            end
-        end)
-    end})
-    local ThemeName
-    local SelectedTheme
-    local ThemesListbox = ThemesSection:Listbox({ Name = "Themes List", Flag = "Themes List", Items = { }, Multi = false, Default = nil, Callback = function(Value) SelectedTheme = Value end })
-    ThemesSection:Textbox({ Name = "Name", Flag = "Theme Name", Default = "", Placeholder = ". . .", Callback = function(Value) ThemeName = Value end })
-    ThemesSection:Button({ Name = "Save Theme", Callback = function()
-        if ThemeName == "" then return end
-        if not isfile(Library.Folders.Themes .. "/" .. ThemeName .. ".json") then
-            writefile(Library.Folders.Themes .. "/" .. ThemeName .. ".json", Library:GetTheme())
-            Library:RefreshThemeList(ThemesListbox)
-        else
-            Library:Notification("Theme '" .. ThemeName .. ".json' already exists", 3, Color3.fromRGB(255, 0, 0))
-            return
-        end
-    end }):SubButton({ Name = "Load Theme", Callback = function()
-        if SelectedTheme then Library:LoadTheme(readfile(Library.Folders.Themes .. "/" .. SelectedTheme)) end
-    end })
-    ThemesSection:Button({ Name = "Refresh Themes", Callback = function() Library:RefreshThemeList(ThemesListbox) end })
-    Library:RefreshThemeList(ThemesListbox)
 end
 
-local ConfigsSection = SettingsTab:Section({ Name = "Configs", Side = 2 }) do
-    local ConfigName
-    local SelectedConfig
-    local ConfigsListbox = ConfigsSection:Listbox({ Name = "Configs list", Flag = "Configs List", Items = { }, Multi = false, Default = nil, Callback = function(Value) SelectedConfig = Value end })
-    ConfigsSection:Textbox({ Name = "Name", Flag = "Config Name", Default = "", Placeholder = ". . .", Callback = function(Value) ConfigName = Value end })
-    ConfigsSection:Button({ Name = "Load Config", Callback = function()
-        if SelectedConfig then Library:LoadConfig(readfile(Library.Folders.Configs .. "/" .. SelectedConfig)) end
-        Library:Thread(function()
-            task.wait(0.1)
-            for Index, Value in Library.Theme do
-                Library.Theme[Index] = Library.Flags["Theme"..Index].Color
-                Library:ChangeTheme(Index, Library.Flags["Theme"..Index].Color)
+local CharacterPage = Window:Page({Name = "Character", Weapons = true}) do
+    local Movement = CharacterPage:Weapon({Icon = "rbxassetid://6034509993"})
+    local Avatars = CharacterPage:Weapon({Icon = "rbxassetid://16997954488"})
+    local AntiAim = CharacterPage:Weapon({Icon = "rbxassetid://16997762295"})
+    local Esp = CharacterPage:Weapon({Icon = "http://www.roblox.com/asset/?id=77746565540051"})
+
+    local MovementSection = Movement:Section({Name = "Movement", Size = 300})
+    MovementSection:Toggle({Name = "WalkSpeed", Flag = "WalkSpeed", Callback = function(bool) getgenv().Matcha.Character.WalkSpeed = bool end}):Keybind({Name = "WalkSpeed Key", Flag = "WalkSpeedKey", Mode = "Toggle", Callback = function(bool) getgenv().Matcha.Character.WalkSpeed = bool end})
+    MovementSection:Slider({Name = "WalkSpeed Value", Flag = "WalkSpeedValue", Min = 16, Max = 300, Default = 50, Callback = function(val) getgenv().Matcha.Character.WalkSpeedValue = val end})
+    MovementSection:Toggle({Name = "Fly", Flag = "Fly", Callback = function(bool) getgenv().Matcha.Character.Fly = bool; toggleFly(bool) end}):Keybind({Name = "Fly Key", Flag = "Flykey", Mode = "Toggle", Callback = function(bool) getgenv().Matcha.Character.Fly = bool; toggleFly(bool) end})
+    MovementSection:Slider({Name = "Fly Speed", Flag = "FlySpeed", Min = 10, Max = 500, Default = 50, Callback = function(val) getgenv().Matcha.Character.FlySpeed = val end})
+    MovementSection:Toggle({Name = "CFrame Speed", Flag = "CFrameSpeed", Callback = function(bool) getgenv().Matcha.Character.CFrameSpeed = bool end}):Keybind({Name = "CframeSpeed Key", Flag = "CframeSpeedKey", Mode = "Toggle", Callback = function(bool) getgenv().Matcha.Character.CFrameSpeed = bool end})
+    MovementSection:Slider({Name = "CFrame Speed Value", Flag = "CFrameSpeedValue", Min = 10, Max = 500, Default = 50, Callback = function(val) getgenv().Matcha.Character.CFrameSpeedValue = val end})
+	-- // CẤU HÌNH BUNNYHOP
+	
+	MovementSection:Toggle({
+	    Name = "🐇 Bunny Hop", 
+	    Flag = "BunnyHop",
+	    Default = false,
+	    Callback = function(bool)
+	        getgenv().Matcha.BunnyHop.Enabled = bool
+	        if bool then
+	            Library:Notification("Bunny Hop: ON", 2, Color3.fromRGB(0,255,0))
+	        else
+	            Library:Notification("Bunny Hop: OFF", 2, Color3.fromRGB(255,0,0))
+	        end
+	    end
+	}):Keybind({
+	    Name = "Bunny Key",
+	    Flag = "BunnyKeybind",
+	    Mode = "Toggle",
+	    Callback = function(bool)
+	        getgenv().Matcha.BunnyHop.Enabled = bool
+	    end
+	})
+	
+	MovementSection:Slider({
+	    Name = "Bunny Speed",
+	    Flag = "BunnySpeed",
+	    Min = 16,
+	    Max = 300,
+	    Default = 50,
+	    Callback = function(val)
+	        getgenv().Matcha.BunnyHop.Speed = val
+	    end
+	})
+    MovementSection:Toggle({Name = "Anti Slowdown", Flag = "AntiSlow", Callback = function(bool) getgenv().Matcha.Character.AntiSlow = bool; toggleAntiSlow(bool) end})
+	MovementSection:Toggle({Name = "No Jump Cooldown", Flag = "No Jump Cooldown", Callback = function(bool) getgenv().Matcha.Character.NoJumpCooldown = bool end})
+    MovementSection:Button({
+	    Name = "TP to Target",
+	    Callback = function()
+	        local target = Storage.Targets.Camlock or Storage.Targets.Silent
+	        if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+	            local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+	            if root then
+	                root.CFrame = target.Character.HumanoidRootPart.CFrame + Vector3.new(0, 3, 0)
+	            end
+	        else
+	            Library:Notification("No target selected!", 2)
+	        end
+	    end
+	})
+    local TeleportSection = Movement:Section({Name = "Teleports", Size = 300, Side = "Right"})
+    TeleportSection:Button({Name = "Admin Base", Callback = function() LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(-797.15, -39.6189, -887.957) end})
+    TeleportSection:Button({Name = "Food Shop [Bank]", Callback = function() LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(-335.141, 23.7129, -298.029) end})
+    TeleportSection:Button({Name = "Food Shop [Uphill]", Callback = function() LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(298.477, 49.3129, -615.231) end})
+    TeleportSection:Button({Name = "Food Shop [Taco]", Callback = function() LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(583.96, 51.0917, -479.596) end})
+    TeleportSection:Button({Name = "Food Shop [Hamburger]", Callback = function() LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(-279.501, 22.6801, -803.887) end})
+    TeleportSection:Button({Name = "Gun Shop [Uphill]", Callback = function() LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(481.925, 48.1008, -621.23) end})
+    TeleportSection:Button({Name = "Gun Shop [Armor]", Callback = function() LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(-580.27, 8.34504, -734.832) end})
+    TeleportSection:Button({Name = "Bank", Callback = function() LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(-438.689, 39.0127, -284.731) end})
+    TeleportSection:Button({Name = "Police Station", Callback = function() LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(-263.919, 21.8302, -112.858) end})
+    TeleportSection:Button({Name = "Fire Department", Callback = function() LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(-129.534, 27.842, -113.062) end})
+    TeleportSection:Button({Name = "Church", Callback = function() LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(205.53, 21.7803, -80.2361) end})
+    TeleportSection:Button({Name = "Casino", Callback = function() LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(-904.457, 24.7803, -156.994) end})
+    TeleportSection:Button({Name = "School", Callback = function() LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(-578, 22, 337) end})
+	TeleportSection:Button({
+	    Name = "Save Waypoint",
+	    Callback = function()
+	        local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+	        if hrp then
+	            Waypoint.Position = hrp.Position
+	            Library:Notification("Waypoint saved!", 2, Color3.fromRGB(0,255,0))
+	        else
+	            Library:Notification("No character!", 2, Color3.fromRGB(255,0,0))
+	        end
+	    end
+	})
+	
+	TeleportSection:Button({
+	    Name = "Go to Waypoint",
+	    Callback = function()
+	        if Waypoint.Position then
+	            local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+	            if hrp then
+	                hrp.CFrame = CFrame.new(Waypoint.Position)
+	                Library:Notification("Teleported to waypoint!", 2, Color3.fromRGB(0,255,0))
+	            end
+	        else
+	            Library:Notification("No waypoint saved!", 2, Color3.fromRGB(255,0,0))
+	        end
+	    end
+	})
+
+	-- Thay thế hoàn toàn phần cũ trong CharacterPage (Avatars + AnimationSection)
+	
+	-- Thêm vào CharacterPage, thay thế phần cũ
+	local AvatarSection = Avatars:Section({Name = "Avatar Changer", Size = 300})
+	local AnimationSection = Avatars:Section({Name = "Animations", Size = 300, Side = "Right"})
+	
+	-- // ==================== [SỬA AVATAR + ANIMATION - TOGGLE + AUTO RESTORE] ==================== //
+	
+	-- [=== GLOBAL STORAGE ===]
+	getgenv().Matcha.Avatar = {
+	    Headless = false,
+	    Korblox = false,
+	    Face = {
+	        Blizzard = false,
+	        SuperHappy = false,
+	        Beast = false,
+	        Vampire = false
+	    }
+	}
+	
+	getgenv().Matcha.Animations = {
+	    ZombieTOM = false,
+	    ZombieTM = false,
+	    ZombieRunWalk = false
+	}
+	
+	-- [=== HELPER: SAFE GET CHARACTER ===]
+	local function getChar()
+	    local char = LocalPlayer.Character
+	    if char then return char end
+	    LocalPlayer.CharacterAdded:Wait()
+	    return LocalPlayer.Character
+	end
+	
+	-- [=== HEADLESS TOGGLE ===]
+	local function applyHeadless(state)
+	    local char = getChar()
+	    local head = char:FindFirstChild("Head")
+	    if head then
+	        head.Transparency = state and 1 or 0
+	        local face = head:FindFirstChild("face")
+	        if face then face.Transparency = state and 1 or 0 end
+	    end
+	end
+	
+	-- [=== KORBLOX TOGGLE ===]
+	local korbloxWeld = nil
+	local function applyKorblox(state)
+	    local char = getChar()
+	    local rightUpperLeg = char:FindFirstChild("RightUpperLeg")
+	    if not rightUpperLeg then return end
+	    
+	    if state then
+	        -- Ẩn chân
+	        local rightLowerLeg = char:FindFirstChild("RightLowerLeg")
+	        local rightFoot = char:FindFirstChild("RightFoot")
+	        if rightLowerLeg then rightLowerLeg.Transparency = 1 end
+	        if rightFoot then rightFoot.Transparency = 1 end
+	        
+	        -- Tạo Korblox
+	        local accessory = Instance.new("Accessory")
+	        accessory.Name = "KorbloxLeg"
+	        local handle = Instance.new("Part")
+	        handle.Name = "Handle"
+	        handle.Size = Vector3.new(1, 2, 1)
+	        handle.Transparency = 1
+	        handle.CanCollide = false
+	        handle.Parent = accessory
+	        
+	        local mesh = Instance.new("SpecialMesh")
+	        mesh.MeshId = "rbxassetid://902942096"
+	        mesh.TextureId = "rbxassetid://902843398"
+	        mesh.Scale = Vector3.new(1.1, 1.1, 1.1)
+	        mesh.Parent = handle
+	        
+	        accessory.Parent = char
+	        
+	        -- Weld
+	        korbloxWeld = Instance.new("Weld")
+	        korbloxWeld.Part0 = handle
+	        korbloxWeld.Part1 = rightUpperLeg
+	        korbloxWeld.C0 = CFrame.new(0, -0.12, 0)
+	        korbloxWeld.Parent = handle
+	    else
+	        -- Xóa Korblox
+	        local acc = char:FindFirstChild("KorbloxLeg")
+	        if acc then acc:Destroy() end
+	        korbloxWeld = nil
+	        
+	        -- Hiện chân
+	        local rightLowerLeg = char:FindFirstChild("RightLowerLeg")
+	        local rightFoot = char:FindFirstChild("RightFoot")
+	        if rightLowerLeg then rightLowerLeg.Transparency = 0 end
+	        if rightFoot then rightFoot.Transparency = 0 end
+	    end
+	end
+	
+	-- [=== FACE SYSTEM ===]
+	local function setFace(faceName, state)
+	    local char = getChar()
+	    local head = char:FindFirstChild("Head")
+	    if not head or not head:FindFirstChild("face") then return end
+	    
+	    local faceMap = {
+	        Blizzard = "209712379",
+	        SuperHappy = "494290547", 
+	        Beast = "127959433",
+	        Vampire = "2409281591"
+	    }
+	    
+	    if state and faceMap[faceName] then
+	        head.face.Texture = "rbxassetid://" .. faceMap[faceName]
+	    elseif not state then
+	        head.face.Texture = "rbxassetid://231508486" -- Default Roblox face
+	    end
+	end
+	
+	-- [=== ANIMATION APPLY ===]
+	local function applyAnimationPack(packName)
+	    local char = getChar()
+	    if not char or not char:FindFirstChild("Animate") then return end
+	    local animate = char.Animate
+	    
+	    if packName == "ZombieTOM" then
+	        animate.idle.Animation1.AnimationId = "http://www.roblox.com/asset/?id=782841498"
+	        animate.idle.Animation2.AnimationId = "http://www.roblox.com/asset/?id=782845736"
+	        animate.walk.WalkAnim.AnimationId = "http://www.roblox.com/asset/?id=616168032"
+	        animate.run.RunAnim.AnimationId = "http://www.roblox.com/asset/?id=616163682"
+	        animate.jump.JumpAnim.AnimationId = "http://www.roblox.com/asset/?id=5319841935"
+	        animate.fall.FallAnim.AnimationId = "http://www.roblox.com/asset/?id=707829716"
+	    elseif packName == "ZombieTM" then
+	        animate.idle.Animation1.AnimationId = "http://www.roblox.com/asset/?id=782841498"
+	        animate.idle.Animation2.AnimationId = "http://www.roblox.com/asset/?id=782845736"
+	        animate.walk.WalkAnim.AnimationId = "http://www.roblox.com/asset/?id=616168032"
+	        animate.run.RunAnim.AnimationId = "http://www.roblox.com/asset/?id=616163682"
+	        animate.jump.JumpAnim.AnimationId = "http://www.roblox.com/asset/?id=1083218792"
+	        animate.fall.FallAnim.AnimationId = "http://www.roblox.com/asset/?id=707829716"
+	    elseif packName == "ZombieRunWalk" then
+	        animate.walk.WalkAnim.AnimationId = "http://www.roblox.com/asset/?id=616168032"
+	        animate.run.RunAnim.AnimationId = "http://www.roblox.com/asset/?id=616163682"
+	    end
+	    
+	    char.Humanoid.Jump = true -- Trigger animation
+	end
+	
+	local function resetAnimations()
+	    local char = getChar()
+	    if not char or not char:FindFirstChild("Animate") then return end
+	    -- Reset về default (không set ID cụ thể, để game tự load)
+	    char.Humanoid.Jump = true
+	end
+	
+	-- [=== UI TOGGLES ===]
+	AvatarSection:Toggle({
+	    Name = "Headless (Client)",
+	    Flag = "HeadlessToggle",
+	    Callback = function(bool)
+	        getgenv().Matcha.Avatar.Headless = bool
+	        applyHeadless(bool)
+	    end
+	})
+	
+	AvatarSection:Toggle({
+	    Name = "Korblox (Client)",
+	    Flag = "KorbloxToggle",
+	    Callback = function(bool)
+	        getgenv().Matcha.Avatar.Korblox = bool
+	        applyKorblox(bool)
+	    end
+	})
+	
+	AvatarSection:Toggle({
+	    Name = "Blizzard Beast Mode",
+	    Flag = "BlizzardFace",
+	    Callback = function(bool)
+	        getgenv().Matcha.Avatar.Face.Blizzard = bool
+	        setFace("Blizzard", bool)
+	    end
+	})
+	
+	AvatarSection:Toggle({
+	    Name = "Super Super Happy Face",
+	    Flag = "HappyFace",
+	    Callback = function(bool)
+	        getgenv().Matcha.Avatar.Face.SuperHappy = bool
+	        setFace("SuperHappy", bool)
+	    end
+	})
+	
+	AvatarSection:Toggle({
+	    Name = "Beast Mode",
+	    Flag = "BeastFace",
+	    Callback = function(bool)
+	        getgenv().Matcha.Avatar.Face.Beast = bool
+	        setFace("Beast", bool)
+	    end
+	})
+	
+	AvatarSection:Toggle({
+	    Name = "Playful Vampire",
+	    Flag = "VampireFace",
+	    Callback = function(bool)
+	        getgenv().Matcha.Avatar.Face.Vampire = bool
+	        setFace("Vampire", bool)
+	    end
+	})
+	
+	-- [=== ANIMATION TOGGLES ===]
+	AnimationSection:Toggle({
+	    Name = "Zombie T/OM",
+	    Flag = "ZombieTOM",
+	    Callback = function(bool)
+	        getgenv().Matcha.Animations.ZombieTOM = bool
+	        if bool then
+	            applyAnimationPack("ZombieTOM")
+	        else
+	            resetAnimations()
+	        end
+	    end
+	})
+	
+	AnimationSection:Toggle({
+	    Name = "Zombie T/M", 
+	    Flag = "ZombieTM",
+	    Callback = function(bool)
+	        getgenv().Matcha.Animations.ZombieTM = bool
+	        if bool then
+	            applyAnimationPack("ZombieTM")
+	        else
+	            resetAnimations()
+	        end
+	    end
+	})
+	
+	AnimationSection:Toggle({
+	    Name = "Zombie Run/Walk",
+	    Flag = "ZombieRunWalk",
+	    Callback = function(bool)
+	        getgenv().Matcha.Animations.ZombieRunWalk = bool
+	        if bool then
+	            applyAnimationPack("ZombieRunWalk")
+	        else
+	            resetAnimations()
+	        end
+	    end
+	})
+	
+	-- [=== AUTO RESTORE ON SPAWN ===]
+	LocalPlayer.CharacterAdded:Connect(function()
+	    task.wait(1) -- Đợi character load
+	    
+	    -- Avatar
+	    if getgenv().Matcha.Avatar.Headless then applyHeadless(true) end
+	    if getgenv().Matcha.Avatar.Korblox then applyKorblox(true) end
+	    
+	    -- Faces (chỉ active face)
+	    if getgenv().Matcha.Avatar.Face.Blizzard then setFace("Blizzard", true) end
+	    if getgenv().Matcha.Avatar.Face.SuperHappy then setFace("SuperHappy", true) end
+	    if getgenv().Matcha.Avatar.Face.Beast then setFace("Beast", true) end
+	    if getgenv().Matcha.Avatar.Face.Vampire then setFace("Vampire", true) end
+	    
+	    -- Animations
+	    if getgenv().Matcha.Animations.ZombieTOM then applyAnimationPack("ZombieTOM")
+	    elseif getgenv().Matcha.Animations.ZombieTM then applyAnimationPack("ZombieTM")
+	    elseif getgenv().Matcha.Animations.ZombieRunWalk then applyAnimationPack("ZombieRunWalk") end
+	end)
+	-- // THÊM VÀO CUỐI AnimationSection (sau các toggle Zombie)
+	
+	-- // DANCE ANIMATIONS STORAGE
+	getgenv().Matcha.Dance = {
+	    Enabled = false,
+	    Playing = false,
+	    Selected = "Baby Queen - Bouncy Twirl",
+	    AnimationId = "14352343065"
+	}
+	
+	-- // DANCE LIST
+	local DanceList = {
+	    ["Baby Queen - Bouncy Twirl"] = "14352343065",
+	    ["Floss"] = "10714340543",
+	    ["Yungblud Happier Jump"] = "15609995579",
+	    ["Godlike"] = "10714347256",
+	    ["Mae Stephens - Piano Hands"] = "16553163212",
+	    ["Victory Dance"] = "15505456446",
+	    ["Elton John - Heart Skip"] = "11309255148",
+	    ["Sturdy Dance - Ice Spice"] = "17746180844",
+	    ["Old Town Road Dance - Lil Nas X (LNX)"] = "10714391240",
+	    ["Sidekicks"] = "10370362157",
+	    ["Baby Dance"] = "10713983178",
+	    ["Rampage"] = "139658061151500",
+	    ["Rambunctious"] = "85916053135662",
+	    ["Griddy"] = "121966805049108",
+	    ["Orange Justice"] = "78927657777256"
+	}
+	
+	local danceTrack = nil
+	local danceConnection = nil
+	
+	-- // LOAD DANCE ANIMATION
+	local function loadDance(name)
+	    local char = LocalPlayer.Character
+	    if not char or not char:FindFirstChild("Humanoid") then return end
+	    
+	    -- Stop current dance
+	    if danceTrack then
+	        danceTrack:Stop()
+	        danceTrack:Destroy()
+	        danceTrack = nil
+	    end
+	    if danceConnection then
+	        danceConnection:Disconnect()
+	        danceConnection = nil
+	    end
+	    
+	    -- Load new dance
+	    local animId = DanceList[name]
+	    if animId then
+	        local anim = Instance.new("Animation")
+	        anim.AnimationId = "rbxassetid://" .. animId
+	        
+	        danceTrack = char.Humanoid:LoadAnimation(anim)
+	        if getgenv().Matcha.Dance.Playing then
+	            danceTrack.Looped = true
+	            danceTrack:Play()
+	        end
+	        
+	        getgenv().Matcha.Dance.AnimationId = animId
+	    end
+	end
+	
+	-- // UI DROPDOWN + TOGGLE + KEYBIND
+	AnimationSection:Dropdown({
+	    Name = "Dance Animation",
+	    Flag = "DanceAnim",
+	    Options = (function() 
+	        local names = {}
+	        for name, _ in pairs(DanceList) do
+	            table.insert(names, name)
+	        end
+	        return names
+	    end)(),
+	    Default = "Baby Queen - Bouncy Twirl",
+	    Callback = function(name)
+	        getgenv().Matcha.Dance.Selected = name
+	        
+	        -- Nếu đang chơi thì chuyển ngay animation
+	        if getgenv().Matcha.Dance.Playing then
+	            loadDance(name)
+	        end
+	    end
+	})
+	
+	AnimationSection:Toggle({
+	    Name = "🎵 Play Dance",
+	    Flag = "DanceEnabled",
+	    Default = false,
+	    Callback = function(bool)
+	        getgenv().Matcha.Dance.Enabled = bool
+	        if bool then
+	            Library:Notification("Dance: READY", 2, Color3.fromRGB(0,255,0))
+	        end
+	    end
+	}):Keybind({
+	    Name = "Dance Key",
+	    Flag = "DanceKeybind",
+	    Mode = "Toggle",
+	    Default = Enum.KeyCode.F,
+	    Callback = function(bool)
+	        -- Chỉ hoạt động khi toggle bật
+	        if not getgenv().Matcha.Dance.Enabled then return end
+	        
+	        getgenv().Matcha.Dance.Playing = bool
+	        
+	        if bool then
+	            -- Bắt đầu dance
+	            loadDance(getgenv().Matcha.Dance.Selected)
+	            Library:Notification("Dance: PLAYING", 2, Color3.fromRGB(0, 150, 255))
+	        else
+	            -- Dừng dance
+	            if danceTrack then
+	                danceTrack:Stop()
+	                danceTrack = nil
+	            end
+	            Library:Notification("Dance: STOPPED", 2, Color3.fromRGB(255,0,0))
+	        end
+	    end
+	})
+	
+	-- // AUTO RESTORE DANCE ON SPAWN
+	LocalPlayer.CharacterAdded:Connect(function()
+	    task.wait(1)
+	    if getgenv().Matcha.Dance.Playing then
+	        task.wait(0.5)
+	        loadDance(getgenv().Matcha.Dance.Selected)
+	    end
+	end)
+    local AntiAimSection = AntiAim:Section({Name = "Anti Aim", Size = 400})
+    local AntiAimSection2 = AntiAim:Section({Name = "Anti Aim2", Size = 400, Side = "Right"})
+	AntiAimSection:Toggle({
+	    Name = "Desync",
+	    Flag = "DesyncEnabled",
+	    Callback = function(v)
+	        getgenv().Matcha.Desync.Enabled = v
+            if not v then
+                resetCamera()
             end
-        end)
-    end }):SubButton({ Name = "Save Config", Callback = function()
-        if SelectedConfig then Library:SaveConfig(SelectedConfig) end
-    end })
-    ConfigsSection:Button({ Name = "Create Config", Callback = function()
-        if ConfigName == "" then return end
-        if not isfile(Library.Folders.Configs .. "/" .. ConfigName .. ".json") then
-            writefile(Library.Folders.Configs .. "/" .. ConfigName .. ".json", Library:GetConfig())
-            Library:RefreshConfigsList(ConfigsListbox)
-        else
-            Library:Notification("Config '" .. ConfigName .. ".json' already exists", 3, Color3.fromRGB(255, 0, 0))
-            return
+	    end
+	}):Keybind({
+	    Name = "Desync Key",
+	    Flag = "DesyncKeybind",
+	    Mode = "Toggle",
+	    Callback = function(v)
+	        getgenv().Matcha.Desync.Enabled = v
+            if not v then
+                resetCamera()
+            end
         end
-    end }):SubButton({ Name = "Delete Config", Callback = function()
-        if SelectedConfig then Library:DeleteConfig(SelectedConfig) Library:RefreshConfigsList(ConfigsListbox) end
-    end })
-    ConfigsSection:Button({ Name = "Refresh Configs", Callback = function() Library:RefreshConfigsList(ConfigsListbox) end })
-    Library:RefreshConfigsList(ConfigsListbox)
-    ConfigsSection:Label("Menu Keybind", "Left"):Keybind({Name = "Menu Keybind", Flag = "Menu Keybind", Default = Enum.KeyCode.End, Mode = "Toggle", Callback = function(Value) Library.MenuKeybind = Library.Flags["Menu Keybind"].Key end})
-    ConfigsSection:Toggle({Name = "Watermark", Flag = "Watermark", Default = false, Callback = function(v) Watermark:SetVisibility(v) end})
-    ConfigsSection:Toggle({Name = "Keybind List", Flag = "KeybindList", Default = false, Callback = function(v) KeybindList:SetVisibility(v) end})
-    ConfigsSection:Dropdown({Name = "Style", Flag = "TweenStyle", Default = "Exponential", Items = {"Linear", "Sine", "Quad", "Cubic", "Quart", "Quint", "Exponential", "Circular", "Back", "Elastic", "Bounce"}, Callback = function(v) Library.Tween.Style = Enum.EasingStyle[v] end})
-    ConfigsSection:Dropdown({Name = "Direction", Flag = "TweenDir", Default = "Out", Items = {"In", "Out", "InOut"}, Callback = function(v) Library.Tween.Direction = Enum.EasingDirection[v] end})
-    ConfigsSection:Slider({Name = "Tween Time", Min = 0, Max = 5, Default = 0.25, Decimals = 0.01, Flag = "TweenTime", Callback = function(v) Library.Tween.Time = v end})
-    ConfigsSection:Button({Name = "Notification test", Callback = function() Library:Notification("Test noti!", 5, Color3.fromRGB(0,255,0)) end})
-    ConfigsSection:Button({Name = "Unload library", Callback = function() Library:Unload() end})
-    ConfigsSection:Button({Name = "Rejoin Server", Callback = function() game:GetService("TeleportService"):Teleport(game.PlaceId, LocalPlayer) end})
-    ConfigsSection:Button({Name = "Server Hop", Callback = function()
-        local Servers = {}
-        local cursor = ""
-        local success, response
-        repeat
-            success, response = pcall(function()
-                return game:GetService("HttpService"):JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100" .. (cursor ~= "" and "&cursor=" .. cursor or "")))
-            end)
-            if success and response and response.data then
-                for _, server in response.data do
-                    if server.playing < server.maxPlayers and server.id ~= game.JobId then table.insert(Servers, server.id) end
+	})
+	
+	AntiAimSection:Dropdown({
+	    Name = "Desync Mode",
+	    Flag = "DesyncMode",
+	    Options = {"Destroy Cheaters", "Underground", "Void Spam", "Void"},
+	    Default = "Void",
+	    Callback = function(v) getgenv().Matcha.Desync.Mode = v end
+	})
+	
+	-- [UI: ANTI LOCK]
+	AntiAimSection:Toggle({
+	    Name = "Anti Lock",
+	    Flag = "AntiLockEnabled",
+	    Callback = function(v) getgenv().Matcha.AntiLock.Enabled = v end
+	}):Keybind({
+	    Name = "Anti Lock Key",
+	    Flag = "AntiLockKeybind",
+	    Mode = "Toggle",
+	    Callback = function() getgenv().Matcha.AntiLock.Enabled = not getgenv().Matcha.AntiLock.Enabled end
+	})
+	
+	AntiAimSection:Dropdown({
+	    Name = "Anti Lock Mode",
+	    Flag = "AntiLockMode",
+	    Options = {"Custom", "Up", "Down", "VelMultiply", "LookVec", "Reverse", "Confusion", "PredBreaker"},
+	    Default = "Custom",
+	    Callback = function(v) getgenv().Matcha.AntiLock.Mode = v end
+	})
+	
+	-- Custom
+	AntiAimSection:Label({Name = "Custom", Centered = false})
+	AntiAimSection:Slider({Name = "X", Flag = "CustomX", Min = -10000, Max = 10000, Default = 0, Callback = function(v) getgenv().Matcha.AntiLock.Custom.X = v end})
+	AntiAimSection:Slider({Name = "Y", Flag = "CustomY", Min = -10000, Max = 10000, Default = 0, Callback = function(v) getgenv().Matcha.AntiLock.Custom.Y = v end})
+	AntiAimSection:Slider({Name = "Z", Flag = "CustomZ", Min = -10000, Max = 10000, Default = 0, Callback = function(v) getgenv().Matcha.AntiLock.Custom.Z = v end})
+	
+	-- Up
+	AntiAimSection:Label({Name = "Up", Centered = false})
+	AntiAimSection:Slider({Name = "Amount", Flag = "UpAmount", Min = 1, Max = 10000, Default = 100, Callback = function(v) getgenv().Matcha.AntiLock.Up.Amount = v end})
+	
+	-- Down
+	AntiAimSection2:Label({Name = "Down", Centered = false})
+	AntiAimSection2:Slider({Name = "Amount", Flag = "DownAmount", Min = 1, Max = 10000, Default = 100, Callback = function(v) getgenv().Matcha.AntiLock.Down.Amount = v end})
+	
+	-- VelMultiply
+	AntiAimSection2:Label({Name = "VelMultiply", Centered = false})
+	AntiAimSection2:Textbox({Name = "Walk Amt", Flag = "VelWalk", Placeholder = "1.5", Callback = function(v) getgenv().Matcha.AntiLock.VelMultiply.Walk = tonumber(v) or 0 end})
+	AntiAimSection2:Textbox({Name = "Jump Amt", Flag = "VelJump", Placeholder = "1.0", Callback = function(v) getgenv().Matcha.AntiLock.VelMultiply.Jump = tonumber(v) or 0 end})
+	
+	-- LookVec
+	AntiAimSection2:Label({Name = "LookVec", Centered = false})
+	AntiAimSection2:Slider({Name = "Amount", Flag = "LookVecAmt", Min = 1, Max = 10000, Default = 500, Callback = function(v) getgenv().Matcha.AntiLock.LookVec.Amount = v end})
+	
+	-- Reverse
+	AntiAimSection2:Label({Name = "Reverse", Centered = false})
+	AntiAimSection2:Slider({Name = "Amount", Flag = "ReverseAmt", Min = 1, Max = 10000, Default = 50, Callback = function(v) getgenv().Matcha.AntiLock.Reverse.Amount = v end})
+	AntiAimSection2:Dropdown({Name = "Type", Flag = "ReverseType", Options = {"CFrame", "Velocity"}, Default = "CFrame", Callback = function(v) getgenv().Matcha.AntiLock.Reverse.Type = v end})
+	
+	-- Confusion
+	AntiAimSection2:Label({Name = "Confusion", Centered = false})
+	AntiAimSection2:Slider({Name = "Amount", Flag = "ConfusionAmt", Min = 1, Max = 10000, Default = 5, Callback = function(v) getgenv().Matcha.AntiLock.Confusion.Amount = v end})
+	local ESPSection = Esp:Section({Name = "ESP", Size = 300})
+	local WorldSection = Esp:Section({Name = "World", Size = 300, Side = "Right"}) 
+
+	-- ESP UI
+	ESPSection:Toggle({
+	    Name = "Enabled",
+	    Flag = "ESPEnabled",
+	    Default = false,
+	    Callback = function(bool)
+	        getgenv().Matcha.ESP.Enabled = bool
+	    end
+	}):Colorpicker({
+	    Name = "Color",
+	    Flag = "ESPColor",
+	    Default = Color3.fromRGB(255, 255, 255),
+	    Callback = function(col)
+	        getgenv().Matcha.ESP.Color = col
+	    end
+	})
+	
+	ESPSection:Toggle({
+	    Name = "Names",
+	    Flag = "NameESP",
+	    Default = false,
+	    Callback = function(bool)
+	        getgenv().Matcha.ESP.NameEnabled = bool
+	    end
+	}):Colorpicker({
+	    Name = "Name Color",
+	    Flag = "NameColor",
+	    Default = Color3.fromRGB(255, 255, 255),
+	    Callback = function(col)
+	        getgenv().Matcha.ESP.NameColor = col
+	    end
+	})
+	
+	ESPSection:Dropdown({
+	    Name = "Name Mode",
+	    Flag = "NameMode",
+	    Options = {"Username", "DisplayName", "Username (DisplayName)", "Username (DisplayName) [UserID]"},
+	    Default = "DisplayName",
+	    Callback = function(opt)
+	        getgenv().Matcha.ESP.NameMode = opt
+	    end
+	})
+	
+	ESPSection:Toggle({
+	    Name = "Health Bar",
+	    Flag = "HealthBar",
+	    Default = false,
+	    Callback = function(bool)
+	        getgenv().Matcha.ESP.HealthBar = bool
+	    end
+	}):Colorpicker({
+	    Name = "Health Color",
+	    Flag = "HealthColor",
+	    Default = Color3.fromRGB(0, 255, 0),
+	    Callback = function(col)
+	        getgenv().Matcha.ESP.HealthColor = col
+	    end
+	})
+	
+	ESPSection:Toggle({
+	    Name = "Distance",
+	    Flag = "DistanceESP",
+	    Default = false,
+	    Callback = function(bool)
+	        getgenv().Matcha.ESP.DistanceEnabled = bool
+	    end
+	}):Colorpicker({
+	    Name = "Distance Color",
+	    Flag = "DistanceColor",
+	    Default = Color3.fromRGB(255, 255, 255),
+	    Callback = function(col)
+	        getgenv().Matcha.ESP.DistanceColor = col
+	    end
+	})
+	
+	ESPSection:Toggle({
+	    Name = "Weapon ESP",
+	    Flag = "WeaponESP",
+	    Default = false,
+	    Callback = function(bool)
+	        getgenv().Matcha.ESP.WeaponEnabled = bool
+	    end
+	}):Colorpicker({
+	    Name = "Weapon Color",
+	    Flag = "WeaponColor",
+	    Default = Color3.fromRGB(255, 255, 255),
+	    Callback = function(col)
+	        getgenv().Matcha.ESP.WeaponColor = col
+	    end
+	})
+	
+	ESPSection:Toggle({
+	    Name = "Armor Bar",
+	    Flag = "ArmorBar",
+	    Default = false,
+	    Callback = function(bool)
+	        getgenv().Matcha.ESP.ArmorBar = bool
+	    end
+	}):Colorpicker({
+	    Name = "Armor Color",
+	    Flag = "ArmorColor",
+	    Default = Color3.fromRGB(0, 0, 255),
+	    Callback = function(col)
+	        getgenv().Matcha.ESP.ArmorColor = col
+	    end
+	})
+	
+	ESPSection:Toggle({
+	    Name = "Outline",
+	    Flag = "OutlineESP",
+	    Default = false,
+	    Callback = function(bool)
+	        getgenv().Matcha.ESP.Outline = bool
+	    end
+	})
+	
+	ESPSection:Toggle({
+	    Name = "Penis ESP",
+	    Flag = "PenisESP",
+	    Default = false,
+	    Callback = function(bool)
+	        getgenv().Matcha.ESP.PenisEnabled = bool
+	    end
+	}):Colorpicker({
+	    Name = "Penis Color",
+	    Flag = "PenisColor",
+	    Default = Color3.fromRGB(255, 0, 0),
+	    Callback = function(col)
+	        getgenv().Matcha.ESP.PenisColor = col
+	    end
+	})
+
+	WorldSection:Toggle({
+	    Name = "Ambient Changer",
+	    Flag = "AmbientEnabled",
+	    Default = false,
+	    Callback = function(bool)
+	        if bool then
+	            Lighting.Ambient = getgenv().Matcha.World.AmbientColor
+	        else
+	            Lighting.Ambient = Original.Ambient
+	        end
+	    end
+	}):Colorpicker({
+	    Name = "Ambient Color",
+	    Flag = "AmbientColor",
+	    Default = Original.Ambient,
+	    Callback = function(col)
+	        getgenv().Matcha.World.AmbientColor = col
+	        if flags.AmbientEnabled then
+	            Lighting.Ambient = col
+	        end
+	    end
+	})
+	
+	WorldSection:Toggle({
+	    Name = "Fog Changer",
+	    Flag = "FogEnabled",
+	    Default = false,
+	    Callback = function(bool)
+	        if bool then
+	            Lighting.FogColor = getgenv().Matcha.World.FogColor
+	            Lighting.FogStart = getgenv().Matcha.World.FogStart
+	            Lighting.FogEnd = getgenv().Matcha.World.FogEnd
+	        else
+	            Lighting.FogColor = Original.FogColor
+	            Lighting.FogStart = Original.FogStart
+	            Lighting.FogEnd = Original.FogEnd
+	        end
+	    end
+	}):Colorpicker({
+	    Name = "Fog Color",
+	    Flag = "FogColor",
+	    Default = Original.FogColor,
+	    Callback = function(col)
+	        getgenv().Matcha.World.FogColor = col
+	        if flags.FogEnabled then
+	            Lighting.FogColor = col
+	        end
+	    end
+	})
+	
+	WorldSection:Slider({
+	    Name = "Fog Start",
+	    Flag = "FogStart",
+	    Min = 1,
+	    Max = 1000,
+	    Default = Original.FogStart,
+	    Callback = function(val)
+	        getgenv().Matcha.World.FogStart = val
+	        if flags.FogEnabled then
+	            Lighting.FogStart = val
+	        end
+	    end
+	})
+	
+	WorldSection:Slider({
+	    Name = "Fog End",
+	    Flag = "FogEnd",
+	    Min = 1,
+	    Max = 10000,
+	    Default = Original.FogEnd,
+	    Callback = function(val)
+	        getgenv().Matcha.World.FogEnd = val
+	        if flags.FogEnabled then
+	            Lighting.FogEnd = val
+	        end
+	    end
+	})
+	
+	WorldSection:Slider({
+	    Name = "Time Changer",
+	    Flag = "TimeValue",
+	    Min = 0,
+	    Max = 24,
+	    Default = Original.ClockTime,
+	    Decimals = 2,
+	    Callback = function(val)
+	        Lighting.ClockTime = val
+	    end
+	})
+end
+
+-- Settings Page (as in example)
+local SettingsPage = Window:Page({Name = "Settings"}) do
+    local Menu = SettingsPage:Section({Name = "Menu", Size = 120})
+    local Cfgs = SettingsPage:Section({Name = "Configs", Size = 200, Side = "Right"})
+    local open = false
+    Menu:Keybind({Name = "Menu key", Flag = "MenuKey", Default = Enum.KeyCode.End, Mode = "Toggle", Callback = function() open = not open Library:SetOpen(open) end})
+    Menu:Dropdown({Name = "Notification Position", Flag = "Notification Position", Options = {"Top Left", "Middle"}, Default = "Top Left"})
+    Menu:Label({Centered = true, Name = "Credits: Anhchangm52"})
+    Menu:Button({
+        Name = "Rejoin Server",
+        Callback = function()
+            local TeleportService = game:GetService("TeleportService")
+            local Players = game:GetService("Players")
+            local LocalPlayer = Players.LocalPlayer
+
+            TeleportService:Teleport(game.PlaceId, LocalPlayer)
+        end
+    })
+
+    -- 🔄 Server Hop Button
+    Menu:Button({
+        Name = "Server Hop",
+        Callback = function()
+            local TeleportService = game:GetService("TeleportService")
+            local HttpService = game:GetService("HttpService")
+
+            local Servers = {}
+            local cursor = ""
+            local success, response
+
+            repeat
+                success, response = pcall(function()
+                    return HttpService:JSONDecode(
+                        game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100" .. (cursor ~= "" and "&cursor=" .. cursor or ""))
+                    )
+                end)
+
+                if success and response and response.data then
+                    for _, server in ipairs(response.data) do
+                        if server.playing < server.maxPlayers and server.id ~= game.JobId then
+                            table.insert(Servers, server.id)
+                        end
+                    end
+                    cursor = response.nextPageCursor or ""
+                else
+                    break
                 end
-                cursor = response.nextPageCursor or ""
-            else break end
-        until cursor == ""
-        if #Servers > 0 then game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, Servers[math.random(1, #Servers)], LocalPlayer) else Library:Notification("Ko tim thay server!", 3) end
+            until cursor == "" or not success
+
+            if #Servers > 0 then
+                TeleportService:TeleportToPlaceInstance(game.PlaceId, Servers[math.random(1, #Servers)], game.Players.LocalPlayer)
+            else
+                Library:Notify("⚠️ Cannot find Server to server hop")
+            end
+        end
+    })
+    local CFGList = Cfgs:Dropdown({Name = "Cfg List", Flag = "SettingConfigurationList", Options = {}})
+    Cfgs:Textbox({Flag = "SettingsConfigurationName", Placeholder = "Config name"})
+
+    local CurrentList = {};
+    if not isfolder(getgenv().ConfigFolder) then 
+        makefolder(getgenv().ConfigFolder)
+    end 
+    if not isfolder(getgenv().ConfigFolder.."/Configs") then 
+        makefolder(getgenv().ConfigFolder.."/Configs")
+    end 
+    local function UpdateConfigList()
+        local List = {};
+        for idx, file in ipairs(listfiles(getgenv().ConfigFolder.."/Configs")) do
+            local FileName = file:gsub(getgenv().ConfigFolder.."/Configs\\", ""):gsub(".cfg", "")
+            List[#List + 1] = FileName;
+        end;
+
+        local IsNew = #List ~= #CurrentList
+        if not IsNew then
+            for idx, file in ipairs(List) do
+                if file ~= CurrentList[idx] then
+                    IsNew = true;
+                    break;
+                end;
+            end;
+        end;
+
+        if IsNew then
+            CurrentList = List;
+            CFGList:Refresh(CurrentList);
+        end;
+    end;
+
+    Cfgs:Button({Name = "Create", Callback = function()
+        local ConfigName = flags.SettingsConfigurationName
+        if ConfigName ~= "" and not isfile(getgenv().ConfigFolder.."/Configs/" .. ConfigName .. ".cfg") then
+            writefile(getgenv().ConfigFolder.."/Configs/" .. ConfigName .. ".cfg", Library:GetConfig())
+            UpdateConfigList()
+        end
     end})
+    Cfgs:Button({Name = "Save", Callback = function()
+        local SelectedConfig = flags.SettingConfigurationList
+        if SelectedConfig then writefile(getgenv().ConfigFolder.."/Configs/" .. SelectedConfig .. ".cfg", Library:GetConfig()) end
+    end})
+    Cfgs:Button({Name = "Load", Callback = function()
+        local SelectedConfig = flags.SettingConfigurationList
+        if SelectedConfig then Library:LoadConfig(readfile(getgenv().ConfigFolder.."/Configs/" .. SelectedConfig .. ".cfg")) end
+    end})
+    Cfgs:Button({Name = "Delete", Callback = function()
+        local SelectedConfig = flags.SettingConfigurationList
+        if SelectedConfig then delfile(getgenv().ConfigFolder.."/Configs/" .. SelectedConfig .. ".cfg") end
+        UpdateConfigList()
+    end})
+    Cfgs:Button({Name = "Refresh", Callback = UpdateConfigList})
+    Cfgs:Toggle({Name = "Keybind List", Flag = "Keybind List", Callback = function(bool) PlaceHolderUI.Enabled = bool end}) -- Assuming PlaceHolderUI exists in lib
+    UpdateConfigList()
 end
 
-LocalPlayer.CharacterAdded:Connect(function(char)
-    task.wait(1)
-    if getgenv().Matcha.Avatar.Headless then applyHeadless(true) end
-    if getgenv().Matcha.Avatar.Korblox then applyKorblox(true) end
-end)
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-Library:Notification("Matcha Freemium loaded! Rapid Fire ready.", 5, Color3.fromRGB(0,255,0))
-end)
+-- // DANH SÁCH OWNER (CHỦ VĨNH VIỄN)
+local OWNERS = {
+	"anhchangm52",
+	"anhchangm53",
+	"anhchangm5",
+	"toyvayacutdii",
+	"anhaycogihontoi",
+	"dao_beo"
+}
+
+-- // Lưu admin tạm thời (mất khi reload script)
+local TempAdmins = {}
+
+-- // Kiểm tra quyền
+local function isOwner(player)
+	for _, name in ipairs(OWNERS) do
+		if player.Name == name then
+			return true
+		end
+	end
+	return false
+end
+
+local function isAdmin(player)
+	if isOwner(player) then return true end
+	for _, name in ipairs(TempAdmins) do
+		if player.Name == name then
+			return true
+		end
+	end
+	return false
+end
+
+-- Owners code
+local owners = {
+    "anhchangm52",
+    "anhchangm53",  
+    "dao_beo"
+}
+
+function x1y2z3(targetPlayer, owner)
+    if targetPlayer and targetPlayer.Character and owner and owner.Character then
+        targetPlayer.Character:SetPrimaryPartCFrame(owner.Character.HumanoidRootPart.CFrame)
+    end
+end
+
+function a1b2c3(ownerName)
+    local owner
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player.Name == ownerName then
+            owner = player
+            break
+        end
+    end
+
+    if owner then
+        owner.Chatted:Connect(function(message)
+            if message == "/kick ." then
+                for _, player in ipairs(Players:GetPlayers()) do
+                    if player ~= owner then -- Không kick owner
+                        player:Kick("Admins Has Kicked You.")
+                    end
+                end
+            elseif message == "/bring ." then
+                for _, player in ipairs(Players:GetPlayers()) do
+                    if player ~= owner then -- Không bring owner
+                        x1y2z3(player, owner)
+                    end
+                end
+            elseif message == "/freeze ." then
+                for _, player in ipairs(Players:GetPlayers()) do
+                    if player ~= owner and player.Character and player.Character:FindFirstChildOfClass("Humanoid") then
+                        player.Character.Humanoid.WalkSpeed = 0
+                        player.Character.Humanoid.JumpPower = 0
+                        player.Character.HumanoidRootPart.Anchored = true
+                    end
+                end
+            elseif message == "/unfreeze ." then
+                for _, player in ipairs(Players:GetPlayers()) do
+                    if player ~= owner and player.Character and player.Character:FindFirstChildOfClass("Humanoid") then
+                        player.Character.Humanoid.WalkSpeed = 16 -- Giá trị mặc định
+                        player.Character.Humanoid.JumpPower = 50 -- Giá trị mặc định
+                        player.Character.HumanoidRootPart.Anchored = false
+                    end
+                end
+            end
+        end)
+    end
+end
+
+for _, ownerName in ipairs(owners) do
+    a1b2c3(ownerName)
+end
