@@ -2,10 +2,7 @@
 local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/Kazamatcha/matcha.tea/refs/heads/main/libpvp"))()
 local flags = Library.Flags
 getgenv().ConfigFolder = "matchafree"
-
--- Adjusted Window Size for better fit
 local Window = Library:Window({Size = UDim2.new(0, 470, 0, 500)})
-
 -- Services and Variables
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
@@ -13,7 +10,7 @@ local Mouse = LocalPlayer:GetMouse()
 local Camera = workspace.CurrentCamera
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
-
+local ReplicatedStorage = game:GetService('ReplicatedStorage')
 -- Global Settings
 getgenv().Matcha = {
     Legit = {
@@ -57,7 +54,6 @@ getgenv().Matcha = {
 	    ToggleKeybind = false
     },
 }
-
 -- Storage
 local Storage = {
     Targets = { Camlock = nil, Silent = nil },
@@ -84,9 +80,8 @@ local Original = {
 }
 getgenv().Matcha.BunnyHop = {
 	Enabled = false,
-	Speed = 50  -- Tốc độ nhảy (tương đương walkspeed)
+	Speed = 50
 }
--- Helper Functions
 local function NewConnection(signal, callback)
     local conn = signal:Connect(callback)
     table.insert(Storage.Connections, conn)
@@ -131,7 +126,7 @@ local function isVisible(targetPart)
     return true -- không bị che
 end
 local FOVCircle = Drawing.new("Circle")
-FOVCircle.Thickness = 2          -- line chính
+FOVCircle.Thickness = 2
 FOVCircle.Color = getgenv().Matcha.Legit.FOVOutline
 FOVCircle.Transparency = 1
 FOVCircle.Filled = false
@@ -921,8 +916,194 @@ NewConnection(RunService.Heartbeat, function()
     desync_setback.CFrame = old * CFrame.new(0, hrp.Size.Y/2 + 0.5, 0)
     hrp.CFrame = old
 end)
+-- Thêm hàm Levenshtein distance (để tìm tên gần đúng)
+local function levenshtein(s, t)
+    local m, n = #s, #t
+    if m == 0 then return n end
+    if n == 0 then return m end
+    local d = {}
+    for i = 0, m do d[i] = {[0] = i} end
+    for j = 0, n do d[0][j] = j end
+    for i = 1, m do
+        for j = 1, n do
+            local cost = (s:sub(i,i) == t:sub(j,j)) and 0 or 1
+            d[i][j] = math.min(
+                d[i-1][j] + 1,
+                d[i][j-1] + 1,
+                d[i-1][j-1] + cost
+            )
+        end
+    end
+    return d[m][n]
+end
 
--- Anti Lock Heartbeat
+-- Hàm tìm player gần đúng tên nhất (dùng Levenshtein nếu ko exact match)
+local function findClosestPlayer(query)
+    query = string.lower(query)
+    local bestMatch, bestScore = nil, math.huge
+    for _, plr in pairs(Players:GetPlayers()) do
+        local uname = string.lower(plr.Name)
+        local dname = string.lower(plr.DisplayName)
+        if string.find(uname, query) or string.find(dname, query) then
+            return plr
+        end
+        local score = math.min(levenshtein(uname, query), levenshtein(dname, query))
+        if score < bestScore then
+            bestScore = score
+            bestMatch = plr
+        end
+    end
+    return bestMatch
+end
+
+-- Hàm tìm MainRemote (đa năng cho nhiều game)
+local possibleRemotes = { "MAINEVENT", "MainEvent", "Remote", "Packages", "MainRemotes", "Bullets" }
+local function getMainRemote()
+    if ReplicatedStorage:FindFirstChild("MainEvent") then return ReplicatedStorage.MainEvent end
+    if ReplicatedStorage:FindFirstChild("MAINEVENT") then return ReplicatedStorage.MAINEVENT end
+    if ReplicatedStorage:FindFirstChild("Remote") then return ReplicatedStorage.Remote end
+    if ReplicatedStorage:FindFirstChild("Bullets") then return ReplicatedStorage.Bullets end
+    -- MainRemotes.MainRemoteEvent
+    local mainRemotes = ReplicatedStorage:FindFirstChild("MainRemotes")
+    if mainRemotes and mainRemotes:FindFirstChild("MainRemoteEvent") then return mainRemotes.MainRemoteEvent end
+    -- Packages.Knit.Services.ToolService.RE.UpdateAim
+    local packages = ReplicatedStorage:FindFirstChild("Packages")
+    if packages then
+        local knit = packages:FindFirstChild("Knit")
+        if knit and knit:FindFirstChild("Services") then
+            local toolService = knit.Services:FindFirstChild("ToolService")
+            if toolService and toolService:FindFirstChild("RE") then
+                local re = toolService.RE
+                if re:FindFirstChild("UpdateAim") then return re.UpdateAim end
+            end
+        end
+    end
+    -- fallback: không tìm thấy
+    return nil
+end
+
+local MainRemote = getMainRemote() -- Gọi một lần để cache
+
+-- Hàm ShootPlayer (dùng để bắn)
+getgenv().ShootPlayer = function(target, tool)
+    if not tool:FindFirstChild("Handle") then return end
+    local targetHead = target.Character:FindFirstChild("Head")
+    if not targetHead then return end
+    MainRemote:FireServer("ShootGun", tool.Handle, tool.Handle.CFrame.Position, targetHead.Position, targetHead, Vector3.new(0, 0, -1))
+end
+
+-- Cấu hình Auto Reload
+getgenv().Matcha.AutoReload = {
+    Enabled = false
+}
+
+-- Logic Auto Reload
+local function startAutoReload()
+    if _G.AutoReloadConnection then
+        _G.AutoReloadConnection:Disconnect()
+        _G.AutoReloadConnection = nil
+    end
+    if getgenv().Matcha.AutoReload.Enabled and MainRemote then
+        _G.AutoReloadConnection = RunService.RenderStepped:Connect(function()
+            local tool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool")
+            local ammo = tool and tool:FindFirstChild("Ammo")
+            if ammo and ammo.Value <= 0 then
+                MainRemote:FireServer("Reload", tool)
+                task.wait(3.7) -- Delay reload (có thể adjust nếu cần)
+            end
+        end)
+    end
+end
+
+-- Fake Silent Aim vars (cho executor kém, ko support hookmetamethod)
+getgenv().whitelist = {} -- Bỏ trống hoặc add tên whitelist nếu cần
+local silentAimFakeEnabled = false
+local targetLockEnabled = false
+local fovEnabled = false
+local fovColor = Color3.fromRGB(255, 255, 255)
+local fovSize = 100
+local currentTarget = nil
+local isMobile = UserInputService.TouchEnabled
+local fovCircle = Drawing.new("Circle")
+fovCircle.Thickness = 1
+fovCircle.NumSides = 100
+fovCircle.Radius = fovSize
+fovCircle.Visible = false
+fovCircle.Color = fovColor
+fovCircle.Filled = false
+fovCircle.Transparency = 1
+fovCircle.Position = Vector2.new(0, 0)
+
+local function getClosestPlayer(checkFOV)
+    local camera = workspace.CurrentCamera
+    local pos = isMobile and (camera.ViewportSize / 2) or UserInputService:GetMouseLocation()
+    local closest, closestDist = nil, math.huge
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Head") and not table.find(getgenv().whitelist, player.Name) then
+            local head = player.Character.Head
+            local screenPos, onScreen = camera:WorldToViewportPoint(head.Position)
+            if onScreen then
+                local dist = (Vector2.new(screenPos.X, screenPos.Y) - pos).Magnitude
+                if checkFOV and fovEnabled and dist > fovSize then continue end
+                -- Check for obstacles/walls
+                local rayParams = RaycastParams.new()
+                rayParams.FilterType = Enum.RaycastFilterType.Exclude
+                rayParams.FilterDescendantsInstances = {LocalPlayer.Character}
+                local ray = workspace:Raycast(camera.CFrame.Position, (head.Position - camera.CFrame.Position), rayParams)
+                if ray and ray.Instance:IsDescendantOf(player.Character) then
+                    if dist < closestDist then
+                        closestDist = dist
+                        closest = player
+                    end
+                end
+            end
+        end
+    end
+    return closest
+end
+
+-- RenderStepped cho Fake Silent Aim
+NewConnection(RunService.RenderStepped, function()
+    if fovEnabled then
+        local pos = isMobile and (workspace.CurrentCamera.ViewportSize / 2) or UserInputService:GetMouseLocation()
+        fovCircle.Position = pos
+        fovCircle.Radius = fovSize
+    end
+    if targetLockEnabled then return end
+    if silentAimFakeEnabled then
+        local newTarget = getClosestPlayer(true)
+        if newTarget then
+            currentTarget = newTarget
+        else
+            currentTarget = nil
+        end
+    end
+end)
+
+local isFiring2 = false
+UserInputService.InputBegan:Connect(function(input, gp)
+    if gp then return end
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        if currentTarget then
+            isFiring2 = true
+            task.spawn(function()
+                while isFiring2 and currentTarget do
+                    local tool = LocalPlayer.Character:FindFirstChildOfClass("Tool")
+                    if tool then
+                        getgenv().ShootPlayer(currentTarget, tool)
+                    end
+                    task.wait()
+                end
+            end)
+        end
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        isFiring2 = false
+    end
+end)
 NewConnection(RunService.Heartbeat, function()
     if not getgenv().Matcha.AntiLock.Enabled or not LocalPlayer.Character then return end
     local hrp = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
@@ -1004,6 +1185,45 @@ local LegitPage = Window:Page({Name = "Legit"}) do
     AimSection:Toggle({Name = "Jump Offset", Flag = "Offset", Callback = function(bool) getgenv().Matcha.Legit.Offset = bool end})
     AimSection:Textbox({Name = "Jump Offset Value", Flag = "JumpOffset", Placeholder = "0", Callback = function(val) getgenv().Matcha.Legit.JumpOffset = tonumber(val) end})
     AimSection:Dropdown({Name = "Hit Part", Flag = "HitPart", Options = {"Head", "HumanoidRootPart", "UpperTorso", "Torso(R6)", "LowerTorso"}, Default = "HumanoidRootPart", Callback = function(opt) getgenv().Matcha.Legit.HitPart = opt end})
+	AimSection:Textbox({
+		Name = "Set Target by Name",
+		Flag = "TargetName",
+		Placeholder = "Enter name...",
+		Callback = function(val)
+			if val == "" then
+				Storage.Targets.Camlock = nil
+				Storage.Targets.Silent = nil
+				Storage.LastNotifiedTarget = nil
+				Library:Notification("Target cleared", 3, Library.Accent)
+				return
+			end
+			local target = findClosestPlayer(val)
+			if target then
+				Storage.Targets.Camlock = target
+				Storage.Targets.Silent = target
+				Storage.BodyParts.Camlock = getgenv().Matcha.Legit.HitPart
+				Storage.BodyParts.Silent = getgenv().Matcha.Legit.HitPart
+				Library:Notification("Target set: " .. target.DisplayName .. " (@" .. target.Name .. ")", 3, Library.Accent)
+				Storage.LastNotifiedTarget = target
+			else
+				Library:Notification("No player found matching: " .. val, 3, Color3.fromRGB(255, 0, 0))
+			end
+		end
+	})
+    AimSection:Button({
+	    Name = "TP to Target",
+	    Callback = function()
+	        local target = Storage.Targets.Camlock or Storage.Targets.Silent
+	        if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+	            local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+	            if root then
+	                root.CFrame = target.Character.HumanoidRootPart.CFrame + Vector3.new(0, 3, 0)
+	            end
+	        else
+	            Library:Notification("No target selected!", 2)
+	        end
+	    end
+	})
     AimSection2:Toggle({Name = "Alive Check", Flag = "Alive Check", Callback = function(bool) getgenv().Matcha.Legit.Checks.GrabbedKnocked = bool end})
 	AimSection2:Toggle({
 		Name = "Wall Check",
@@ -1322,7 +1542,85 @@ local LegitPage = Window:Page({Name = "Legit"}) do
 	        end
 	    end
 	})
-
+    MiscSection:Toggle({
+        Name = "Auto Reload",
+        Flag = "AutoReload",
+        Default = false,
+        Callback = function(bool)
+            getgenv().Matcha.AutoReload.Enabled = bool
+            startAutoReload()
+            if bool then
+                Library:Notification("Auto Reload: ON", 2, Color3.fromRGB(0,255,0))
+            else
+                Library:Notification("Auto Reload: OFF", 2, Color3.fromRGB(255,0,0))
+            end
+        end
+    })
+    local FakeSilentSection = LegitPage:Section({Name = "Fake Silent Aim (for bad executors)", Size = 200, Side = "Right"})
+    FakeSilentSection:Toggle({
+        Name = "Silent Aim",
+        Flag = "SilentAimFake",
+        Default = false,
+        Callback = function(bool)
+            silentAimFakeEnabled = bool
+            if not bool then currentTarget = nil end
+        end
+    })
+    FakeSilentSection:Toggle({
+        Name = "Target Lock",
+        Flag = "TargetLock",
+        Default = false,
+        Callback = function(bool)
+            targetLockEnabled = bool
+            if not bool then currentTarget = nil end
+        end
+    }):Keybind({
+        Name = "Target Lock Key",
+        Flag = "TargetLockKey",
+        Default = Enum.KeyCode.Q,
+        Mode = "Toggle",
+        Callback = function()
+            if targetLockEnabled then
+                if currentTarget then
+                    currentTarget = nil
+                    Library:Notification("Untargeted", 2, Library.Accent)
+                else
+                    currentTarget = getClosestPlayer(false)
+                    if currentTarget then
+                        Library:Notification("Locked: " .. currentTarget.DisplayName, 2, Library.Accent)
+                    end
+                end
+            end
+        end
+    })
+    FakeSilentSection:Toggle({
+        Name = "FOV",
+        Flag = "FOVFake",
+        Default = false,
+        Callback = function(bool)
+            fovEnabled = bool
+            fovCircle.Visible = bool
+        end
+    }):Colorpicker({
+        Name = "FOV Color",
+        Flag = "FOVColorFake",
+        Default = Color3.fromRGB(255, 255, 255),
+        Callback = function(col)
+            fovColor = col
+            fovCircle.Color = col
+        end
+    })
+    FakeSilentSection:Slider({
+        Name = "FOV Size",
+        Flag = "FOVSizeFake",
+        Min = 1,
+        Max = 1000,
+        Default = 100,
+        Callback = function(val)
+            fovSize = val
+            fovCircle.Radius = val
+        end
+    })
 end
 
 local CharacterPage = Window:Page({Name = "Character", Weapons = true}) do
@@ -1386,20 +1684,6 @@ local CharacterPage = Window:Page({Name = "Character", Weapons = true}) do
 	    Mode = "Toggle",
 	    Callback = function(bool)
 	        getgenv().Matcha.Character.Noclip = bool
-	    end
-	})
-    MovementSection:Button({
-	    Name = "TP to Target",
-	    Callback = function()
-	        local target = Storage.Targets.Camlock or Storage.Targets.Silent
-	        if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
-	            local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-	            if root then
-	                root.CFrame = target.Character.HumanoidRootPart.CFrame + Vector3.new(0, 3, 0)
-	            end
-	        else
-	            Library:Notification("No target selected!", 2)
-	        end
 	    end
 	})
     local TeleportSection = Movement:Section({Name = "Teleports", Size = 300, Side = "Right"})
