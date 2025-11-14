@@ -1,8 +1,8 @@
--- Load the UI Library
+loadstring(game:HttpGet("https://raw.githubusercontent.com/Kazamatcha/matcha.tea/refs/heads/main/key%20system"))()
 local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/Kazamatcha/matcha.tea/refs/heads/main/libpvp"))()
 local flags = Library.Flags
 getgenv().ConfigFolder = "matchafree"
-local Window = Library:Window({Size = UDim2.new(0, 470, 0, 500)})
+local Window = Library:Window({Size = UDim2.new(0, 470, 0, 520)})
 -- Services and Variables
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
@@ -12,6 +12,7 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService('ReplicatedStorage')
 -- Global Settings
+local radarLoaded = false
 getgenv().Matcha = {
     Legit = {
         AimEnabled = false,
@@ -2209,7 +2210,21 @@ local CharacterPage = Window:Page({Name = "Character", Weapons = true}) do
 	local ESPSection = Esp:Section({Name = "ESP", Size = 300})
 	local WorldSection = Esp:Section({Name = "World", Size = 300, Side = "Right"}) 
 
-	-- ESP UI
+	ESPSection:Button({
+	    Name = "Radar",
+	    Callback = function()
+	        if radarLoaded then
+	            Library:Notification("Radar đã được bật! Không thể load lại.", 3, Color3.fromRGB(255, 200, 0))
+	            return
+	        end
+	
+	        radarLoaded = true
+	        pcall(function()
+	            loadstring(game:HttpGet("https://raw.githubusercontent.com/Kazamatcha/matcha.tea/refs/heads/main/radar"))()
+	            Library:Notification("Radar đã được bật thành công!", 3, Color3.fromRGB(0, 255, 0))
+	        end)
+	    end
+	})
 	ESPSection:Toggle({
 	    Name = "Enabled",
 	    Flag = "ESPEnabled",
