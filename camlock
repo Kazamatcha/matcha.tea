@@ -772,22 +772,45 @@ NewConnection(RunService.Heartbeat, function()
     end
 end)
 
--- Silent Aim Hook (Assuming hookmetamethod support)
 pcall(function()
     local oldIndex = hookmetamethod(game, "__index", function(self, key)
-        if not checkcaller() and getgenv().Matcha.Legit.SilentAim and Storage.CFPosition then
+        if not checkcaller() and getgenv().Matcha.Legit.SilentAim and Storage.Targets.Silent then
             if self == Mouse and (key == "Hit" or key == "Target") then
-                local spoof = CFrame.new(Storage.CFPosition)
-                if key == "Hit" then return spoof end
-                if key == "Target" then
-                    local part = Instance.new("Part")
-                    part.CFrame = spoof
-                    part.Transparency = 1
-                    part.Anchored = true
-                    part.CanCollide = false
-                    part.Parent = workspace
-                    delay(0.1, function() part:Destroy() end)
-                    return part
+                local target = Storage.Targets.Silent
+                local char = target.Character
+                if not char then return oldIndex(self, key) end
+                
+                local hum = char:FindFirstChildOfClass("Humanoid")
+                if not hum or hum.Health <= 0 then return oldIndex(self, key) end
+
+                -- Freefall check
+                local isTargetFreefall = hum:GetState() == Enum.HumanoidStateType.Freefall
+                local localHum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+                local isLocalFreefall = localHum and localHum:GetState() == Enum.HumanoidStateType.Freefall or false
+                local freefall = isTargetFreefall or isLocalFreefall
+
+                -- Hit part selection
+                local hitPart = getgenv().Matcha.Legit.HitPart == "Torso" and "UpperTorso" or getgenv().Matcha.Legit.HitPart
+                local targetPart = char:FindFirstChild(hitPart)
+                if not targetPart then return oldIndex(self, key) end
+
+                local root = char:FindFirstChild("HumanoidRootPart")
+                if not root then return oldIndex(self, key) end
+
+                -- Prediction
+                local pred = getgenv().Matcha.Legit.Prediction or 0.135
+                local predPos = targetPart.Position + (root.AssemblyLinearVelocity * pred)
+
+                -- Jump offset for freefall (if Offset enabled)
+                if freefall and getgenv().Matcha.Legit.Offset and getgenv().Matcha.Legit.JumpOffset ~= 0 then
+                    predPos = predPos + Vector3.new(0, getgenv().Matcha.Legit.JumpOffset, 0)
+                end
+
+                -- Return values
+                if key == "Hit" then
+                    return CFrame.new(predPos)
+                elseif key == "Target" then
+                    return targetPart
                 end
             end
         end
@@ -1045,7 +1068,173 @@ local LegitPage = Window:Page({Name = "Legit"}) do
 			getgenv().Matcha.Legit.ChamsInline = col
 		end
 	})
-
+	--== [CROSSHAIR SELECTION] ==--
+	local CrosshairSection = LegitPage:Section({Name = "Crosshair", Size = 75, Side = "Right"})
+	
+	-- Crosshair Settings Storage
+	getgenv().crosshair = {
+	    enabled = true,
+	    refreshrate = 0,
+	    mode = 'mouse',
+	    position = Vector2.new(0, 0),
+	
+	    width = 1.5,
+	    length = 10,
+	    radius = 11,
+	    color = Color3.fromRGB(118, 241, 69), -- Matcha green
+	
+	    spin = true,
+	    spin_speed = 150,
+	    spin_max = 340,
+	    spin_style = Enum.EasingStyle.Sine,
+	
+	    resize = true,
+	    resize_speed = 150,
+	    resize_min = 5,
+	    resize_max = 22,
+	}
+	
+	-- Hook Drawing.new để tạo nhanh
+	local old; old = hookfunction(Drawing.new, function(class, properties)
+	    local drawing = old(class)
+	    for i, v in next, properties or {} do
+	        drawing[i] = v
+	    end
+	    return drawing
+	end)
+	
+	-- Services
+	local runservice = game:GetService('RunService')
+	local inputservice = game:GetService('UserInputService')
+	local tweenservice = game:GetService('TweenService')
+	local camera = workspace.CurrentCamera
+	
+	-- Drawings
+	local last_render = 0
+	local drawings = {
+	    crosshair = {},
+	    text = {
+	        Drawing.new('Text', {
+	            Size = 13,
+	            Font = 2,
+	            Outline = true,
+	            Text = 'Matcha',
+	            Color = Color3.fromRGB(118, 241, 69) -- Matcha green
+	        }),
+	        Drawing.new('Text', {
+	            Size = 13,
+	            Font = 2,
+	            Outline = true,
+	            Text = ".lol",
+	            Color = Color3.new(1, 1, 1) -- White
+	        })
+	    },
+	}
+	
+	for idx = 1, 8 do
+	    drawings.crosshair[idx] = Drawing.new('Line')
+	end
+	
+	-- Math helper
+	function solve(angle, radius)
+	    return Vector2.new(
+	        math.sin(math.rad(angle)) * radius,
+	        math.cos(math.rad(angle)) * radius
+	    )
+	end
+	
+	-- Render Loop
+	runservice.PostSimulation:Connect(function()
+	    local _tick = tick()
+	
+	    if _tick - last_render > getgenv().crosshair.refreshrate then
+	        last_render = _tick
+	
+	        local position = (
+	            getgenv().crosshair.mode == 'center' and camera.ViewportSize / 2 or
+	            getgenv().crosshair.mode == 'mouse' and inputservice:GetMouseLocation() or
+	            getgenv().crosshair.position
+	        )
+	
+	        local text_x = drawings.text[1].TextBounds.X + drawings.text[2].TextBounds.X
+	
+	        drawings.text[1].Visible = getgenv().crosshair.enabled
+	        drawings.text[2].Visible = getgenv().crosshair.enabled
+	
+	        if getgenv().crosshair.enabled then
+	            drawings.text[1].Position = position + Vector2.new(-text_x / 2, getgenv().crosshair.radius + (getgenv().crosshair.resize and getgenv().crosshair.resize_max or getgenv().crosshair.length) + 15)
+	            drawings.text[2].Position = drawings.text[1].Position + Vector2.new(drawings.text[1].TextBounds.X)
+	            drawings.text[2].Color = Color3.new(1, 1, 1) -- .lol luôn trắng
+	
+	            for idx = 1, 4 do
+	                local outline = drawings.crosshair[idx]
+	                local inline = drawings.crosshair[idx + 4]
+	
+	                local angle = (idx - 1) * 90
+	                local length = getgenv().crosshair.length
+	
+	                -- Spin effect
+	                if getgenv().crosshair.spin then
+	                    local spin_angle = -_tick * getgenv().crosshair.spin_speed % getgenv().crosshair.spin_max
+	                    angle = angle + tweenservice:GetValue(spin_angle / 360, getgenv().crosshair.spin_style, Enum.EasingDirection.InOut) * 360
+	                end
+	
+	                -- Resize effect
+	                if getgenv().crosshair.resize then
+	                    local resize_length = tick() * getgenv().crosshair.resize_speed % 180
+	                    length = getgenv().crosshair.resize_min + math.sin(math.rad(resize_length)) * (getgenv().crosshair.resize_max - getgenv().crosshair.resize_min)
+	                end
+	
+	                -- Inline
+	                inline.Visible = true
+	                inline.Color = getgenv().crosshair.color
+	                inline.From = position + solve(angle, getgenv().crosshair.radius)
+	                inline.To = position + solve(angle, getgenv().crosshair.radius + length)
+	                inline.Thickness = getgenv().crosshair.width
+	
+	                -- Outline
+	                outline.Visible = true
+	                outline.Color = Color3.new(0, 0, 0)
+	                outline.From = position + solve(angle, getgenv().crosshair.radius - 1)
+	                outline.To = position + solve(angle, getgenv().crosshair.radius + length + 1)
+	                outline.Thickness = getgenv().crosshair.width + 1.5
+	            end
+	        else
+	            for idx = 1, 8 do
+	                drawings.crosshair[idx].Visible = false
+	            end
+	        end
+	    end
+	end)
+	
+	-- UI Controls
+	CrosshairSection:Toggle({
+	    Name = "Crosshair",
+	    Flag = "CrosshairEnabled",
+	    Default = true,
+	    Callback = function(bool)
+	        getgenv().crosshair.enabled = bool
+	    end
+	}):Colorpicker({
+	    Name = "Color",
+	    Flag = "CrosshairColor",
+	    Default = Color3.fromRGB(118, 241, 69),
+	    Callback = function(col)
+	        getgenv().crosshair.color = col
+	        drawings.text[1].Color = col -- Matcha text theo màu crosshair
+	    end
+	})
+	
+	CrosshairSection:Slider({
+	    Name = "Spin Speed",
+	    Flag = "CrosshairSpinSpeed",
+	    Min = 1,
+	    Max = 1000,
+	    Default = 150,
+	    Callback = function(val)
+	        getgenv().crosshair.spin_speed = val
+	    end
+	})
 	local MiscSection = LegitPage:Section({Name = "Misc", Size = 50, Side = "Right"})
 	
 	-- // CẤU HÌNH RAPID FIRE
