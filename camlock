@@ -54,7 +54,7 @@ getgenv().Matcha = {
 	    ToggleKeybind = false
     },
 }
-getgenv().Matcha.Desync.RandomAmount = 200  -- Default
+getgenv().Matcha.Desync.RandomAmount = 20  -- Default
 getgenv().Matcha.Desync.Dot = false
 
 -- ĐỘT DESYNC (Drawing Circle - size vừa, rõ)
@@ -1070,55 +1070,34 @@ getgenv().Matcha.Desync.LastKONotify = 0
 -- LOOP KIỂM TRA K.O RIÊNG (PASTE SAU LOOP DESYNC CHÍNH)
 NewConnection(RunService.Heartbeat, function()
     pcall(function()
-        if getgenv().Matcha.Desync.Mode ~= "Random Target" then return end  -- Luôn check nếu mode Random Target
+        if not getgenv().Matcha.Desync.Enabled or getgenv().Matcha.Desync.Mode ~= "Random Target" then return end
         
         local target = Storage.Targets.Camlock or Storage.Targets.Silent
-        if not target then return end
+        if not target or not target.Character then return end
         
-        -- Nếu không có character → tắt AutoStomp nếu đang bật
-        if not target.Character then
-            if getgenv().stompTargetEnabled then
-                toggleStomp(false)
-            end
-            return
-        end
-        
-        if game.PlaceId ~= 2788229376 then return end
-        
-        local char = target.Character
-        local bodyEffects = char:FindFirstChild("BodyEffects")
-        if not bodyEffects then return end
-        
-        local koValue = bodyEffects:FindFirstChild("K.O")
-        local sdeathValue = bodyEffects:FindFirstChild("SDeath")
-        local isKO = koValue and koValue.Value
-        local isSDeath = sdeathValue and sdeathValue.Value
-        
-        -- Nếu target chết hẳn (SDeath hoặc không alive) → tắt AutoStomp
-        if getgenv().stompTargetEnabled and (isSDeath or not isAlive(target)) then
-            toggleStomp(false)
-            return
-        end
-        
-        -- Nếu Desync đang bật + target K.O → TẮT DESYNC + BẬT AUTOSTOMP
-        if getgenv().Matcha.Desync.Enabled and isKO and not isSDeath then
-            -- TẮT DESYNC + RESET
-            getgenv().Matcha.Desync.Enabled = false
-            resetCamera()
-            
-            -- RESET VISUALIZE
-            BodyClone:SetPrimaryPartCFrame(CFrame.new(9999, 9999, 9999))
-            BodyCloneHighlight.Enabled = false
-            DesyncLine.Visible = false
-            DesyncDot.Visible = false
-            
-            -- BẬT AUTOSTOMP TARGET
-            toggleStomp(true)
-            
-            -- NOTIFY ĐỎ (debounce 3s)
-            if not getgenv().Matcha.Desync.LastKONotify or tick() - getgenv().Matcha.Desync.LastKONotify > 3 then
-                Library:Notification("Desync turned off (AutoStomp ON)", 3, Color3.fromRGB(255, 0, 0), flags["Notification Position"])
-                getgenv().Matcha.Desync.LastKONotify = tick()
+        if game.PlaceId == 2788229376 then
+            local char = target.Character
+            local bodyEffects = char:FindFirstChild("BodyEffects")
+            if bodyEffects then
+                local koValue = bodyEffects:FindFirstChild("K.O")
+                local sdeathValue = bodyEffects:FindFirstChild("SDeath")
+                if koValue and koValue.Value and (not sdeathValue or not sdeathValue.Value) then
+                    -- TẮT DESYNC + RESET
+                    getgenv().Matcha.Desync.Enabled = false
+                    resetCamera()
+                    
+                    -- RESET VISUALIZE
+                    BodyClone:SetPrimaryPartCFrame(CFrame.new(9999, 9999, 9999))
+                    BodyCloneHighlight.Enabled = false
+                    DesyncLine.Visible = false
+                    DesyncDot.Visible = false
+                    
+                    -- NOTIFY ĐỎ (debounce 3s)
+                    if not getgenv().Matcha.Desync.LastKONotify or tick() - getgenv().Matcha.Desync.LastKONotify > 3 then
+                        Library:Notification("Desync turned off", 3, Color3.fromRGB(255, 0, 0), flags["Notification Position"])
+                        getgenv().Matcha.Desync.LastKONotify = tick()
+                    end
+                end
             end
         end
     end)
@@ -2421,9 +2400,17 @@ local CharacterPage = Window:Page({Name = "Character", Weapons = true}) do
 	    Flag = "DesyncRandomAmount",
 	    Min = 1,
 	    Max = 1000,
-	    Default = 200,
+	    Default = 20,
 	    Callback = function(val)
 	        getgenv().Matcha.Desync.RandomAmount = val
+	    end
+	})
+	AntiAimSection:Toggle({
+	    Name = "AutoStompTarget",
+	    Flag = "AutoStompTarget",
+	    Default = false,
+	    Callback = function(bool)
+	        toggleStomp(bool)
 	    end
 	})
 	AntiAimSection:Toggle({
