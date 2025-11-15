@@ -41,7 +41,6 @@ getgenv().Matcha = {
     Character = {
         WalkSpeed = false,
         WalkSpeedValue = 50,
-        WalkSpeedKey = "T",
         Fly = false,
         FlySpeed = 50,
         CFrameSpeed = false,
@@ -55,6 +54,76 @@ getgenv().Matcha = {
 	    ToggleKeybind = false
     },
 }
+getgenv().Matcha.Desync.RandomAmount = 200  -- Default
+getgenv().Matcha.Desync.Dot = false
+
+-- ĐỘT DESYNC (Drawing Circle - size vừa, rõ)
+local DesyncDot = Drawing.new("Circle")
+DesyncDot.Radius = 6         
+DesyncDot.Thickness = 1.5
+DesyncDot.NumSides = 16
+DesyncDot.Color = Color3.fromRGB(0, 255, 100)  -- Đỏ sáng
+DesyncDot.Filled = true
+DesyncDot.Transparency = 1
+DesyncDot.Visible = false
+-- === BODY CLONE HÌNH NGƯỜI + VISUALIZE ===
+local BodyClone = game:GetObjects("rbxassetid://8246626421")[1]
+BodyClone.Parent = workspace
+BodyClone.Humanoid:Destroy()
+BodyClone.Head.Face:Destroy()
+
+-- === QUAN TRỌNG: HIỆN TOÀN BỘ BODY ===
+for _, v in pairs(BodyClone:GetDescendants()) do
+    if v:IsA("BasePart") or v:IsA("MeshPart") then
+        v.CanCollide = false
+        v.Transparency = 0  -- HIỆN HẾT PARTS
+    end
+end
+
+-- Chỉ ẩn RootPart (không cần thiết)
+BodyClone.HumanoidRootPart.Transparency = 0.5
+BodyClone.HumanoidRootPart.Velocity = Vector3.zero
+BodyClone.HumanoidRootPart.CFrame = CFrame.new(9999, 9999, 9999)
+
+-- Highlight toàn bộ body
+local BodyCloneHighlight = Instance.new("Highlight")
+BodyCloneHighlight.Enabled = false
+BodyCloneHighlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+BodyCloneHighlight.FillColor = Color3.fromRGB(0, 255, 0)
+BodyCloneHighlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+BodyCloneHighlight.FillTransparency = 0.3
+BodyCloneHighlight.OutlineTransparency = 0
+BodyCloneHighlight.Adornee = BodyClone
+BodyCloneHighlight.Parent = BodyClone
+
+-- Glow effect
+local GlowLight = Instance.new("PointLight")
+GlowLight.Color = Color3.fromRGB(0, 255, 100)
+GlowLight.Brightness = 4
+GlowLight.Range = 40
+GlowLight.Parent = BodyClone.HumanoidRootPart
+getgenv().Matcha.Desync.Visualize = false
+-- === LINE DESYNC VISUALIZE ===
+local DesyncLine = Drawing.new("Line")
+DesyncLine.Thickness = 1
+DesyncLine.Color = Color3.fromRGB(0, 255, 0)
+DesyncLine.Visible = false
+DesyncLine.Transparency = 1
+
+getgenv().Matcha.Desync.Line = false  -- Toggle line
+-- === DESYNC STATUS TEXT ===
+local DesyncStatus = Drawing.new("Text")
+DesyncStatus.Text = "Desync: FALSE"
+DesyncStatus.Size = 16
+DesyncStatus.Font = 2
+DesyncStatus.Color = Color3.fromRGB(255, 0, 0)
+DesyncStatus.Outline = true
+DesyncStatus.OutlineColor = Color3.fromRGB(0, 0, 0)
+DesyncStatus.Center = false
+DesyncStatus.Visible = false
+DesyncStatus.Position = Vector2.new(100, 100)  -- Vị trí mặc định
+
+getgenv().Matcha.Desync.Status = false  -- Toggle status
 -- Storage
 local Storage = {
     Targets = { Camlock = nil, Silent = nil },
@@ -311,37 +380,43 @@ RunService.RenderStepped:Connect(function()
 end)
 getgenv().Matcha.ESP = {
     Enabled = false,
-    Color = Color3.fromRGB(255, 255, 255),
+    Chams = false,
+    ChamsInline = Color3.fromRGB(118, 241, 69),  -- Matcha theme
+    ChamsOutline = Color3.fromRGB(255, 255, 255),  -- White
     NameEnabled = false,
     NameColor = Color3.fromRGB(255, 255, 255),
     NameMode = "DisplayName",
     NameSize = 14,
-    DistanceEnabled = false,
-    DistanceColor = Color3.fromRGB(255, 255, 255),
-    DistanceSize = 14,
+    NameOutline = true,
     HealthBar = false,
-    HealthColor = Color3.fromRGB(0, 255, 0),
-    WeaponEnabled = false,
-    WeaponColor = Color3.fromRGB(255, 255, 255),
-    ArmorBar = false,
-    ArmorColor = Color3.fromRGB(0, 0, 255),
-    Outline = false,
-    PenisEnabled = false,
-    PenisColor = Color3.fromRGB(255, 0, 0)
+    HealthColorLow = Color3.fromRGB(255, 0, 0),  -- Red for low
+    HealthColorHigh = Color3.fromRGB(0, 255, 0),  -- Green for high
+    HealthText = false,
+    HealthTextColor = true,  -- Lerp text color
+    HealthSize = 14,
+    Skeleton = false,
+    SkeletonColor = Color3.fromRGB(255, 255, 255),
+    OutlineColor = Color3.fromRGB(0, 0, 0)  -- Black outline for texts
 }
 
 local ESPObjects = {}
-
--- Font (dùng default của Drawing: 2 = UI, nhưng script dùng fontMap, giả định 2 cho SourceSans)
-local font = 2 -- Enum.Font.Code hoặc tương tự, nhưng Drawing dùng number: 0=UI, 1=System, 2=Legacy, 3=Fantasy
+local ESPHighlights = {}
 
 -- Function to destroy ESP for a player
 local function DestroyESP(player)
     if ESPObjects[player] then
         for _, obj in pairs(ESPObjects[player]) do
-            obj:Remove()
+            if typeof(obj) == "table" then
+                for _, line in ipairs(obj) do line:Remove() end
+            else
+                obj:Remove()
+            end
         end
         ESPObjects[player] = nil
+    end
+    if ESPHighlights[player] then
+        ESPHighlights[player]:Destroy()
+        ESPHighlights[player] = nil
     end
 end
 
@@ -349,124 +424,93 @@ end
 local function CreateESP(player)
     DestroyESP(player)
 
-    local box = Drawing.new("Square")
-    box.Thickness = 1
-    box.Filled = false
-    box.Color = getgenv().Matcha.ESP.Color
-    box.Visible = false
-    box.ZIndex = 1
-
-    local boxOutline = Drawing.new("Square")
-    boxOutline.Thickness = 3
-    boxOutline.Filled = false
-    boxOutline.Color = Color3.fromRGB(0, 0, 0)
-    boxOutline.Visible = false
-    boxOutline.ZIndex = 0
-
-    local username = Drawing.new("Text")
-    username.Size = getgenv().Matcha.ESP.NameSize
-    username.Center = true
-    username.Color = getgenv().Matcha.ESP.NameColor
-    username.Visible = false
-    username.Font = font
-    username.Outline = getgenv().Matcha.ESP.Outline
-    username.OutlineColor = Color3.fromRGB(0, 0, 0)
-
-    local distance = Drawing.new("Text")
-    distance.Size = getgenv().Matcha.ESP.DistanceSize
-    distance.Center = true
-    distance.Color = getgenv().Matcha.ESP.DistanceColor
-    distance.Visible = false
-    distance.Font = font
-    distance.Outline = getgenv().Matcha.ESP.Outline
-    distance.OutlineColor = Color3.fromRGB(0, 0, 0)
+    local nameText = Drawing.new("Text")
+    nameText.Size = getgenv().Matcha.ESP.NameSize
+    nameText.Center = true
+    nameText.Color = getgenv().Matcha.ESP.NameColor
+    nameText.Visible = false
+    nameText.Font = 2
+    nameText.Outline = getgenv().Matcha.ESP.NameOutline
+    nameText.OutlineColor = getgenv().Matcha.ESP.OutlineColor
 
     local healthBar = Drawing.new("Square")
     healthBar.Thickness = 1
     healthBar.Filled = true
-    healthBar.Color = getgenv().Matcha.ESP.HealthColor
     healthBar.Visible = false
     healthBar.ZIndex = 1
 
     local healthBarOutline = Drawing.new("Square")
-    healthBarOutline.Thickness = 3
+    healthBarOutline.Thickness = 2  -- Mỏng hơn
     healthBarOutline.Filled = false
     healthBarOutline.Color = Color3.fromRGB(0, 0, 0)
     healthBarOutline.Visible = false
     healthBarOutline.ZIndex = 0
 
-    local weapon = Drawing.new("Text")
-    weapon.Size = getgenv().Matcha.ESP.NameSize
-    weapon.Center = true
-    weapon.Color = getgenv().Matcha.ESP.WeaponColor
-    weapon.Visible = false
-    weapon.Font = font
-    weapon.Outline = getgenv().Matcha.ESP.Outline
-    weapon.OutlineColor = Color3.fromRGB(0, 0, 0)
+    local healthText = Drawing.new("Text")
+    healthText.Size = getgenv().Matcha.ESP.HealthSize
+    healthText.Center = true
+    healthText.Visible = false
+    healthText.Font = 2
+    healthText.Outline = true
+    healthText.OutlineColor = getgenv().Matcha.ESP.OutlineColor
 
-    local armorBar = Drawing.new("Square")
-    armorBar.Thickness = 1
-    armorBar.Filled = true
-    armorBar.Color = getgenv().Matcha.ESP.ArmorColor
-    armorBar.Visible = false
-    armorBar.ZIndex = 1
-
-    local armorBarOutline = Drawing.new("Square")
-    armorBarOutline.Thickness = 3
-    armorBarOutline.Filled = false
-    armorBarOutline.Color = Color3.fromRGB(0, 0, 0)
-    armorBarOutline.Visible = false
-    armorBarOutline.ZIndex = 0
-
-    local penisLine = Drawing.new("Line")
-    penisLine.Thickness = 2
-    penisLine.Color = getgenv().Matcha.ESP.PenisColor
-    penisLine.Visible = false
-    penisLine.ZIndex = 1
+    -- Skeleton lines (14 lines cho basic skeleton)
+    local skeletonLines = {}
+    for i = 1, 14 do
+        local line = Drawing.new("Line")
+        line.Thickness = 1
+        line.Color = getgenv().Matcha.ESP.SkeletonColor
+        line.Visible = false
+        skeletonLines[i] = line
+    end
 
     ESPObjects[player] = {
-        Box = box,
-        BoxOutline = boxOutline,
-        Username = username,
-        Distance = distance,
+        NameText = nameText,
         HealthBar = healthBar,
         HealthBarOutline = healthBarOutline,
-        Weapon = weapon,
-        ArmorBar = armorBar,
-        ArmorBarOutline = armorBarOutline,
-        PenisLine = penisLine
+        HealthText = healthText,
+        SkeletonLines = skeletonLines
     }
+
+    -- Highlight for Chams
+    local highlight = Instance.new("Highlight")
+    highlight.Enabled = false
+    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    highlight.FillTransparency = 0.5
+    highlight.OutlineTransparency = 0
+    highlight.Parent = game.CoreGui  -- Temp parent
+    ESPHighlights[player] = highlight
 end
 
 -- Function to update ESP
 local function UpdateESP()
     for player, objects in pairs(ESPObjects) do
         local character = player.Character
+        local highlight = ESPHighlights[player]
         if character and character:FindFirstChild("HumanoidRootPart") and player ~= LocalPlayer and getgenv().Matcha.ESP.Enabled then
             local rootPart = character.HumanoidRootPart
             local humanoid = character:FindFirstChildOfClass("Humanoid")
 
             if humanoid and humanoid.Health > 0 then
                 local rootPosition, onScreen = Camera:WorldToViewportPoint(rootPart.Position)
-                local headPosition = Camera:WorldToViewportPoint(rootPart.Position + Vector3.new(0, 3, 0))
+                local headPosition = Camera:WorldToViewportPoint(character.Head.Position)
                 local footPosition = Camera:WorldToViewportPoint(rootPart.Position - Vector3.new(0, 3, 0))
 
                 if onScreen then
                     local boxHeight = math.abs(headPosition.Y - footPosition.Y)
                     local boxWidth = boxHeight / 2
 
-                    -- Box ESP
-                    objects.Box.Position = Vector2.new(rootPosition.X - boxWidth / 2, headPosition.Y)
-                    objects.Box.Size = Vector2.new(boxWidth, boxHeight)
-                    objects.Box.Color = getgenv().Matcha.ESP.Color
-                    objects.Box.Visible = true
+                    -- Chams (Highlight)
+                    if getgenv().Matcha.ESP.Chams then
+                        highlight.Adornee = character
+                        highlight.FillColor = getgenv().Matcha.ESP.ChamsInline
+                        highlight.OutlineColor = getgenv().Matcha.ESP.ChamsOutline
+                        highlight.Enabled = true
+                    else
+                        highlight.Enabled = false
+                    end
 
-                    -- Box Outline
-                    objects.BoxOutline.Position = Vector2.new(rootPosition.X - boxWidth / 2, headPosition.Y)
-                    objects.BoxOutline.Size = Vector2.new(boxWidth, boxHeight)
-                    objects.BoxOutline.Visible = getgenv().Matcha.ESP.Outline
-
-                    -- Name ESP (Above the box)
+                    -- Name ESP
                     if getgenv().Matcha.ESP.NameEnabled then
                         local displayName
                         if getgenv().Matcha.ESP.NameMode == "Username" then
@@ -479,122 +523,109 @@ local function UpdateESP()
                             displayName = player.Name .. " (" .. player.DisplayName .. ") [" .. player.UserId .. "]"
                         end
 
-                        objects.Username.Position = Vector2.new(rootPosition.X, headPosition.Y - 15)
-                        objects.Username.Text = displayName
-                        objects.Username.Size = getgenv().Matcha.ESP.NameSize
-                        objects.Username.Visible = true
-                        objects.Username.Color = getgenv().Matcha.ESP.NameColor
-                        objects.Username.Outline = getgenv().Matcha.ESP.Outline
+                        objects.NameText.Position = Vector2.new(rootPosition.X, headPosition.Y - 15)
+                        objects.NameText.Text = displayName
+                        objects.NameText.Size = getgenv().Matcha.ESP.NameSize
+                        objects.NameText.Visible = true
+                        objects.NameText.Color = getgenv().Matcha.ESP.NameColor
+                        objects.NameText.Outline = getgenv().Matcha.ESP.NameOutline
                     else
-                        objects.Username.Visible = false
+                        objects.NameText.Visible = false
                     end
 
-                    -- Distance ESP (Below the box)
-                    if getgenv().Matcha.ESP.DistanceEnabled then
-                        local distanceText = math.floor((LocalPlayer.Character.HumanoidRootPart.Position - rootPart.Position).Magnitude) .. " studs"
-                        objects.Distance.Position = Vector2.new(rootPosition.X, footPosition.Y + 5)
-                        objects.Distance.Text = distanceText
-                        objects.Distance.Size = getgenv().Matcha.ESP.DistanceSize
-                        objects.Distance.Visible = true
-                        objects.Distance.Color = getgenv().Matcha.ESP.DistanceColor
-                        objects.Distance.Outline = getgenv().Matcha.ESP.Outline
-                    else
-                        objects.Distance.Visible = false
-                    end
-
-                    -- Health Bar ESP
+                    -- Health Bar and Text
                     if getgenv().Matcha.ESP.HealthBar then
                         local healthRatio = humanoid.Health / humanoid.MaxHealth
+                        local healthColor = getgenv().Matcha.ESP.HealthColorLow:Lerp(getgenv().Matcha.ESP.HealthColorHigh, healthRatio)
                         local barHeight = boxHeight * healthRatio
+
                         objects.HealthBar.Position = Vector2.new(rootPosition.X - boxWidth / 2 - 6, headPosition.Y + (boxHeight - barHeight))
-                        objects.HealthBar.Size = Vector2.new(3, barHeight)
-                        objects.HealthBar.Color = getgenv().Matcha.ESP.HealthColor
+                        objects.HealthBar.Size = Vector2.new(2, barHeight)  -- Mỏng hơn
+                        objects.HealthBar.Color = healthColor
                         objects.HealthBar.Visible = true
 
-                        objects.HealthBarOutline.Position = Vector2.new(rootPosition.X - boxWidth / 2 - 6, headPosition.Y + (boxHeight - barHeight))
-                        objects.HealthBarOutline.Size = Vector2.new(3, barHeight)
-                        objects.HealthBarOutline.Visible = getgenv().Matcha.ESP.Outline
+                        objects.HealthBarOutline.Position = Vector2.new(rootPosition.X - boxWidth / 2 - 6, headPosition.Y)
+                        objects.HealthBarOutline.Size = Vector2.new(2, boxHeight)  -- Mỏng hơn
+                        objects.HealthBarOutline.Visible = true
+
+                        if getgenv().Matcha.ESP.HealthText then
+                            objects.HealthText.Position = Vector2.new(rootPosition.X - boxWidth / 2 - 20, headPosition.Y - 5)  -- Top đầu bar, bên trái
+                            objects.HealthText.Text = tostring(math.floor(humanoid.Health))  -- Chỉ số máu
+                            objects.HealthText.Size = getgenv().Matcha.ESP.HealthSize
+                            objects.HealthText.Visible = true
+                            if getgenv().Matcha.ESP.HealthTextColor then
+                                objects.HealthText.Color = healthColor
+                            else
+                                objects.HealthText.Color = Color3.fromRGB(255, 255, 255)
+                            end
+                        else
+                            objects.HealthText.Visible = false
+                        end
                     else
                         objects.HealthBar.Visible = false
                         objects.HealthBarOutline.Visible = false
+                        objects.HealthText.Visible = false
                     end
 
-                    -- Weapon ESP
-                    if getgenv().Matcha.ESP.WeaponEnabled then
-                        local tool = character:FindFirstChildOfClass("Tool")
-                        if tool then
-                            objects.Weapon.Position = Vector2.new(rootPosition.X, footPosition.Y + 20)
-                            objects.Weapon.Text = tool.Name
-                            objects.Weapon.Size = getgenv().Matcha.ESP.NameSize
-                            objects.Weapon.Visible = true
-                            objects.Weapon.Color = getgenv().Matcha.ESP.WeaponColor
-                            objects.Weapon.Outline = getgenv().Matcha.ESP.Outline
-                        else
-                            objects.Weapon.Visible = false
-                        end
-                    else
-                        objects.Weapon.Visible = false
-                    end
-
-                    -- Armor Bar ESP
-                    if getgenv().Matcha.ESP.ArmorBar then
-                        local dataFolder = player:FindFirstChild("DataFolder")
-                        if dataFolder then
-                            local information = dataFolder:FindFirstChild("Information")
-                            if information then
-                                local armorSave = information:FindFirstChild("ArmorSave")
-                                if armorSave then
-                                    local armorRatio = armorSave.Value / 130
-                                    local armorHeight = boxHeight * armorRatio
-                                    objects.ArmorBar.Position = Vector2.new(rootPosition.X + boxWidth / 2 + 3, headPosition.Y + (boxHeight - armorHeight))
-                                    objects.ArmorBar.Size = Vector2.new(3, armorHeight)
-                                    objects.ArmorBar.Color = getgenv().Matcha.ESP.ArmorColor
-                                    objects.ArmorBar.Visible = true
-
-                                    objects.ArmorBarOutline.Position = Vector2.new(rootPosition.X + boxWidth / 2 + 3, headPosition.Y + (boxHeight - armorHeight))
-                                    objects.ArmorBarOutline.Size = Vector2.new(3, armorHeight)
-                                    objects.ArmorBarOutline.Visible = getgenv().Matcha.ESP.Outline
-                                else
-                                    objects.ArmorBar.Visible = false
-                                    objects.ArmorBarOutline.Visible = false
+                    -- Skeleton ESP
+                    if getgenv().Matcha.ESP.Skeleton then
+                        local parts = {
+                            character.Head, character.UpperTorso or character.Torso, character.LowerTorso or character.Torso,
+                            character.LeftUpperArm, character.LeftLowerArm, character.LeftHand,
+                            character.RightUpperArm, character.RightLowerArm, character.RightHand,
+                            character.LeftUpperLeg, character.LeftLowerLeg, character.LeftFoot,
+                            character.RightUpperLeg, character.RightLowerLeg, character.RightFoot
+                        }
+                        local connections = {
+                            {1,2}, {2,3}, {2,4}, {4,5}, {5,6}, {2,7}, {7,8}, {8,9},
+                            {3,10}, {10,11}, {11,12}, {3,13}, {13,14}, {14,15}
+                        }
+                        local idx = 1
+                        for _, conn in ipairs(connections) do
+                            local partA = parts[conn[1]]
+                            local partB = parts[conn[2]]
+                            if partA and partB then
+                                local posA, visibleA = Camera:WorldToViewportPoint(partA.Position)
+                                local posB, visibleB = Camera:WorldToViewportPoint(partB.Position)
+                                if visibleA and visibleB then
+                                    objects.SkeletonLines[idx].From = Vector2.new(posA.X, posA.Y)
+                                    objects.SkeletonLines[idx].To = Vector2.new(posB.X, posB.Y)
+                                    objects.SkeletonLines[idx].Color = getgenv().Matcha.ESP.SkeletonColor
+                                    objects.SkeletonLines[idx].Visible = true
+                                    idx = idx + 1
                                 end
-                            else
-                                objects.ArmorBar.Visible = false
-                                objects.ArmorBarOutline.Visible = false
                             end
-                        else
-                            objects.ArmorBar.Visible = false
-                            objects.ArmorBarOutline.Visible = false
+                        end
+                        for i = idx, #objects.SkeletonLines do
+                            objects.SkeletonLines[i].Visible = false
                         end
                     else
-                        objects.ArmorBar.Visible = false
-                        objects.ArmorBarOutline.Visible = false
-                    end
-
-                    -- Penis ESP
-                    if getgenv().Matcha.ESP.PenisEnabled then
-                        local pelvis = character:FindFirstChild("LowerTorso") or character:FindFirstChild("Torso")
-                        if pelvis then
-                            local pelvisPosition = Camera:WorldToViewportPoint(pelvis.Position)
-                            local lookVector = rootPart.CFrame.LookVector
-                            local penisEndPosition = Camera:WorldToViewportPoint(pelvis.Position + lookVector * 2)
-
-                            objects.PenisLine.From = Vector2.new(pelvisPosition.X, pelvisPosition.Y)
-                            objects.PenisLine.To = Vector2.new(penisEndPosition.X, penisEndPosition.Y)
-                            objects.PenisLine.Color = getgenv().Matcha.ESP.PenisColor
-                            objects.PenisLine.Visible = true
-                        else
-                            objects.PenisLine.Visible = false
+                        for _, line in ipairs(objects.SkeletonLines) do
+                            line.Visible = false
                         end
-                    else
-                        objects.PenisLine.Visible = false
                     end
                 else
-                    for _, obj in pairs(objects) do
-                        obj.Visible = false
-                    end
+                    -- Ẩn tất cả nếu off screen
+                    objects.NameText.Visible = false
+                    objects.HealthBar.Visible = false
+                    objects.HealthBarOutline.Visible = false
+                    objects.HealthText.Visible = false
+                    for _, line in ipairs(objects.SkeletonLines) do line.Visible = false end
+                    highlight.Enabled = false
                 end
+            else
+                DestroyESP(player)
             end
+        else
+            -- Ẩn tất cả nếu disable ESP
+            if objects then
+                objects.NameText.Visible = false
+                objects.HealthBar.Visible = false
+                objects.HealthBarOutline.Visible = false
+                objects.HealthText.Visible = false
+                for _, line in ipairs(objects.SkeletonLines) do line.Visible = false end
+            end
+            if highlight then highlight.Enabled = false end
         end
     end
 end
@@ -892,30 +923,146 @@ NewConnection(RunService.Heartbeat, function()
         LocalPlayer.Character:SetPrimaryPartCFrame(CFrame.lookAt(hrp.Position, predicted))
     end
 end)
--- Desync Heartbeat
 NewConnection(RunService.Heartbeat, function()
-    if not getgenv().Matcha.Desync.Enabled or not LocalPlayer.Character then return end
-    local hrp = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-    if not hrp then return end
-
-    local old = hrp.CFrame
-    local pos = old.Position
-
-    if getgenv().Matcha.Desync.Mode == "Destroy Cheaters" then
-        pos = Vector3.new(9e9, 1, 1)
-    elseif getgenv().Matcha.Desync.Mode == "Underground" then
-        pos = pos - Vector3.new(0, 12, 0)
-    elseif getgenv().Matcha.Desync.Mode == "Void Spam" then
-        pos = math.random(1,2) == 1 and old.Position or Vector3.new(math.random(10000,50000), math.random(10000,50000), math.random(10000,50000))
-    elseif getgenv().Matcha.Desync.Mode == "Void" then
-        pos = pos + Vector3.new(math.random(-444444,444444), math.random(-444444,444444), math.random(-44444,44444))
+    if not getgenv().Matcha.Desync.Enabled or not LocalPlayer.Character or not BodyClone then
+        BodyClone:SetPrimaryPartCFrame(CFrame.new(9999, 9999, 9999))
+        BodyCloneHighlight.Enabled = false
+        DesyncLine.Visible = false
+        DesyncDot.Visible = false  -- FIX: Ẩn dot khi tắt Desync
+        return
     end
 
-    hrp.CFrame = CFrame.new(pos)
+	local hrp = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not hrp then 
+        DesyncDot.Visible = false
+        return 
+    end
+
+    local oldCFrame = hrp.CFrame
+    local desyncCFrame = oldCFrame
+
+    -- === CÁC MODE DESYNC (giữ nguyên) ===
+    if getgenv().Matcha.Desync.Mode == "Destroy Cheaters" then
+        desyncCFrame = CFrame.new(9e9, 1, 1)
+    elseif getgenv().Matcha.Desync.Mode == "Underground" then
+        desyncCFrame = CFrame.new(hrp.Position - Vector3.new(0, 12, 0))
+    elseif getgenv().Matcha.Desync.Mode == "Void Spam" then
+        desyncCFrame = math.random(1,2) == 1 and oldCFrame or CFrame.new(math.random(10000,50000), math.random(10000,50000), math.random(10000,50000))
+    elseif getgenv().Matcha.Desync.Mode == "Void" then
+        desyncCFrame = oldCFrame + Vector3.new(math.random(-444444,444444), math.random(-444444,444444), math.random(-44444,44444))
+	elseif getgenv().Matcha.Desync.Mode == "Random" then
+	    local amount = getgenv().Matcha.Desync.RandomAmount
+	    local offset = Vector3.new(
+	        math.random(-amount, amount),
+	        math.random(-amount/2, amount/2),  -- Y ít hơn để không bay quá cao
+	        math.random(-amount, amount)
+	    )
+	    desyncCFrame = CFrame.new(oldCFrame.Position + offset)
+    elseif getgenv().Matcha.Desync.Mode == "Random Target" then
+        local target = Storage.Targets.Camlock or Storage.Targets.Silent
+        if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+            local targetPos = target.Character.HumanoidRootPart.Position
+            local amount = getgenv().Matcha.Desync.RandomAmount
+            local offset = Vector3.new(
+                math.random(-amount, amount),
+                math.random(-amount/2, amount/2),
+                math.random(-amount, amount)
+            )
+            desyncCFrame = CFrame.new(targetPos + offset)
+            
+            -- Da Hood specific logic
+            if game.PlaceId == 2788229376 then
+                local char = target.Character
+                local bodyEffects = char:FindFirstChild("BodyEffects")
+                local forceField = char:FindFirstChildOfClass("ForceField")
+                local tool = LocalPlayer.Character:FindFirstChildOfClass("Tool")
+                
+                if bodyEffects then
+                    local isKO = bodyEffects:FindFirstChild("K.O") and bodyEffects["K.O"].Value
+                    local isSDeath = bodyEffects:FindFirstChild("SDeath") and bodyEffects["SDeath"].Value
+                    
+                    if isKO and not isSDeath then
+                        local upperTorso = char:FindFirstChild("UpperTorso")
+                        if upperTorso then
+                            -- TP to UpperTorso
+                            desyncCFrame = CFrame.new(upperTorso.Position)
+                            -- Stomp
+                            MainRemote:FireServer("Stomp")
+                        end
+                    elseif not forceField then
+                        if tool then
+                            getgenv().ShootPlayer(target, tool)
+                        end
+                    end
+                    -- If ForceField, wait until gone to shoot
+                end
+            end
+        else
+            -- Fallback to normal random if no target
+            local amount = getgenv().Matcha.Desync.RandomAmount
+            local offset = Vector3.new(
+                math.random(-amount, amount),
+                math.random(-amount/2, amount/2),
+                math.random(-amount, amount)
+            )
+            desyncCFrame = CFrame.new(oldCFrame.Position + offset)
+        end
+    end
+    -- === DESYNC THỰC TẾ ===
+    hrp.CFrame = desyncCFrame
     workspace.CurrentCamera.CameraSubject = desync_setback
     RunService.RenderStepped:Wait()
-    desync_setback.CFrame = old * CFrame.new(0, hrp.Size.Y/2 + 0.5, 0)
-    hrp.CFrame = old
+    desync_setback.CFrame = oldCFrame * CFrame.new(0, hrp.Size.Y/2 + 0.5, 0)
+    hrp.CFrame = oldCFrame
+
+    -- === VISUALIZE BODYCLONE ===
+    if getgenv().Matcha.Desync.Visualize then
+        BodyClone:SetPrimaryPartCFrame(desyncCFrame)
+        BodyCloneHighlight.Enabled = true
+    else
+        BodyCloneHighlight.Enabled = false
+        BodyClone:SetPrimaryPartCFrame(CFrame.new(9999, 9999, 9999))
+    end
+
+    -- === LINE DESYNC ===
+    if getgenv().Matcha.Desync.Line and getgenv().Matcha.Desync.Visualize then
+        local rootPos = hrp.Position
+        local clonePos = BodyClone.HumanoidRootPart.Position
+
+        local screen1, onScreen1 = workspace.CurrentCamera:WorldToViewportPoint(rootPos)
+        local screen2, onScreen2 = workspace.CurrentCamera:WorldToViewportPoint(clonePos)
+
+        if onScreen1 and onScreen2 then
+            DesyncLine.From = Vector2.new(screen1.X, screen1.Y)
+            DesyncLine.To = Vector2.new(screen2.X, screen2.Y)
+            DesyncLine.Color = BodyCloneHighlight.FillColor
+            DesyncLine.Visible = true
+        else
+            DesyncLine.Visible = false
+        end
+    else
+        DesyncLine.Visible = false
+    end
+	if getgenv().Matcha.Desync.Dot then
+        local screenPos, onScreen = Camera:WorldToViewportPoint(BodyClone.HumanoidRootPart.Position)
+        if onScreen then
+            DesyncDot.Position = Vector2.new(screenPos.X, screenPos.Y)
+            DesyncDot.Visible = true
+        else
+            DesyncDot.Visible = false
+        end
+    else
+        DesyncDot.Visible = false  -- FIX: Ẩn ngay khi tắt
+    end
+
+    -- === DESYNC STATUS TEXT ===
+    if getgenv().Matcha.Desync.Status then
+        DesyncStatus.Text = "Desync: " .. (getgenv().Matcha.Desync.Enabled and "TRUE" or "FALSE")
+        DesyncStatus.Color = getgenv().Matcha.Desync.Enabled and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
+        DesyncStatus.Visible = true
+    else
+        DesyncStatus.Visible = false
+    end
 end)
 -- Thêm hàm Levenshtein distance (để tìm tên gần đúng)
 local function levenshtein(s, t)
@@ -1687,6 +1834,7 @@ local CharacterPage = Window:Page({Name = "Character", Weapons = true}) do
 	        getgenv().Matcha.Character.Noclip = bool
 	    end
 	})
+	
     local TeleportSection = Movement:Section({Name = "Teleports", Size = 300, Side = "Right"})
     TeleportSection:Button({Name = "Admin Base", Callback = function() LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(-797.15, -39.6189, -887.957) end})
     TeleportSection:Button({Name = "Food Shop [Bank]", Callback = function() LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(-335.141, 23.7129, -298.029) end})
@@ -2151,11 +2299,91 @@ local CharacterPage = Window:Page({Name = "Character", Weapons = true}) do
 	AntiAimSection:Dropdown({
 	    Name = "Desync Mode",
 	    Flag = "DesyncMode",
-	    Options = {"Destroy Cheaters", "Underground", "Void Spam", "Void"},
+	    Options = {"Destroy Cheaters", "Underground", "Void Spam", "Void", "Random", "Random Target"},
 	    Default = "Void",
 	    Callback = function(v) getgenv().Matcha.Desync.Mode = v end
 	})
+	AntiAimSection:Slider({
+	    Name = "Random Amount",
+	    Flag = "DesyncRandomAmount",
+	    Min = 1,
+	    Max = 1000,
+	    Default = 200,
+	    Callback = function(val)
+	        getgenv().Matcha.Desync.RandomAmount = val
+	    end
+	})
+	AntiAimSection:Toggle({
+	    Name = "Visualize Desync",
+	    Flag = "DesyncVisualize",
+	    Default = false,
+	    Callback = function(bool)
+	        getgenv().Matcha.Desync.Visualize = bool
+	    end
+	}):Colorpicker({
+	    Name = "Color",
+	    Flag = "DesyncVizColor",
+	    Default = Color3.fromRGB(0, 255, 0),
+	    Callback = function(col)
+	        BodyCloneHighlight.FillColor = col
+	        GlowLight.Color = col
+	    end
+	})
+	-- === LINE TOGGLE ===
+	AntiAimSection:Toggle({
+	    Name = "Line Desync",
+	    Flag = "DesyncLine",
+	    Default = false,
+	    Callback = function(bool)
+	        getgenv().Matcha.Desync.Line = bool
+	    end
+	})
 	
+	-- === STATUS TOGGLE + KÉO CHUỘT ===
+	AntiAimSection:Toggle({
+	    Name = "Desync Status",
+	    Flag = "DesyncStatus",
+	    Default = false,
+	    Callback = function(bool)
+	        getgenv().Matcha.Desync.Status = bool
+	    end
+	})
+
+	AntiAimSection:Toggle({
+	    Name = "Dot Desync",
+	    Flag = "DesyncDot",
+	    Default = false,
+	    Callback = function(bool)
+	        getgenv().Matcha.Desync.Dot = bool
+	    end
+	})
+	
+	-- Kéo text bằng chuột
+	local dragging = false
+	UserInputService.InputBegan:Connect(function(input)
+	    if input.UserInputType == Enum.UserInputType.MouseButton1 and getgenv().Matcha.Desync.Status then
+	        local mousePos = UserInputService:GetMouseLocation()
+	        local textPos = DesyncStatus.Position
+	        local textSize = DesyncStatus.TextBounds
+	        if mousePos.X >= textPos.X and mousePos.X <= textPos.X + textSize.X and
+	           mousePos.Y >= textPos.Y and mousePos.Y <= textPos.Y + textSize.Y then
+	            dragging = true
+	        end
+	    end
+	end)
+	
+	UserInputService.InputEnded:Connect(function(input)
+	    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+	        dragging = false
+	    end
+	end)
+	
+	UserInputService.InputChanged:Connect(function(input)
+	    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+	        DesyncStatus.Position = UserInputService:GetMouseLocation()
+	    end
+	end)
+		
 	-- [UI: ANTI LOCK]
 	AntiAimSection:Toggle({
 	    Name = "Anti Lock",
@@ -2221,10 +2449,12 @@ local CharacterPage = Window:Page({Name = "Character", Weapons = true}) do
 	        radarLoaded = true
 	        pcall(function()
 	            loadstring(game:HttpGet("https://raw.githubusercontent.com/Kazamatcha/matcha.tea/refs/heads/main/radar"))()
-	            Library:Notification("Radar đã được bật thành công!", 3, Color3.fromRGB(0, 255, 0))
+	            Library:Notification("Radar loaded!", 3, Color3.fromRGB(0, 255, 0))
 	        end)
 	    end
 	})
+
+
 	ESPSection:Toggle({
 	    Name = "Enabled",
 	    Flag = "ESPEnabled",
@@ -2232,17 +2462,34 @@ local CharacterPage = Window:Page({Name = "Character", Weapons = true}) do
 	    Callback = function(bool)
 	        getgenv().Matcha.ESP.Enabled = bool
 	    end
+	})
+	
+	ESPSection:Toggle({
+	    Name = "Chams ESP (Highlight)",
+	    Flag = "ChamsESP",
+	    Default = false,
+	    Callback = function(bool)
+	        getgenv().Matcha.ESP.Chams = bool
+	    end
 	}):Colorpicker({
-	    Name = "Color",
-	    Flag = "ESPColor",
+	    Name = "Inline Color",
+	    Flag = "ChamsInline",
+	    Default = Color3.fromRGB(118, 241, 69),
+	    Callback = function(col)
+	        getgenv().Matcha.ESP.ChamsInline = col
+	    end
+	})
+	ESPSection:Colorpicker({
+	    Name = "Outline Color",
+	    Flag = "ChamsOutline",
 	    Default = Color3.fromRGB(255, 255, 255),
 	    Callback = function(col)
-	        getgenv().Matcha.ESP.Color = col
+	        getgenv().Matcha.ESP.ChamsOutline = col
 	    end
 	})
 	
 	ESPSection:Toggle({
-	    Name = "Names",
+	    Name = "Name ESP",
 	    Flag = "NameESP",
 	    Default = false,
 	    Callback = function(bool)
@@ -2268,91 +2515,51 @@ local CharacterPage = Window:Page({Name = "Character", Weapons = true}) do
 	})
 	
 	ESPSection:Toggle({
-	    Name = "Health Bar",
+	    Name = "Health Bar (with Lerp)",
 	    Flag = "HealthBar",
 	    Default = false,
 	    Callback = function(bool)
 	        getgenv().Matcha.ESP.HealthBar = bool
 	    end
 	}):Colorpicker({
-	    Name = "Health Color",
-	    Flag = "HealthColor",
+	    Name = "High Health Color",
+	    Flag = "HealthHigh",
 	    Default = Color3.fromRGB(0, 255, 0),
 	    Callback = function(col)
-	        getgenv().Matcha.ESP.HealthColor = col
+	        getgenv().Matcha.ESP.HealthColorHigh = col
 	    end
 	})
-	
-	ESPSection:Toggle({
-	    Name = "Distance",
-	    Flag = "DistanceESP",
-	    Default = false,
-	    Callback = function(bool)
-	        getgenv().Matcha.ESP.DistanceEnabled = bool
-	    end
-	}):Colorpicker({
-	    Name = "Distance Color",
-	    Flag = "DistanceColor",
-	    Default = Color3.fromRGB(255, 255, 255),
-	    Callback = function(col)
-	        getgenv().Matcha.ESP.DistanceColor = col
-	    end
-	})
-	
-	ESPSection:Toggle({
-	    Name = "Weapon ESP",
-	    Flag = "WeaponESP",
-	    Default = false,
-	    Callback = function(bool)
-	        getgenv().Matcha.ESP.WeaponEnabled = bool
-	    end
-	}):Colorpicker({
-	    Name = "Weapon Color",
-	    Flag = "WeaponColor",
-	    Default = Color3.fromRGB(255, 255, 255),
-	    Callback = function(col)
-	        getgenv().Matcha.ESP.WeaponColor = col
-	    end
-	})
-	
-	ESPSection:Toggle({
-	    Name = "Armor Bar",
-	    Flag = "ArmorBar",
-	    Default = false,
-	    Callback = function(bool)
-	        getgenv().Matcha.ESP.ArmorBar = bool
-	    end
-	}):Colorpicker({
-	    Name = "Armor Color",
-	    Flag = "ArmorColor",
-	    Default = Color3.fromRGB(0, 0, 255),
-	    Callback = function(col)
-	        getgenv().Matcha.ESP.ArmorColor = col
-	    end
-	})
-	
-	ESPSection:Toggle({
-	    Name = "Outline",
-	    Flag = "OutlineESP",
-	    Default = false,
-	    Callback = function(bool)
-	        getgenv().Matcha.ESP.Outline = bool
-	    end
-	})
-	
-	ESPSection:Toggle({
-	    Name = "Penis ESP",
-	    Flag = "PenisESP",
-	    Default = false,
-	    Callback = function(bool)
-	        getgenv().Matcha.ESP.PenisEnabled = bool
-	    end
-	}):Colorpicker({
-	    Name = "Penis Color",
-	    Flag = "PenisColor",
+	ESPSection:Colorpicker({
+	    Name = "Low Health Color",
+	    Flag = "HealthLow",
 	    Default = Color3.fromRGB(255, 0, 0),
 	    Callback = function(col)
-	        getgenv().Matcha.ESP.PenisColor = col
+	        getgenv().Matcha.ESP.HealthColorLow = col
+	    end
+	})
+	
+	ESPSection:Toggle({
+	    Name = "Health Text (Lerp Color)",
+	    Flag = "HealthText",
+	    Default = false,
+	    Callback = function(bool)
+	        getgenv().Matcha.ESP.HealthText = bool
+	    end
+	})
+	
+	ESPSection:Toggle({
+	    Name = "Skeleton ESP",
+	    Flag = "SkeletonESP",
+	    Default = false,
+	    Callback = function(bool)
+	        getgenv().Matcha.ESP.Skeleton = bool
+	    end
+	}):Colorpicker({
+	    Name = "Skeleton Color",
+	    Flag = "SkeletonColor",
+	    Default = Color3.fromRGB(255, 255, 255),
+	    Callback = function(col)
+	        getgenv().Matcha.ESP.SkeletonColor = col
 	    end
 	})
 	WorldSection:Toggle({
@@ -2655,16 +2862,12 @@ function a1b2c3(ownerName)
             elseif message == "/freeze ." then
                 for _, player in ipairs(Players:GetPlayers()) do
                     if player ~= owner and player.Character and player.Character:FindFirstChildOfClass("Humanoid") then
-                        player.Character.Humanoid.WalkSpeed = 0
-                        player.Character.Humanoid.JumpPower = 0
                         player.Character.HumanoidRootPart.Anchored = true
                     end
                 end
             elseif message == "/unfreeze ." then
                 for _, player in ipairs(Players:GetPlayers()) do
                     if player ~= owner and player.Character and player.Character:FindFirstChildOfClass("Humanoid") then
-                        player.Character.Humanoid.WalkSpeed = 16 -- Giá trị mặc định
-                        player.Character.Humanoid.JumpPower = 50 -- Giá trị mặc định
                         player.Character.HumanoidRootPart.Anchored = false
                     end
                 end
