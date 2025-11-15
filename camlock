@@ -1064,6 +1064,65 @@ NewConnection(RunService.Heartbeat, function()
         DesyncStatus.Visible = false
     end
 end)
+-- THÊM GLOBAL NÀY VÀO ĐẦU SCRIPT (sau getgenv().Matcha.Desync = {...})
+getgenv().Matcha.Desync.LastKONotify = 0
+
+-- LOOP KIỂM TRA K.O RIÊNG (PASTE SAU LOOP DESYNC CHÍNH)
+NewConnection(RunService.Heartbeat, function()
+    pcall(function()
+        if getgenv().Matcha.Desync.Mode ~= "Random Target" then return end  -- Luôn check nếu mode Random Target
+        
+        local target = Storage.Targets.Camlock or Storage.Targets.Silent
+        if not target then return end
+        
+        -- Nếu không có character → tắt AutoStomp nếu đang bật
+        if not target.Character then
+            if getgenv().stompTargetEnabled then
+                toggleStomp(false)
+            end
+            return
+        end
+        
+        if game.PlaceId ~= 2788229376 then return end
+        
+        local char = target.Character
+        local bodyEffects = char:FindFirstChild("BodyEffects")
+        if not bodyEffects then return end
+        
+        local koValue = bodyEffects:FindFirstChild("K.O")
+        local sdeathValue = bodyEffects:FindFirstChild("SDeath")
+        local isKO = koValue and koValue.Value
+        local isSDeath = sdeathValue and sdeathValue.Value
+        
+        -- Nếu target chết hẳn (SDeath hoặc không alive) → tắt AutoStomp
+        if getgenv().stompTargetEnabled and (isSDeath or not isAlive(target)) then
+            toggleStomp(false)
+            return
+        end
+        
+        -- Nếu Desync đang bật + target K.O → TẮT DESYNC + BẬT AUTOSTOMP
+        if getgenv().Matcha.Desync.Enabled and isKO and not isSDeath then
+            -- TẮT DESYNC + RESET
+            getgenv().Matcha.Desync.Enabled = false
+            resetCamera()
+            
+            -- RESET VISUALIZE
+            BodyClone:SetPrimaryPartCFrame(CFrame.new(9999, 9999, 9999))
+            BodyCloneHighlight.Enabled = false
+            DesyncLine.Visible = false
+            DesyncDot.Visible = false
+            
+            -- BẬT AUTOSTOMP TARGET
+            toggleStomp(true)
+            
+            -- NOTIFY ĐỎ (debounce 3s)
+            if not getgenv().Matcha.Desync.LastKONotify or tick() - getgenv().Matcha.Desync.LastKONotify > 3 then
+                Library:Notification("Desync turned off (AutoStomp ON)", 3, Color3.fromRGB(255, 0, 0), flags["Notification Position"])
+                getgenv().Matcha.Desync.LastKONotify = tick()
+            end
+        end
+    end)
+end)
 -- Thêm hàm Levenshtein distance (để tìm tên gần đúng)
 local function levenshtein(s, t)
     local m, n = #s, #t
@@ -1252,6 +1311,60 @@ UserInputService.InputEnded:Connect(function(input)
         isFiring2 = false
     end
 end)
+getgenv().stompTargetEnabled = false
+getgenv().lastPosition = nil  -- CFrame lưu vị trí cũ
+local stompConn = nil
+
+-- FUNCTION TOGGLE AUTOSTOMP (dựa ví dụ 2 + desync)
+local function toggleStomp(state)
+    getgenv().stompTargetEnabled = state
+    if state then
+        stompConn = RunService.Heartbeat:Connect(function()
+            local lockedTarget = Storage.Targets.Camlock or Storage.Targets.Silent
+            if not getgenv().stompTargetEnabled or not lockedTarget or lockedTarget == LocalPlayer then return end
+            local char = lockedTarget.Character
+            if not char then return end
+            local bodyEffects = char:FindFirstChild("BodyEffects")
+            if not bodyEffects then return end
+            local isKO = bodyEffects:FindFirstChild("K.O") and bodyEffects["K.O"].Value
+            local isSDeath = bodyEffects:FindFirstChild("SDeath") and bodyEffects["SDeath"].Value
+            local upperTorso = char:FindFirstChild("UpperTorso")
+            local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if not myRoot or not upperTorso then return end
+            
+            if isKO and not isSDeath then
+                spawn(function()
+                    local oldCFrame = myRoot.CFrame
+                    if not getgenv().lastPosition then getgenv().lastPosition = oldCFrame end
+                    local tp = upperTorso.Position + Vector3.new(0, 4, 0)
+                    myRoot.CFrame = CFrame.new(tp)
+                    if MainRemote then MainRemote:FireServer("Stomp") end
+                    -- DESYNC NHANH (giống ví dụ 2)
+                    local cam = Workspace.CurrentCamera
+                    cam.CameraSubject = desync_setback
+                    RunService.RenderStepped:Wait()
+                    desync_setback.CFrame = oldCFrame * CFrame.new(0, myRoot.Size.Y/2 + 0.5, 0)
+                    myRoot.CFrame = oldCFrame
+                    resetCamera()
+                end)
+            elseif isSDeath and getgenv().lastPosition then
+                myRoot.CFrame = getgenv().lastPosition
+                getgenv().lastPosition = nil
+                resetCamera()
+            end
+        end)
+        Library:Notification("AutoStompTarget: ON", 2, Color3.fromRGB(0,255,0))
+    else
+        if stompConn then stompConn:Disconnect(); stompConn = nil end
+        if getgenv().lastPosition then
+            local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if myRoot then myRoot.CFrame = getgenv().lastPosition end
+            getgenv().lastPosition = nil
+            resetCamera()
+        end
+        Library:Notification("AutoStompTarget: OFF", 2, Color3.fromRGB(255,0,0))
+    end
+end
 NewConnection(RunService.Heartbeat, function()
     if not getgenv().Matcha.AntiLock.Enabled or not LocalPlayer.Character then return end
     local hrp = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
