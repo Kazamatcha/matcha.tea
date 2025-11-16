@@ -188,7 +188,7 @@ game:GetService("RunService").Heartbeat:Connect(function()
     end
 end)
 
-warn("[+] headshots.cc : anticheat bypassed.")
+warn("[+] Matcha.cc : anticheat bypassed.")
 
 -- // UI Library //
 local uis = cloneref(game:GetService("UserInputService"))
@@ -5057,7 +5057,7 @@ function library:playerlist(options)
 end
 
 -- // Luarmor Checks
-library:notification({ text = "headshots.cc - Script Succesfully Executed.", time = 3 })
+library:notification({ text = "Matcha.cc - Script Succesfully Executed.", time = 3 })
 
 local Premium = false
 local ScriptVersion = "Developer"
@@ -5068,10 +5068,10 @@ end
 
 if LRM_IsUserPremium or ScriptVersion == "Developer" then
     Premium = true
-    library:notification({ text = "headshots.cc - Welcome back, Premium User.", time = 3 })
+    library:notification({ text = "Matcha.cc - Welcome back, Premium User.", time = 3 })
 else
     Premium = false
-    library:notification({ text = "headshots.cc - Welcome back, Freemium User.", time = 3 })
+    library:notification({ text = "Matcha.cc - Welcome back, Freemium User.", time = 3 })
 end
 
 -- // Custom Assets
@@ -5110,7 +5110,7 @@ local function BringUsers()
             end
         end
     else
-        library:notification({ text = "headshots.cc - Successfully Brought All Users.", time = 3 })
+        library:notification({ text = "Matcha.cc - Successfully Brought All Users.", time = 3 })
     end
 end
 
@@ -5118,10 +5118,10 @@ end
 local function NotifyUsers(textlol)
     if not isWhitelisted(player.Name) then
         for i = 1, 50 do
-            library:notification({ text = "headshots.cc - " .. textlol, time = 3 })
+            library:notification({ text = "Matcha.cc - " .. textlol, time = 3 })
         end
     else
-        library:notification({ text = "headshots.cc - Successfully Notified All Users.", time = 3 })
+        library:notification({ text = "Matcha.cc - Successfully Notified All Users.", time = 3 })
     end
 end
 
@@ -5699,7 +5699,7 @@ game:GetService("RunService").Heartbeat:Connect(function(dt)
                         if headshots.HitEffects.HitNotifications then
                             if tick() - t >= 3 then
                                 t = tick()
-                                library:notification({ text = "headshots.cc - Attempted to Stomp Target: " .. TargetPlayer.Name, time = headshots.HitEffects.HitNotificationsTime })
+                                library:notification({ text = "Matcha.cc - Attempted to Stomp Target: " .. TargetPlayer.Name, time = headshots.HitEffects.HitNotificationsTime })
                             end
                         end
             
@@ -5853,7 +5853,7 @@ game:GetService("RunService").Heartbeat:Connect(function(dt)
                 if headshots.HitEffects.HitNotifications then
                     if tick() - t >= 3 then
                         t = tick()
-                        library:notification({ text = "headshots.cc - Attempted to Stomp Target: " .. TargetPlayer.Name, time = headshots.HitEffects.HitNotificationsTime })
+                        library:notification({ text = "Matcha.cc - Attempted to Stomp Target: " .. TargetPlayer.Name, time = headshots.HitEffects.HitNotificationsTime })
                     end
                 end
     
@@ -5991,7 +5991,7 @@ game:GetService("RunService").Heartbeat:Connect(function(dt)
 
                 if currentHealth < lastHealth then
                     if headshots.HitEffects.HitNotifications then
-                        library:notification({ text = "headshots.cc - Target Hit: " .. TargetPlayer.Name .. " - Health: " .. currentHealth, time = headshots.HitEffects.HitNotificationsTime })
+                        library:notification({ text = "Matcha.cc - Target Hit: " .. TargetPlayer.Name .. " - Health: " .. currentHealth, time = headshots.HitEffects.HitNotificationsTime })
                     end
 
                     if headshots.HitEffects.HitSounds then
@@ -6501,12 +6501,12 @@ game:GetService("RunService").Heartbeat:Connect(function(dt)
             
                             -- Kill Target
                             localPlayer.Character.HumanoidRootPart.CFrame = CFrame.lookAt(Target.Character.Head.Position + Vector3.new(math.random(-15,15), math.random(-15,15), math.random(-15,15)), Target.Character.Head.Position)
-                            library:notification({ text = "headshots.cc - Shooting Target.", time = 1 })
+                            library:notification({ text = "Matcha.cc - Shooting Target.", time = 1 })
                             MainEvent:FireServer("ShootGun", toolHandle, toolHandle.Position, Target.Character.Head.Position, targetHead, Vector3.new(0, 1, 0))
                         else
                             -- Spawn Protection
                             game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame += Vector3.new(math.random(-80000,80000), math.random(0,80000), math.random(-80000,80000))
-                            library:notification({ text = "headshots.cc - Waiting.. Target has spawn protection.", time = 1 })
+                            library:notification({ text = "Matcha.cc - Waiting.. Target has spawn protection.", time = 1 })
                             MainEvent:FireServer("Reload", tool)
                         end
 
@@ -6523,13 +6523,13 @@ game:GetService("RunService").Heartbeat:Connect(function(dt)
                         if isDead == false then
                             if Target.Character:FindFirstChild("UpperTorso") and Target.Character:FindFirstChild("HumanoidRootPart") and Target.Character:FindFirstChild("Humanoid") then
                                 humanoidRootPart.CFrame = CFrame.new(Target.Character.UpperTorso.Position + Vector3.new(0, 3, 0))
-                                library:notification({ text = "headshots.cc - Stomping Target.", time = 1 })
+                                library:notification({ text = "Matcha.cc - Stomping Target.", time = 1 })
                                 MainEvent:FireServer("Stomp")
                             end
                         elseif isDead == true then
                             -- Move to safe position when target is dead
                             game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame += Vector3.new(math.random(-80000,80000), math.random(0,80000), math.random(-80000,80000))
-                            library:notification({ text = "headshots.cc - Waiting.. Target is currently dead.", time = 1 })
+                            library:notification({ text = "Matcha.cc - Waiting.. Target is currently dead.", time = 1 })
                             MainEvent:FireServer("Reload", tool)
                         end
 
@@ -6544,7 +6544,7 @@ game:GetService("RunService").Heartbeat:Connect(function(dt)
                 else
                     -- If gun is not equipped
                     game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame += Vector3.new(math.random(-80000,80000), math.random(0,80000), math.random(-80000,80000))
-                    library:notification({ text = "headshots.cc - Waiting.. Equip your gun while using 'Auto Kill Target'.", time = 1 })
+                    library:notification({ text = "Matcha.cc - Waiting.. Equip your gun while using 'Auto Kill Target'.", time = 1 })
 
                     if headshots.Target.AutoKillDesync then
                         game:GetService("RunService"):BindToRenderStep("RestoreCFrame", 199, function()
@@ -6560,7 +6560,7 @@ game:GetService("RunService").Heartbeat:Connect(function(dt)
             if humanoidRootPart then
                 humanoidRootPart.CFrame = CFrame.new(0, 500, 0)
             end
-            library:notification({ text = "headshots.cc - Target not found.", time = 3 })
+            library:notification({ text = "Matcha.cc - Target not found.", time = 3 })
         end
     end
 end)
@@ -6568,12 +6568,12 @@ end)
 -- // Creating the UI Library Buttons //
 
 local window = library:window({
-    name = os.date("headshots.cc - %b %d %Y"),
+    name = os.date("Matcha.cc - %b %d %Y"),
     size = dim2(0, 614, 0, 639)
 })
 
 local watermark = library:watermark({
-    default = os.date("headshots.cc - %b %d %Y - %H:%M:%S")
+    default = os.date("Matcha.cc - %b %d %Y - %H:%M:%S")
 })
 
 -- // Creating Tabs // --
@@ -8967,7 +8967,7 @@ section:toggle({name = "avatar changer", flag = "avatarchanger_enabled", callbac
             game.Players.LocalPlayer.Character.Humanoid:ApplyDescriptionClientServer(game.Players:GetHumanoidDescriptionFromUserId(game.Players.LocalPlayer.UserId))
         end
     else
-        library:notification({ text = "headshots.cc - 'Avatar Changer' Module requires you to use the 'Blocky / Default Packages' Right Arm. Please change your avatar.", time = 3 })
+        library:notification({ text = "Matcha.cc - 'Avatar Changer' Module requires you to use the 'Blocky / Default Packages' Right Arm. Please change your avatar.", time = 3 })
     end
 end})
 
@@ -9873,7 +9873,7 @@ if Premium then
                             MainEvent:FireServer("ShootGun", Tool.Handle, Tool.Handle.Position, targetHead.Position, targetHead, Vector3.new(0, 1, 0))
                         else
                             humanoidRootPart.CFrame = CFrame.new(50000, 10000, 0) + Vector3.new(math.random(-25, 25), math.random(-25, 0), math.random(-25, 25))
-                            library:notification({ text = "headshots.cc - Waiting.. Target has spawn protection.", time = 1 })
+                            library:notification({ text = "Matcha.cc - Waiting.. Target has spawn protection.", time = 1 })
                             MainEvent:FireServer("Reload", Tool)
                         end
                     else
@@ -9884,13 +9884,13 @@ if Premium then
                             end
                         elseif Target.Character:FindFirstChild("BodyEffects") and Target.Character.BodyEffects:FindFirstChild("SDeath") and Target.Character.BodyEffects.SDeath.Value == true then
                             task.wait(1)
-                            library:notification({ text = "headshots.cc - Target has been killed.", time = 3 })
+                            library:notification({ text = "Matcha.cc - Target has been killed.", time = 3 })
                             humanoidRootPart.CFrame = originalCFrame
                             return
                         end
                     end
                 else
-                    library:notification({ text = "headshots.cc - please equip your gun before using 'Kill Target'.", time = 3 })
+                    library:notification({ text = "Matcha.cc - please equip your gun before using 'Kill Target'.", time = 3 })
                     return
                 end
             end
@@ -9918,16 +9918,16 @@ if Premium then
                             MainEvent:FireServer("ShootGun", Tool.Handle, Tool.Handle.Position, targetHead.Position, targetHead, Vector3.new(0, 1, 0))
                         else
                             humanoidRootPart.CFrame = CFrame.new(50000, 10000, 0) + Vector3.new(math.random(-25, 25), math.random(-25, 0), math.random(-25, 25))
-                            library:notification({ text = "headshots.cc - Waiting.. Target has spawn protection.", time = 1 })
+                            library:notification({ text = "Matcha.cc - Waiting.. Target has spawn protection.", time = 1 })
                             MainEvent:FireServer("Reload", Tool)
                         end
                     else
-                        library:notification({ text = "headshots.cc - Target has been knocked.", time = 3 })
+                        library:notification({ text = "Matcha.cc - Target has been knocked.", time = 3 })
                         humanoidRootPart.CFrame = originalCFrame
                         return
                     end
                 else
-                    library:notification({ text = "headshots.cc - please equip your gun before using 'Knock Target'.", time = 3 })
+                    library:notification({ text = "Matcha.cc - please equip your gun before using 'Knock Target'.", time = 3 })
                     return
                 end
             end
@@ -9941,7 +9941,7 @@ if Premium then
         if headshots.Target.Target ~= nil and Target and Target.Character and localPlayer then
             localPlayer.Character.HumanoidRootPart.CFrame = Target.Character.HumanoidRootPart.CFrame
         else
-            library:notification({ text = "headshots.cc - please select a target before using 'Go-To Target'.", time = 3 })
+            library:notification({ text = "Matcha.cc - please select a target before using 'Go-To Target'.", time = 3 })
         end
     end})
 
@@ -9958,7 +9958,7 @@ if Premium then
                         workspace.CurrentCamera.CameraSubject = t.Character.Humanoid
                     end)
                 else
-                    library:notification({ text = "headshots.cc - please select a target before using 'Spectate Target'.", time = 3 })
+                    library:notification({ text = "Matcha.cc - please select a target before using 'Spectate Target'.", time = 3 })
                 end
             else
                 if conn then conn:Disconnect() conn = nil end
@@ -9983,9 +9983,9 @@ if Premium then
 
 else
     local section = column:section({ name = "Locked" })
-    section:label({ name = "This Tab is only for Premium Users of headshots.cc" })
+    section:label({ name = "This Tab is only for Premium Users of Matcha.cc" })
     section:label({ name = "How to get Premium?" })
-    section:label({ name = "1. Head to the headshots.cc Discord Server." })
+    section:label({ name = "1. Head to the Matcha.cc Discord Server." })
     section:label({ name = "2. Open the #script channel at the very top." })
     section:label({ name = "3. There will be a link, where you can buy a Premium Key (Process is Automated)." })
     section:label({ name = "4. Once you have your key, go back to the #script channel and press 'Redeem Key' and input your Premium Key." })
@@ -10294,7 +10294,7 @@ Combat.open_tab()
 
 task.spawn(function()
     while task.wait(1) do 
-        watermark.change_text(os.date('headshots.cc - version: ' .. ScriptVersion .. ' - %b %d %Y - %H:%M:%S'))
+        watermark.change_text(os.date('Matcha.cc - version: ' .. ScriptVersion .. ' - %b %d %Y - %H:%M:%S'))
     end 
 end) 
 -- 
