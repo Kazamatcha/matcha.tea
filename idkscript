@@ -6416,37 +6416,29 @@ do -- [[ UI ]]
             end})
 
             ClientStuff:Toggle({Name = 'Noclip', Flag = 'Noclip', Callback = function(State)
-            end}):Keybind({Name = '', Default = Enum.KeyCode.T, Flag = "Noclip Keybind", Mode = "Toggle", Callback = function(State)
-                if not Library.Flags['Noclip'] then return end
-                if not Script.Functions.ClientChecks() then return end
-
+                -- Tạo connection mới khi toggle
                 if State then
-                    for _, Part in pairs(Script.Client.Character:GetChildren()) do
-                        if (Part:IsA("BasePart") or Part:IsA("MeshPart") or Part:IsA("Part")) then
-                            Part.CanCollide = false
+                    Script.Connections["NoclipConnection"] = Script.Functions.CreateConnection(RunService.Stepped, function()
+                        if Library.Flags['Noclip'] and Script.Functions.ClientChecks() then
+                            for _, v in pairs(Script.Client.Character:GetDescendants()) do
+                                if v:IsA("BasePart") and v.CanCollide then
+                                    v.CanCollide = false
+                                end
+                            end
                         end
-                    end
+                    end)
+                    Library:Notification("Noclip ✅", 2, Library.Theme.Accent)
                 else
-                    for _, Part in pairs(Script.Client.Character:GetChildren()) do
-                        if (Part:IsA("BasePart") or Part:IsA("MeshPart") or Part:IsA("Part")) then
-                            Part.CanCollide = true
-                        end
+                    -- Cleanup connection khi tắt
+                    if Script.Connections["NoclipConnection"] then
+                        Script.Connections["NoclipConnection"]:Disconnect()
+                        Script.Connections["NoclipConnection"] = nil
                     end
+                    Library:Notification("Noclip ❌", 2, Color3.fromRGB(255, 0, 0))
                 end
-            end})
-
-            ClientStuff:Divider()
-
-            ClientStuff:Toggle({Name = 'Face Backwards', Flag = 'Face Backwards', Callback = function(State)
-                UI.Misc.Client.FaceBackwards = State
-            end})
-
-            ClientStuff:Toggle({Name = 'Anti Void', Flag = 'Anti Void', Callback = function(State)
-                if State then
-                    workspace.FallenPartsDestroyHeight = 0/0
-                else
-                    workspace.FallenPartsDestroyHeight = Script.Data.DestroyHeight
-                end
+            end}):Keybind({Name = '', Default = Enum.KeyCode.T, Flag = "Noclip Keybind", Mode = "Toggle", Callback = function(Key)
+                -- Keybind tự động flip toggle
+                Library.Flags['Noclip'] = not Library.Flags['Noclip']
             end})
 
             ClientStuff:Divider()
@@ -6616,86 +6608,3 @@ end
 
 
 setfpscap(240)
-
-
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
--------------------------------------[[ zzzzzzzzzzzzzzzzzzzzzzz ]]-------------------------------------
