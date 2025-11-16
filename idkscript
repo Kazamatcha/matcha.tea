@@ -60,9 +60,12 @@ task.spawn(function()
 
 	setthreadidentity(7)
 end)
-
+getgenv().RapidFireEnabled = false
+getgenv().is_firing = false
+local originalCooldowns = {}
+local utility = {}
 --[[
-    Copyright (c) 2025 [disclosed]
+    Copyright (c) 2025 [matcha]
     All rights reserved.
 
     This script is proprietary and confidential.
@@ -288,9 +291,9 @@ local Library do
         },
 
         Folders = {
-            Directory = "Disclosed",
-            Configs = "Disclosed/Configs",
-            Assets = "Disclosed/Assets"
+            Directory = "matcha",
+            Configs = "matcha/Configs",
+            Assets = "matcha/Assets"
         },
 
         Images = { -- you're welcome to reupload the images and replace it with your own links
@@ -4978,8 +4981,8 @@ DownloadImage = function(Link, Path, Name)
     writefile(Path..Name..".png", Data)
 end
 
-DownloadImage("https://i.imgur.com/vd0r7AH.jpeg", "Disclosed/", "Super Cute Cat")
-DownloadImage("https://i.imgur.com/vd0r7AH.jpeg", "Disclosed/Images/", "Reallyyyy Cute Cat")
+DownloadImage("https://i.imgur.com/vd0r7AH.jpeg", "matcha/", "Super Cute Cat")
+DownloadImage("https://i.imgur.com/vd0r7AH.jpeg", "matcha/Images/", "Reallyyyy Cute Cat")
 DownloadImage("https://i.imgur.com/vd0r7AH.jpeg", "", "SUPER DUPER CUTE CAT")
 
 ---------------------------------------[[ Start ]]---------------------------------------
@@ -4991,14 +4994,14 @@ if not LPH_OBFUSCATED then
 		return f
 	end
 end		
-if not isfolder("Disclosed/Assets") then
-    makefolder("Disclosed/Assets")
+if not isfolder("matcha/Assets") then
+    makefolder("matcha/Assets")
 end
-if not isfolder("Disclosed/Characters") then
-    makefolder("Disclosed/Characters")
+if not isfolder("matcha/Characters") then
+    makefolder("matcha/Characters")
 end
-if not isfile("Disclosed/Characters/Base.Character") then
-    writefile("Disclosed/Characters/Base.Character", [[
+if not isfile("matcha/Characters/Base.Character") then
+    writefile("matcha/Characters/Base.Character", [[
 local CharacterSettings = {}
 
 CharacterSettings.Shirt = 18596812870
@@ -5039,9 +5042,6 @@ local HttpService = cloneref(game:GetService("HttpService"))
 local Client = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 local Mouse = Client:GetMouse()
-
---// Variables
-local MainEvent = ReplicatedStorage:FindFirstChild('MainEvent')
 
 --// Assets
 local BodyClone = game:GetObjects("rbxassetid://8246626421")[1]; BodyClone.Humanoid:Destroy(); BodyClone.Head.Face:Destroy(); BodyClone.Parent = Workspace; BodyClone.HumanoidRootPart.Velocity = Vector3.new(); BodyClone.HumanoidRootPart.CFrame = CFrame.new(9999,9999,9999); BodyClone.HumanoidRootPart.Transparency = 1; BodyClone.HumanoidRootPart.CanCollide = false for i,v in pairs(BodyClone:GetChildren()) do if v:IsA("BasePart") or v:IsA("MeshPart") then v.CanCollide = false end end
@@ -5085,7 +5085,6 @@ local Script = {
 
         Desync = {},
         Prefiretick = 0,
-        LegitbotTick = 0,
         DestroyHeight = workspace.FallenPartsDestroyHeight
     },
 
@@ -5126,10 +5125,11 @@ local UI = {
 
         Legitbot = {
             Enabled = false,
-            Prediction = false,
+            PredictionEnabled = false,
             PredictionValue = 0.095,
             Smoothness = 2,
-            RefreshRate = 0
+            JumpOffsetEnabled = false,
+            JumpOffsetValue = 0
         },
 
         SilentAim = {
@@ -5216,7 +5216,7 @@ local UI = {
 
             AvatarChanger = {
                 LoadOnDeath = false,
-				Name = ""
+                Name = ""
             },
 
             Animation = {
@@ -5224,10 +5224,132 @@ local UI = {
                 Speed = 1
             }
         }
+    },
+
+    -- 🔥 VISUALS mới thêm vào đây
+    Visuals = {
+        BulletTracer = {
+		    Enabled = false,
+		    SelectedTexture = "rbxassetid://12781852245",
+		    TextureID = "rbxassetid://12781852245",
+		    Color = Color3.fromRGB(155, 125, 175),
+		    Size = 0.4,
+		    Transparency = 0,
+		    TimeAlive = 2
+        }
     }
 }
 
-Disclosed = {
+local TweenService = game:GetService("TweenService")
+local Workspace = game:GetService("Workspace")
+local function bullettracerlol(startPos, endPos)
+    local startPart = Instance.new("Part")
+    startPart.Name = "BulletStart"
+    startPart.Anchored = true
+    startPart.CanCollide = false
+    startPart.Transparency = 1
+    startPart.Size = Vector3.new(0.2, 0.2, 0.2)
+    startPart.Material = Enum.Material.ForceField
+    startPart.Color = Color3.new(1, 0, 0)
+    startPart.Transparency = 1
+    startPart.CanTouch = false
+    startPart.CanQuery = false
+    startPart.Massless = true
+    startPart.CollisionGroupId = 0
+    startPart.Position = startPos
+    startPart.Parent = Workspace
+
+    local endPart = Instance.new("Part")
+    endPart.Name = "BulletEnd"
+    endPart.Anchored = true
+    endPart.CanCollide = false
+    endPart.Size = Vector3.new(0.2, 0.2, 0.2)
+    endPart.Material = Enum.Material.ForceField
+    endPart.Color = Color3.new(1, 0, 0)
+    endPart.Transparency = 1
+    endPart.CanTouch = false
+    endPart.CanQuery = false
+    endPart.Massless = true
+    endPart.CollisionGroupId = 0
+    endPart.Position = endPos
+    endPart.Parent = Workspace
+
+    local beam = Instance.new("Beam")
+    beam.Attachment0 = Instance.new("Attachment", startPart)
+    beam.Attachment1 = Instance.new("Attachment", endPart)
+    beam.Parent = startPart
+    beam.FaceCamera = true
+    beam.Color = ColorSequence.new(UI.Visuals.BulletTracer.Color)
+    beam.Texture = UI.Visuals.BulletTracer.TextureID
+    beam.LightEmission = 1
+    beam.Transparency = NumberSequence.new(UI.Visuals.BulletTracer.Transparency)
+    beam.Width0 = UI.Visuals.BulletTracer.Size
+    beam.Width1 = UI.Visuals.BulletTracer.Size
+
+    task.delay(UI.Visuals.BulletTracer.TimeAlive, function()
+        if beam and beam.Parent then
+            local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+            local tween = TweenService:Create(beam, tweenInfo, { Width0 = 0, Width1 = 0 })
+            tween:Play()
+            
+            tween.Completed:Wait()
+        end
+
+        if startPart and startPart.Parent then startPart:Destroy() end
+        if endPart and endPart.Parent then endPart:Destroy() end
+        if beam and beam.Parent then beam:Destroy() end
+    end)
+
+    return startPart, endPart, beam
+end
+local possibleRemotes = { "MAINEVENT", "MainEvent", "Remote", "Bullets", "MainRemotes", "Packages" }
+local Services = {
+
+    ReplicatedStorage = game:GetService("ReplicatedStorage"),
+
+}
+local function getMainRemote()
+    if Services.ReplicatedStorage:FindFirstChild("MainEvent") then return Services.ReplicatedStorage.MainEvent end
+    if Services.ReplicatedStorage:FindFirstChild("MAINEVENT") then return Services.ReplicatedStorage.MAINEVENT end
+    if Services.ReplicatedStorage:FindFirstChild("Remote") then return Services.ReplicatedStorage.Remote end
+    if Services.ReplicatedStorage:FindFirstChild("Bullets") then return Services.ReplicatedStorage.Bullets end
+    
+    local mainRemotes = Services.ReplicatedStorage:FindFirstChild("MainRemotes")
+    if mainRemotes and mainRemotes:FindFirstChild("MainRemoteEvent") then return mainRemotes.MainRemoteEvent end
+    
+    local packages = Services.ReplicatedStorage:FindFirstChild("Packages")
+    if packages then
+        local knit = packages:FindFirstChild("Knit")
+        if knit then
+            local toolService = knit.Services:FindFirstChild("ToolService")
+            if toolService and toolService.RE:FindFirstChild("UpdateAim") then
+                return toolService.RE.UpdateAim
+            end
+        end
+    end
+    return nil
+end
+local MainRemote = getMainRemote()
+local OldNamecall
+OldNamecall = hookmetamethod(game, "__namecall", function(Self, ...)
+    local Args = {...}
+    local Method = getnamecallmethod()
+
+    if Method == "FireServer" and Self == MainRemote and Args[1] == "ShootGun" and UI.Visuals.BulletTracer.Enabled then
+        local Handle = Args[2]  -- Tool Handle
+        local OriginPos = Args[3]  -- Handle.Position
+        local HitPos = Args[4]     -- Target Hit Position
+
+        if Handle and OriginPos and HitPos then
+            task.spawn(function()
+                bullettracerlol(OriginPos, HitPos)
+            end)
+        end
+    end
+
+    return OldNamecall(Self, ...)
+end)
+matcha = {
     Version = "2.0.1",
     Names = {
         "Ratzzzzz",
@@ -5240,7 +5362,7 @@ Disclosed = {
         "obese.vip",
         "headshot.cc",
         "halooo",
-        "disclosed.cc",
+        "matcha.cc",
         "ratted",
         "silentaim.win",
         "hooked.lol",
@@ -5266,7 +5388,6 @@ local GetMousePosition = function()
 end
 local ViewportSize = Camera.ViewportSize
 
----------------------------------------[[ Functions ]]---------------------------------------
 do --[[ Functions ]]--
     do --[[ Logic ]]--
         Script.Functions.CreateConnection = LPH_NO_VIRTUALIZE(function(Connection, Function)
@@ -5505,30 +5626,30 @@ do --[[ Functions ]]--
                     }
                 }
 
-                MainEvent:FireServer(unpack(args))
+                MainRemote:FireServer(unpack(args))
             end
         end
     end
 
     do --[[ Extras ]]--  
-        if isfolder("Disclosed/Configs") then
-            for i, v in pairs(listfiles("Disclosed/Configs")) do
+        if isfolder("matcha/Configs") then
+            for i, v in pairs(listfiles("matcha/Configs")) do
                 local filename = v:match("^.+[\\/](.+)$")
                 local nameWithoutExtension = filename:match("(.+)%..+$")
-                table.insert(Disclosed.Configs, nameWithoutExtension)
+                table.insert(matcha.Configs, nameWithoutExtension)
             end
         else
-            makefolder("Disclosed/Configs")
+            makefolder("matcha/Configs")
         end
 
-        if isfolder("Disclosed/Characters") then
-            for i, v in pairs(listfiles("Disclosed/Characters")) do
+        if isfolder("matcha/Characters") then
+            for i, v in pairs(listfiles("matcha/Characters")) do
                 local filename = v:match("^.+[\\/](.+)$")
                 local nameWithoutExtension = filename:match("(.+)%..+$")
-                table.insert(Disclosed.Characters, nameWithoutExtension)
+                table.insert(matcha.Characters, nameWithoutExtension)
             end
         else
-            makefolder("Disclosed/Characters")
+            makefolder("matcha/Characters")
         end
     end
 
@@ -5647,11 +5768,11 @@ do --[[ Functions ]]--
             Script.Functions.GrabCustomHead(Config.Head)
         end
     end
-
+    
     do --[[ Client ]]--
         Script.Functions.LoadAvatar = function(ConfigName)
             if not Script.Functions.ClientChecks() then return end
-            local CharacterConfig = readfile(("Disclosed/Characters/%s"):format(ConfigName .. ".Character"))
+            local CharacterConfig = readfile(("matcha/Characters/%s"):format(ConfigName .. ".Character"))
             local CharacterSettings = loadstring(CharacterConfig)()
 
             Script.Functions.ApplyCharacter(CharacterSettings, Script.Client.Character)
@@ -5840,28 +5961,44 @@ Script.Functions.CreateConnection(RunService.Heartbeat, function()
     DrawTargetName.Position = TargetScreenPosition and V2New(TargetScreenPosition.X, TargetScreenPosition.Y) or V2New(0, 0)
     DrawTargetName.Text = Target and "$$$$ " .. Target.Name .. " $$$$" or ""
 end)
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+local Camera = workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
 
-Script.Functions.CreateConnection(RunService.RenderStepped, function(DeltaTime)
-    if not UI.Combat.Legitbot.Enabled then return end
-    if not Script.Functions.TargetExists() then return end
+RunService.RenderStepped:Connect(function()
+    if not UI.Combat.Legitbot.Enabled or not LocalPlayer.Character then return end
+    
+    local target = Script.Targeting.Target and Script.Targeting.Target.Character
+    if not target then return end
+    
+    local part = Script.Functions.GetTargetPart(target)
+    if not part then return end
+    
+    local humanoid = target:FindFirstChild("Humanoid")
+    if not humanoid then return end
 
-    local CurrentTime = tick()
-    if (CurrentTime - Script.Data.LegitbotTick) < UI.Combat.Legitbot.RefreshRate then return end
-    Script.Data.LegitbotTick = CurrentTime
+    local pos = part.Position
 
-    local TargetCharacter = Script.Targeting.Target and Script.Targeting.Target.Character
-    if not TargetCharacter then return end
+    -- Prediction
+    if UI.Combat.Legitbot.PredictionEnabled then
+        pos = pos + (part.AssemblyLinearVelocity * UI.Combat.Legitbot.PredictionValue)
+    end
 
-    local TargetPart = Script.Functions.GetTargetPart(TargetCharacter)
-    if not TargetPart then return end
+    -- Jump Offset
+    if UI.Combat.Legitbot.JumpOffsetEnabled 
+       and humanoid:GetState() == Enum.HumanoidStateType.Freefall then
+        pos = pos + Vector3.new(0, UI.Combat.Legitbot.JumpOffsetValue, 0)
+    end
 
-    local TargetPosition = TargetPart.Position
-    local PredictionOffset = UI.Combat.Legitbot.Prediction and (TargetPart.Velocity * UI.Combat.Legitbot.PredictionValue) or Vector3.zero
-    local AimPosition = TargetPosition + PredictionOffset
+    -- Goal camera
+    local goal = CFrame.lookAt(Camera.CFrame.Position, pos)
 
-    local FinalCFrame = CFrame.lookAt(Camera.CFrame.Position, AimPosition)
-    Camera.CFrame = Camera.CFrame:Lerp(FinalCFrame, UI.Combat.Legitbot.Smoothness)
+    -- Smooth
+    local a = UI.Combat.Legitbot.Smoothness
+    Camera.CFrame = Camera.CFrame:Lerp(goal, a)
 end)
+
 
 Script.Functions.CreateConnection(RunService.Heartbeat, function(Delta) -- Combat Mainly
     if Script.Toggles.Targeting and not UI.Combat.Targeting.Sticky then
@@ -5997,7 +6134,7 @@ Script.Hooks.Namecall = hookmetamethod(game, "__namecall", function(Object, ...)
         return nil
     end
 
-    if NameCallMethod == "FireServer" and Object.Name == "MainEvent" and #Arguments > 0 and Arguments[1] == "Shoot" then
+    if NameCallMethod == "FireServer" and Object.Name == "MainRemote" and #Arguments > 0 and Arguments[1] == "Shoot" then
         if Script.Targeting.Target.Character['Head'] and Arguments[2] and #Arguments[2] > 0 then
             for _, Table in pairs(Arguments[2][1]) do
                 Table["Instance"] = Script.Targeting.Target.Character['Head']
@@ -6031,7 +6168,7 @@ Script.Hooks.NewIndex = hookmetamethod(game, "__newindex", LPH_NO_VIRTUALIZE(fun
 end))
 
 ---------------------------------------[[ Library ]]---------------------------------------
-local TitleString = 'disclosed.cc, dev | %A, %B '
+local TitleString = 'matcha.cc, dev | %A, %B '
 local Day = os.date('%d', os.time())
 local SecondString = ', %Y.'
 
@@ -6045,7 +6182,7 @@ end
 TitleString = os.date(TitleString, os.time()) .. Day .. Suffix .. os.date(SecondString, os.time())
 
 do -- [[ UI ]]
-    local Window = Library:Window({Name = TitleString, PageAmmount = 7, Size = UDim2.new(0, 615, 0, 639)})
+    local Window = Library:Window({Name = TitleString, PageAmmount = 7, Size = UDim2.new(0, 500, 0, 600)})
 	local Watermark = Library:Watermark(TitleString)
 	local KeybindList = Library:KeybindList()
 
@@ -6094,22 +6231,26 @@ do -- [[ UI ]]
             LegitbotSection:Divider()
 
             LegitbotSection:Toggle({Name = 'Prediction', Flag = 'Legitbot Prediction Enabled', Callback = function(State)
-                UI.Combat.Legitbot.Prediction = State
+                UI.Combat.Legitbot.PredictionEnabled = State
             end})
 
-            LegitbotSection:Slider({Name = "Prediction", Min = 0, Max = 0.15, Suffix = "", Decimals = 0.0001, Flag = "Legitbot Prediction", Default = 0.095, Callback = function(Value)
+            LegitbotSection:Slider({Name = "Prediction", Min = 0, Max = 1, Suffix = "", Decimals = 0.0001, Flag = "Legitbot Prediction", Default = 0.095, Callback = function(Value)
                 UI.Combat.Legitbot.PredictionValue = Value
             end})
 
             LegitbotSection:Divider()
 
-            LegitbotSection:Slider({Name = "Smoothness", Min = 0, Max = 2, Suffix = "", Decimals = 0.01, Flag = "Legitbot Smoothness", Default = 2, Callback = function(Value)
+            LegitbotSection:Slider({Name = "Smoothness", Min = 0, Max = 1, Suffix = "", Decimals = 0.01, Flag = "Legitbot Smoothness", Default = 2, Callback = function(Value)
                 UI.Combat.Legitbot.Smoothness = Value
             end})
+			LegitbotSection:Toggle({Name = 'Jump Offset', Flag = 'Legitbot Jump Offset Enabled', Callback = function(State)
+			    UI.Combat.Legitbot.JumpOffsetEnabled = State
+			end})
+		
+		    LegitbotSection:Slider({Name = "Jump Offset Amount", Min = 0, Max = 10, Suffix = " studs", Decimals = 0.1, Flag = "Legitbot Jump Offset Value", Default = 2.5, Callback = function(Value)
+		        UI.Combat.Legitbot.JumpOffsetValue = Value
+		    end})
 
-            LegitbotSection:Slider({Name = "Refresh Rate", Min = 0, Max = 1, Suffix = "", Decimals = 0.01, Flag = "Legitbot Refresh Rate", Default = 0, Callback = function(Value)
-                UI.Combat.Legitbot.RefreshRate = Value
-            end})
         end
 
         do --[[ Silent Aim ]]--
@@ -6440,7 +6581,23 @@ do -- [[ UI ]]
                 -- Keybind tự động flip toggle
                 Library.Flags['Noclip'] = not Library.Flags['Noclip']
             end})
-
+            ClientStuff:Toggle({Name = 'Rapid Fire', Flag = 'Rapid Fire', Callback = function(State)
+                getgenv().RapidFireEnabled = State
+                if not State then
+                    getgenv().is_firing = false
+                    -- Reset cooldown khi tắt
+                    for func, orig in pairs(originalCooldowns) do
+                        for i = 1, debug.getinfo(func).nups do
+                            local val = debug.getupvalue(func, i)
+                            if val == 0.00000000000000000001 then
+                                debug.setupvalue(func, i, orig)
+                                break
+                            end
+                        end
+                    end
+                    originalCooldowns = {}
+                end
+            end})
             ClientStuff:Divider()
 
             ClientStuff:Toggle({Name = 'Animation', Flag = 'Animation Enabled', Callback = function(State)
@@ -6473,37 +6630,81 @@ do -- [[ UI ]]
         end
 
         do -- avatar loader
-            local AvatarListbox = AvatarLoader:Listbox({Flag = "Avatar Name", Options = Disclosed.Characters, Callback = function(Option)
+            local AvatarListbox = AvatarLoader:Listbox({Flag = "Avatar Name", Options = matcha.Characters, Callback = function(Option)
 				UI.Misc.Client.AvatarChanger.Name = Option
 			end}) 
             AvatarLoader:Button({Name = "Load Character", Callback = function() Script.Functions.LoadAvatar(AvatarListbox:Get()) end})
             AvatarLoader:Button({Name = "Refresh List", Callback = function()
-				if isfolder("Disclosed/Characters") then
-					for I, V in pairs(listfiles("Disclosed/Characters")) do
+				if isfolder("matcha/Characters") then
+					for I, V in pairs(listfiles("matcha/Characters")) do
 						local FileName = V:match("^.+[\\/](.+)$")
 						local NameWithoutExtension = FileName:match("(.+)%..+$")
 						local Found = false
-						for J, ExistingConfig in pairs(Disclosed.Characters) do
+						for J, ExistingConfig in pairs(matcha.Characters) do
 							if ExistingConfig == NameWithoutExtension then
 								Found = true
 								break
 							end
 						end
 						if not Found then
-							table.insert(Disclosed.Characters, NameWithoutExtension)
+							table.insert(matcha.Characters, NameWithoutExtension)
 						end
 					end
 				else
-					makefolder("Disclosed/Characters")
+					makefolder("matcha/Characters")
 				end
-				AvatarListbox:Refresh(Disclosed.Characters)
+				AvatarListbox:Refresh(matcha.Characters)
 			end})
             AvatarLoader:Toggle({Name = 'Load After Death', Flag = 'Load Avatar After Death', Callback = function(State)
                 UI.Misc.Client.AvatarChanger.LoadOnDeath = State
             end})
         end
     end
-
+	do --[[ Bullet Tracers (HEADSHOTS.CC STYLE - BEAM + PARTS + DROPDOWN) ]]--
+	    local BulletTracerSection = VisualsTab:Section({Name = 'Bullet Tracers', Side = 1})
+	
+	    BulletTracerSection:Toggle({Name = 'Enabled', Flag = 'BulletTracer Enabled', Default = false, Callback = function(State)
+	        UI.Visuals.BulletTracer.Enabled = State
+	        if not State then
+	            -- Cleanup all tracers khi tắt
+	            for _, tracerData in pairs(Script.ActiveTracers or {}) do
+	                if tracerData.startPart then tracerData.startPart:Destroy() end
+	                if tracerData.endPart then tracerData.endPart:Destroy() end
+	                if tracerData.beam then tracerData.beam:Destroy() end
+	            end
+	            Script.ActiveTracers = {}
+	        end
+	    end}):Colorpicker({Name = "Color", Flag = "BulletTracer Color", Default = Color3.fromRGB(155, 125, 175), Callback = function(Color)
+	        UI.Visuals.BulletTracer.Color = Color
+	    end})
+	
+	    local Textures = {
+	        "rbxassetid://12781852245",  -- Pink Glow (Default)
+	        "rbxassetid://241650934",    -- Classic White
+	        "rbxassetid://4996891970",   -- Neon Blue
+	        "rbxassetid://7151778303",   -- Red Laser
+	        "rbxassetid://6504428863",   -- Sparkle
+	        ""                          -- None (transparent)
+	    }
+	
+	    BulletTracerSection:Dropdown({Name = 'Texture', Flag = 'BulletTracer Texture', Items = Textures, Default = "rbxassetid://12781852245", Callback = function(Option)
+	        UI.Visuals.BulletTracer.SelectedTexture = Option
+	        UI.Visuals.BulletTracer.TextureID = Option
+	    end})
+	
+	
+	    BulletTracerSection:Slider({Name = "Size", Min = 0, Max = 2, Decimals = 0.1, Suffix = "", Flag = "BulletTracer Size", Default = 0.4, Callback = function(Value)
+	        UI.Visuals.BulletTracer.Size = Value
+	    end})
+	
+	    BulletTracerSection:Slider({Name = "Transparency", Min = 0, Max = 1, Decimals = 0.1, Suffix = "", Flag = "BulletTracer Transparency", Default = 0, Callback = function(Value)
+	        UI.Visuals.BulletTracer.Transparency = Value
+	    end})
+	
+	    BulletTracerSection:Slider({Name = "Time Alive", Min = 1, Max = 10, Suffix = "s", Flag = "BulletTracer Time", Default = 3, Callback = function(Value)
+	        UI.Visuals.BulletTracer.TimeAlive = Value
+	    end})
+	end
 	do -- Settings Tab
 		local SettingsSection = SettingsTab:Section({Name = "Settings", Side = 2})
 		local ConfigsSection = SettingsTab:Section({Name = "Profiles", Side = 1})
@@ -6539,10 +6740,34 @@ do -- [[ UI ]]
 			Library.Tween.Time = Value
 		end})
 
-		SettingsSection:Button({Name = "Notification test", Callback = function()
-			Library:Notification("This is a notification This is a notification This is a notification This is a notification", 5, Color3.fromRGB(math.random(0, 255), math.random(0, 255), math.random(0, 255)))
+		SettingsSection:Button({Name = "Rejoin Server", Callback = function()
+		    Library:Notification("Rejoining current server...", 3, Library.Theme.Accent)
+		    local ts = game:GetService("TeleportService")
+		    ts:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
 		end})
-
+		
+		-- SERVERHOP (tự động tìm server khác có slot trống)
+		SettingsSection:Button({Name = "Serverhop", Callback = function()
+		    Library:Notification("Serverhopping...", 3, Library.Theme.Accent)
+		    task.spawn(function()
+		        local Http = game:GetService("HttpService")
+		        local TS = game:GetService("TeleportService")
+		        local req = Http:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/"..game.PlaceId.."/servers/Public?sortOrder=Asc&limit=100"))
+		        
+		        local servers = {}
+		        for i,v in pairs(req.data) do
+		            if v.playing < v.maxPlayers and v.id ~= game.JobId then
+		                table.insert(servers, v.id)
+		            end
+		        end
+		        
+		        if #servers > 0 then
+		            TS:TeleportToPlaceInstance(game.PlaceId, servers[math.random(1, #servers)], LocalPlayer)
+		        else
+		            Library:Notification("No available servers found!", 4, Color3.fromRGB(255,0,0))
+		        end
+		    end)
+		end})
 		SettingsSection:Button({Name = "Unload library", Callback = function()
 			Library:Unload()
 		end})
@@ -6606,5 +6831,60 @@ do -- [[ UI ]]
 	end
 end
 
+
+utility.get_gun = function()
+    local char = LocalPlayer.Character
+    if not char then return nil end
+    for _, tool in ipairs(char:GetChildren()) do
+        if tool:IsA("Tool") and tool:FindFirstChild("Ammo") then
+            return tool
+        end
+    end
+    return nil
+end
+
+utility.rapid = function(tool)
+    if tool and tool.Parent then
+        pcall(function() tool:Activate() end)
+    end
+end
+
+-- Bắt đầu bắn khi nhấn chuột trái
+UserInputService.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 and getgenv().RapidFireEnabled then
+        local gun = utility.get_gun()
+        if gun and not getgenv().is_firing then
+            getgenv().is_firing = true
+            task.spawn(function()
+                while getgenv().is_firing and getgenv().RapidFireEnabled and utility.get_gun() do
+                    utility.rapid(utility.get_gun())
+                    task.wait(0.1) 
+                end
+            end)
+        end
+	end
+end)
+
+-- Dừng bắn khi thả chuột
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        getgenv().is_firing = false
+    end
+end)
+
+game:GetService("RunService").Heartbeat:Connect(function()
+    local tool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool")
+    if getgenv().RapidFireEnabled and tool and tool:FindFirstChild("GunScript") then 
+        for _, v in ipairs(getconnections(tool.Activated)) do
+            local funcinfo = debug.getinfo(v.Function)
+            for i = 1, funcinfo.nups do
+                local c = debug.getupvalue(v.Function, i)
+                if type(c) == "number" then 
+                    debug.setupvalue(v.Function, i, 0.00000000000000000001)
+                end
+            end
+        end
+    end
+end)
 
 setfpscap(240)
