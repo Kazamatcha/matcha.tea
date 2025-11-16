@@ -1,0 +1,3216 @@
+local repo = 'https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/'
+
+local Library = loadstring(game:HttpGet(repo .. 'Library.lua'))()
+local ThemeManager = loadstring(game:HttpGet(repo .. 'addons/ThemeManager.lua'))()
+local SaveManager = loadstring(game:HttpGet(repo .. 'addons/SaveManager.lua'))()
+local Window = Library:CreateWindow({
+
+    Title = 'Matcha.cc',
+    Center = true,
+    AutoShow = true,
+    TabPadding = 8,
+    MenuFadeTime = 0.2
+})
+local Tabs = {
+    -- Creates a new tab titled Main
+    Legit = Window:AddTab('Main'),
+    Character = Window:AddTab('Character'),
+    Visual = Window:AddTab('Visual'),
+    ['UI Settings'] = Window:AddTab('UI Settings'),
+}
+-- Services and Variables
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local Mouse = LocalPlayer:GetMouse()
+local Camera = workspace.CurrentCamera
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local ReplicatedStorage = game:GetService('ReplicatedStorage')
+-- Global Settings
+local radarLoaded = false
+getgenv().Matcha = {
+    Legit = {
+        AimEnabled = false,
+        Aimlock = false,
+        SilentAim = false,
+        Prediction = 0.135,
+        Smoothing = false,
+        SmoothingX = 0.5,
+        SmoothingY = 0.5,
+        Offset = false,
+        JumpOffset = 0,
+        HitPart = "Head",
+		AutoSelect = false,
+        Checks = {
+            GrabbedKnocked = true
+        },
+		WallCheck = false,
+        UseFOV = false,
+        FOVSize = 150,
+        FOVOutline = Color3.fromRGB(0, 0, 0),
+        FOVInline = Color3.fromRGB(255, 255, 255),
+        Chams = false,
+        ChamsOutline = Color3.fromRGB(9, 0, 0),
+        ChamsInline = Color3.fromRGB(255, 255, 255)
+    },
+    Character = {
+        WalkSpeed = false,
+        WalkSpeedValue = 50,
+        Fly = false,
+        FlySpeed = 50,
+        CFrameSpeed = false,
+        CFrameSpeedValue = 50,
+        AntiSlow = false,
+		NoJumpCooldown = false,
+    },
+    Desync = {
+	    Enabled = false,
+	    Mode = "Void",
+	    ToggleKeybind = false
+    },
+}
+getgenv().Matcha.Desync.RandomAmount = 20  -- Default
+getgenv().Matcha.Desync.Dot = false
+
+-- ĐỘT DESYNC (Drawing Circle - size vừa, rõ)
+local DesyncDot = Drawing.new("Circle")
+DesyncDot.Radius = 6         
+DesyncDot.Thickness = 1.5
+DesyncDot.NumSides = 16
+DesyncDot.Color = Color3.fromRGB(0, 255, 100)  -- Đỏ sáng
+DesyncDot.Filled = true
+DesyncDot.Transparency = 1
+DesyncDot.Visible = false
+-- === BODY CLONE HÌNH NGƯỜI + VISUALIZE ===
+local BodyClone = game:GetObjects("rbxassetid://8246626421")[1]
+BodyClone.Parent = workspace
+BodyClone.Humanoid:Destroy()
+BodyClone.Head.Face:Destroy()
+
+-- === QUAN TRỌNG: HIỆN TOÀN BỘ BODY ===
+for _, v in pairs(BodyClone:GetDescendants()) do
+    if v:IsA("BasePart") or v:IsA("MeshPart") then
+        v.CanCollide = false
+        v.Transparency = 0  -- HIỆN HẾT PARTS
+    end
+end
+
+-- Chỉ ẩn RootPart (không cần thiết)
+BodyClone.HumanoidRootPart.Transparency = 0.5
+BodyClone.HumanoidRootPart.Velocity = Vector3.zero
+BodyClone.HumanoidRootPart.CFrame = CFrame.new(9999, 9999, 9999)
+
+-- Highlight toàn bộ body
+local BodyCloneHighlight = Instance.new("Highlight")
+BodyCloneHighlight.Enabled = false
+BodyCloneHighlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+BodyCloneHighlight.FillColor = Color3.fromRGB(0, 255, 0)
+BodyCloneHighlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+BodyCloneHighlight.FillTransparency = 0.3
+BodyCloneHighlight.OutlineTransparency = 0
+BodyCloneHighlight.Adornee = BodyClone
+BodyCloneHighlight.Parent = BodyClone
+
+-- Glow effect
+local GlowLight = Instance.new("PointLight")
+GlowLight.Color = Color3.fromRGB(0, 255, 100)
+GlowLight.Brightness = 4
+GlowLight.Range = 40
+GlowLight.Parent = BodyClone.HumanoidRootPart
+getgenv().Matcha.Desync.Visualize = false
+-- === LINE DESYNC VISUALIZE ===
+local DesyncLine = Drawing.new("Line")
+DesyncLine.Thickness = 1
+DesyncLine.Color = Color3.fromRGB(0, 255, 0)
+DesyncLine.Visible = false
+DesyncLine.Transparency = 1
+
+getgenv().Matcha.Desync.Line = false  -- Toggle line
+-- === DESYNC STATUS TEXT ===
+local DesyncStatus = Drawing.new("Text")
+DesyncStatus.Text = "Desync: FALSE"
+DesyncStatus.Size = 16
+DesyncStatus.Font = 2
+DesyncStatus.Color = Color3.fromRGB(255, 0, 0)
+DesyncStatus.Outline = true
+DesyncStatus.OutlineColor = Color3.fromRGB(0, 0, 0)
+DesyncStatus.Center = false
+DesyncStatus.Visible = false
+DesyncStatus.Position = Vector2.new(100, 100)  -- Vị trí mặc định
+
+getgenv().Matcha.Desync.Status = false  -- Toggle status
+-- Storage
+local Storage = {
+    Targets = { Camlock = nil, Silent = nil },
+    BodyParts = { Camlock = "", Silent = "" },
+    CFPosition = nil,
+    Connections = {},
+    Drawings = { FOVCircle = nil },
+    Targeting = false,
+    LastNotifiedTarget = nil
+}
+local Waypoint = {
+    Position = nil,
+    Name = "Custom Waypoint"
+}
+local Lighting = game:GetService("Lighting")
+local Original = {
+	Ambient = Lighting.Ambient,
+	FogColor = Lighting.FogColor,
+	FogStart = Lighting.FogStart,
+	FogEnd = Lighting.FogEnd,
+	ClockTime = Lighting.ClockTime,
+	Brightness = Lighting.Brightness,
+	GlobalShadows = Lighting.GlobalShadows,
+}
+getgenv().Matcha.BunnyHop = {
+	Enabled = false,
+	Speed = 50
+}
+local function NewConnection(signal, callback)
+    local conn = signal:Connect(callback)
+    table.insert(Storage.Connections, conn)
+    return conn
+end
+--=== [STORAGE CHO WORLD] ===--
+getgenv().Matcha.World = {
+    AmbientColor = Original.Ambient,
+    FogColor = Original.FogColor,
+    FogStart = Original.FogStart,
+    FogEnd = Original.FogEnd
+}
+local function isAlive(plr)
+    if not plr or not plr.Character then return false end
+    local hum = plr.Character:FindFirstChildOfClass("Humanoid")
+    if not hum or hum.Health <= 0 then return false end
+    local be = plr.Character:FindFirstChild("BodyEffects")
+    if be then
+        local ko = be:FindFirstChild("K.O")
+        local grabbed = be:FindFirstChild("GRABBING_CONSTRAINT")
+        if (ko and ko.Value) or (grabbed and grabbed.Value) then return false end
+    end
+    return true
+end
+
+-- Kiểm tra target có nhìn thấy không
+local function isVisible(targetPart)
+    if not targetPart or not targetPart.Parent then return false end
+
+    local origin = Camera.CFrame.Position
+    local direction = targetPart.Position - origin -- gọn hơn
+    local params = RaycastParams.new()
+    params.FilterType = Enum.RaycastFilterType.Blacklist
+    params.FilterDescendantsInstances = {LocalPlayer.Character}
+    params.IgnoreWater = true
+
+    local ray = workspace:Raycast(origin, direction, params)
+    if ray then
+        -- Nếu tia chạm vật khác không phải target thì coi như bị che
+        return ray.Instance:IsDescendantOf(targetPart.Parent)
+    end
+    return true -- không bị che
+end
+local FOVCircle = Drawing.new("Circle")
+FOVCircle.Thickness = 2
+FOVCircle.Color = getgenv().Matcha.Legit.FOVOutline
+FOVCircle.Transparency = 1
+FOVCircle.Filled = false
+
+local FOVOutline = Drawing.new("Circle")
+FOVOutline.Thickness = 1         -- outline
+FOVOutline.Color = getgenv().Matcha.Legit.FOVInline
+FOVOutline.Transparency = 1
+FOVOutline.Filled = false
+
+local function getClosestPlayer(useFOV)
+    local maxDist = useFOV and (getgenv().Matcha.Legit.FOVSize or 150) or math.huge
+    local closest = nil
+
+    for _, plr in pairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+            local hum = plr.Character:FindFirstChildOfClass("Humanoid")
+            if hum and hum.Health > 0 then
+                local part = plr.Character:FindFirstChild(getgenv().Matcha.Legit.HitPart or "Head")
+                if part then
+                    -- Chỉ check wall nếu WallCheck bật
+                    if not getgenv().Matcha.Legit.WallCheck or isVisible(part) then
+                        local screenPos, onScreen = Camera:WorldToViewportPoint(part.Position)
+                        local dist = (Vector2.new(Mouse.X, Mouse.Y) - Vector2.new(screenPos.X, screenPos.Y)).Magnitude
+                        if dist < maxDist and onScreen then
+                            closest = plr
+                            maxDist = dist
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    return closest
+end
+
+local function toggleTarget()
+    Storage.Targeting = not Storage.Targeting
+    if Storage.Targeting then
+        local target = getClosestPlayer(getgenv().Matcha.Legit.UseFOV)
+        if target then
+            Storage.Targets.Camlock = target
+            Storage.Targets.Silent = target
+            Storage.BodyParts.Camlock = getgenv().Matcha.Legit.HitPart
+            Storage.BodyParts.Silent = getgenv().Matcha.Legit.HitPart
+            if target ~= Storage.LastNotifiedTarget then
+                Library:Notification("Selected Target: " .. target.DisplayName .. " (@" .. target.Name .. ")", 3, Library.Accent, flags["Notification Position"])
+                Storage.LastNotifiedTarget = target
+            end
+        else
+            Storage.Targeting = false
+        end
+    else
+        Storage.Targets.Camlock = nil
+        Storage.Targets.Silent = nil
+        Storage.LastNotifiedTarget = nil
+    end
+end
+local function toggleTarget2()
+    Storage.Targeting = not Storage.Targeting
+    if Storage.Targeting then
+        local target = getClosestPlayer(getgenv().Matcha.Legit.UseFOV)
+        if target then
+            Storage.Targets.Camlock = target
+            Storage.Targets.Silent = target
+            Storage.BodyParts.Camlock = getgenv().Matcha.Legit.HitPart
+            Storage.BodyParts.Silent = getgenv().Matcha.Legit.HitPart
+            if target ~= Storage.LastNotifiedTarget then
+                Storage.LastNotifiedTarget = target
+            end
+        else
+            Storage.Targeting = false
+        end
+    else
+        Storage.Targets.Camlock = nil
+        Storage.Targets.Silent = nil
+        Storage.LastNotifiedTarget = nil
+    end
+end
+local function updateCamlock()
+    local target = Storage.Targets.Camlock
+    if not getgenv().Matcha.Legit.Aimlock or not target or not target.Character then
+        Storage.Targets.Camlock = nil
+        return
+    end
+
+    local part = target.Character:FindFirstChild(getgenv().Matcha.Legit.HitPart or "Head")
+    if not part or not isAlive(target) then
+        return
+    end
+
+    -- Chỉ check isVisible nếu WallCheck bật
+    if getgenv().Matcha.Legit.WallCheck and not isVisible(part) then
+        return
+    end
+
+    local pos = part.Position + (part.AssemblyLinearVelocity * (getgenv().Matcha.Legit.Prediction or 0))
+    if getgenv().Matcha.Legit.Offset and target.Character.Humanoid:GetState() == Enum.HumanoidStateType.Freefall then
+        pos = pos + Vector3.new(0, getgenv().Matcha.Legit.JumpOffset or 0, 0)
+    end
+
+    local goal = CFrame.new(Camera.CFrame.Position, pos)
+    if getgenv().Matcha.Legit.Smoothing then
+        Camera.CFrame = Camera.CFrame:Lerp(goal, getgenv().Matcha.Legit.SmoothingX or 0.1, getgenv().Matcha.Legit.SmoothingY or 0.1)
+    else
+        Camera.CFrame = goal
+    end
+end
+
+
+local function updateSilent()
+    if getgenv().Matcha.Legit.SilentAim and Storage.Targets.Silent and Storage.Targets.Silent.Character then
+        local part = Storage.Targets.Silent.Character:FindFirstChild(Storage.BodyParts.Silent)
+        if part and isAlive(Storage.Targets.Silent) then
+            local position = part.Position + (part.AssemblyLinearVelocity * getgenv().Matcha.Legit.Prediction)
+            if getgenv().Matcha.Legit.Offset and Storage.Targets.Silent.Character.Humanoid:GetState() == Enum.HumanoidStateType.Freefall then
+                position = position + Vector3.new(0, getgenv().Matcha.Legit.JumpOffset, 0)
+            end
+            Storage.CFPosition = position
+        else
+            Storage.Targets.Silent = nil
+        end
+    end
+end
+
+local noJumpCooldown = true
+RunService.RenderStepped:Connect(function()
+    if noJumpCooldown and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+        local hum = LocalPlayer.Character.Humanoid
+        hum.UseJumpPower = not hum.UseJumpPower
+    end
+end)
+local function applyChams(target)
+    if not target or not target.Character then return end
+
+    -- Nếu đã có Highlight thì update màu, không tạo thêm
+    local highlight = target.Character:FindFirstChild("MatchaHighlight")
+    if not highlight then
+        highlight = Instance.new("Highlight")
+        highlight.Name = "MatchaHighlight"
+        highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+        highlight.FillTransparency = 0.5
+        highlight.Parent = target.Character
+    end
+
+    highlight.FillColor = getgenv().Matcha.Legit.ChamsInline or Color3.fromRGB(255, 255, 255)
+    highlight.OutlineColor = getgenv().Matcha.Legit.ChamsOutline or Color3.fromRGB(255, 0, 0)
+    highlight.Enabled = true
+end
+
+local function removeChams(target)
+    if not target or not target.Character then return end
+    local highlight = target.Character:FindFirstChild("MatchaHighlight")
+    if highlight then
+        highlight:Destroy()
+    end
+end
+
+-- Xóa chams khỏi tất cả player trừ local
+local function clearAllChams()
+    for _, plr in ipairs(game:GetService("Players"):GetPlayers()) do
+        if plr ~= game:GetService("Players").LocalPlayer and plr.Character then
+            local hl = plr.Character:FindFirstChild("MatchaHighlight")
+            if hl then hl:Destroy() end
+        end
+    end
+end
+--== [ NO JUMP COOLDOWN FIX ] ==--
+RunService.RenderStepped:Connect(function()
+    local char = LocalPlayer.Character
+    if not char then return end
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if hum then
+        if getgenv().Matcha.Character.NoJumpCooldown then
+            hum.UseJumpPower = false
+        else
+            hum.UseJumpPower = true
+        end
+    end
+end)
+getgenv().Matcha.ESP = {
+    Enabled = false,
+    Chams = false,
+    ChamsInline = Color3.fromRGB(118, 241, 69),  -- Matcha theme
+    ChamsOutline = Color3.fromRGB(255, 255, 255),  -- White
+    NameEnabled = false,
+    NameColor = Color3.fromRGB(255, 255, 255),
+    NameMode = "DisplayName",
+    NameSize = 14,
+    NameOutline = true,
+    HealthBar = false,
+    HealthColorLow = Color3.fromRGB(255, 0, 0),  -- Red for low
+    HealthColorHigh = Color3.fromRGB(0, 255, 0),  -- Green for high
+    HealthText = false,
+    HealthTextColor = true,  -- Lerp text color
+    HealthSize = 14,
+    Skeleton = false,
+    SkeletonColor = Color3.fromRGB(255, 255, 255),
+    OutlineColor = Color3.fromRGB(0, 0, 0)  -- Black outline for texts
+}
+
+local ESPObjects = {}
+local ESPHighlights = {}
+
+-- Function to destroy ESP for a player
+local function DestroyESP(player)
+    if ESPObjects[player] then
+        for _, obj in pairs(ESPObjects[player]) do
+            if typeof(obj) == "table" then
+                for _, line in ipairs(obj) do line:Remove() end
+            else
+                obj:Remove()
+            end
+        end
+        ESPObjects[player] = nil
+    end
+    if ESPHighlights[player] then
+        ESPHighlights[player]:Destroy()
+        ESPHighlights[player] = nil
+    end
+end
+
+-- Function to create ESP for a player
+local function CreateESP(player)
+    DestroyESP(player)
+
+    local nameText = Drawing.new("Text")
+    nameText.Size = getgenv().Matcha.ESP.NameSize
+    nameText.Center = true
+    nameText.Color = getgenv().Matcha.ESP.NameColor
+    nameText.Visible = false
+    nameText.Font = 2
+    nameText.Outline = getgenv().Matcha.ESP.NameOutline
+    nameText.OutlineColor = getgenv().Matcha.ESP.OutlineColor
+
+    local healthBar = Drawing.new("Square")
+    healthBar.Thickness = 1
+    healthBar.Filled = true
+    healthBar.Visible = false
+    healthBar.ZIndex = 1
+
+    local healthBarOutline = Drawing.new("Square")
+    healthBarOutline.Thickness = 2  -- Mỏng hơn
+    healthBarOutline.Filled = false
+    healthBarOutline.Color = Color3.fromRGB(0, 0, 0)
+    healthBarOutline.Visible = false
+    healthBarOutline.ZIndex = 0
+
+    local healthText = Drawing.new("Text")
+    healthText.Size = getgenv().Matcha.ESP.HealthSize
+    healthText.Center = true
+    healthText.Visible = false
+    healthText.Font = 2
+    healthText.Outline = true
+    healthText.OutlineColor = getgenv().Matcha.ESP.OutlineColor
+
+    -- Skeleton lines (14 lines cho basic skeleton)
+    local skeletonLines = {}
+    for i = 1, 14 do
+        local line = Drawing.new("Line")
+        line.Thickness = 1
+        line.Color = getgenv().Matcha.ESP.SkeletonColor
+        line.Visible = false
+        skeletonLines[i] = line
+    end
+
+    ESPObjects[player] = {
+        NameText = nameText,
+        HealthBar = healthBar,
+        HealthBarOutline = healthBarOutline,
+        HealthText = healthText,
+        SkeletonLines = skeletonLines
+    }
+
+    -- Highlight for Chams
+    local highlight = Instance.new("Highlight")
+    highlight.Enabled = false
+    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    highlight.FillTransparency = 0.5
+    highlight.OutlineTransparency = 0
+    highlight.Parent = game.CoreGui  -- Temp parent
+    ESPHighlights[player] = highlight
+end
+
+-- Function to update ESP
+local function UpdateESP()
+    for player, objects in pairs(ESPObjects) do
+        local character = player.Character
+        local highlight = ESPHighlights[player]
+        if character and character:FindFirstChild("HumanoidRootPart") and player ~= LocalPlayer and getgenv().Matcha.ESP.Enabled then
+            local rootPart = character.HumanoidRootPart
+            local humanoid = character:FindFirstChildOfClass("Humanoid")
+
+            if humanoid and humanoid.Health > 0 then
+                local rootPosition, onScreen = Camera:WorldToViewportPoint(rootPart.Position)
+                local headPosition = Camera:WorldToViewportPoint(character.Head.Position)
+                local footPosition = Camera:WorldToViewportPoint(rootPart.Position - Vector3.new(0, 3, 0))
+
+                if onScreen then
+                    local boxHeight = math.abs(headPosition.Y - footPosition.Y)
+                    local boxWidth = boxHeight / 2
+
+                    -- Chams (Highlight)
+                    if getgenv().Matcha.ESP.Chams then
+                        highlight.Adornee = character
+                        highlight.FillColor = getgenv().Matcha.ESP.ChamsInline
+                        highlight.OutlineColor = getgenv().Matcha.ESP.ChamsOutline
+                        highlight.Enabled = true
+                    else
+                        highlight.Enabled = false
+                    end
+
+                    -- Name ESP
+                    if getgenv().Matcha.ESP.NameEnabled then
+                        local displayName
+                        if getgenv().Matcha.ESP.NameMode == "Username" then
+                            displayName = player.Name
+                        elseif getgenv().Matcha.ESP.NameMode == "DisplayName" then
+                            displayName = player.DisplayName
+                        elseif getgenv().Matcha.ESP.NameMode == "Username (DisplayName)" then
+                            displayName = player.Name .. " (" .. player.DisplayName .. ")"
+                        elseif getgenv().Matcha.ESP.NameMode == "Username (DisplayName) [UserID]" then
+                            displayName = player.Name .. " (" .. player.DisplayName .. ") [" .. player.UserId .. "]"
+                        end
+
+                        objects.NameText.Position = Vector2.new(rootPosition.X, headPosition.Y - 15)
+                        objects.NameText.Text = displayName
+                        objects.NameText.Size = getgenv().Matcha.ESP.NameSize
+                        objects.NameText.Visible = true
+                        objects.NameText.Color = getgenv().Matcha.ESP.NameColor
+                        objects.NameText.Outline = getgenv().Matcha.ESP.NameOutline
+                    else
+                        objects.NameText.Visible = false
+                    end
+
+                    -- Health Bar and Text
+                    if getgenv().Matcha.ESP.HealthBar then
+                        local healthRatio = humanoid.Health / humanoid.MaxHealth
+                        local healthColor = getgenv().Matcha.ESP.HealthColorLow:Lerp(getgenv().Matcha.ESP.HealthColorHigh, healthRatio)
+                        local barHeight = boxHeight * healthRatio
+
+                        objects.HealthBar.Position = Vector2.new(rootPosition.X - boxWidth / 2 - 6, headPosition.Y + (boxHeight - barHeight))
+                        objects.HealthBar.Size = Vector2.new(2, barHeight)  -- Mỏng hơn
+                        objects.HealthBar.Color = healthColor
+                        objects.HealthBar.Visible = true
+
+                        objects.HealthBarOutline.Position = Vector2.new(rootPosition.X - boxWidth / 2 - 6, headPosition.Y)
+                        objects.HealthBarOutline.Size = Vector2.new(2, boxHeight)
+                        objects.HealthBarOutline.Visible = true
+
+                        if getgenv().Matcha.ESP.HealthText then
+                            objects.HealthText.Position = Vector2.new(rootPosition.X - boxWidth / 2 - 20, headPosition.Y - 5)  -- Top đầu bar, bên trái
+                            objects.HealthText.Text = tostring(math.floor(humanoid.Health))  -- Chỉ số máu
+                            objects.HealthText.Size = getgenv().Matcha.ESP.HealthSize
+                            objects.HealthText.Visible = true
+                            if getgenv().Matcha.ESP.HealthTextColor then
+                                objects.HealthText.Color = healthColor
+                            else
+                                objects.HealthText.Color = Color3.fromRGB(255, 255, 255)
+                            end
+                        else
+                            objects.HealthText.Visible = false
+                        end
+                    else
+                        objects.HealthBar.Visible = false
+                        objects.HealthBarOutline.Visible = false
+                        objects.HealthText.Visible = false
+                    end
+
+                    -- Skeleton ESP
+                    if getgenv().Matcha.ESP.Skeleton then
+                        local parts = {
+                            character.Head, character.UpperTorso or character.Torso, character.LowerTorso or character.Torso,
+                            character.LeftUpperArm, character.LeftLowerArm, character.LeftHand,
+                            character.RightUpperArm, character.RightLowerArm, character.RightHand,
+                            character.LeftUpperLeg, character.LeftLowerLeg, character.LeftFoot,
+                            character.RightUpperLeg, character.RightLowerLeg, character.RightFoot
+                        }
+                        local connections = {
+                            {1,2}, {2,3}, {2,4}, {4,5}, {5,6}, {2,7}, {7,8}, {8,9},
+                            {3,10}, {10,11}, {11,12}, {3,13}, {13,14}, {14,15}
+                        }
+                        local idx = 1
+                        for _, conn in ipairs(connections) do
+                            local partA = parts[conn[1]]
+                            local partB = parts[conn[2]]
+                            if partA and partB then
+                                local posA, visibleA = Camera:WorldToViewportPoint(partA.Position)
+                                local posB, visibleB = Camera:WorldToViewportPoint(partB.Position)
+                                if visibleA and visibleB then
+                                    objects.SkeletonLines[idx].From = Vector2.new(posA.X, posA.Y)
+                                    objects.SkeletonLines[idx].To = Vector2.new(posB.X, posB.Y)
+                                    objects.SkeletonLines[idx].Color = getgenv().Matcha.ESP.SkeletonColor
+                                    objects.SkeletonLines[idx].Visible = true
+                                    idx = idx + 1
+                                end
+                            end
+                        end
+                        for i = idx, #objects.SkeletonLines do
+                            objects.SkeletonLines[i].Visible = false
+                        end
+                    else
+                        for _, line in ipairs(objects.SkeletonLines) do
+                            line.Visible = false
+                        end
+                    end
+                else
+                    -- Ẩn tất cả nếu off screen
+                    objects.NameText.Visible = false
+                    objects.HealthBar.Visible = false
+                    objects.HealthBarOutline.Visible = false
+                    objects.HealthText.Visible = false
+                    for _, line in ipairs(objects.SkeletonLines) do line.Visible = false end
+                    highlight.Enabled = false
+                end
+            else
+                DestroyESP(player)
+            end
+        else
+            -- Ẩn tất cả nếu disable ESP
+            if objects then
+                objects.NameText.Visible = false
+                objects.HealthBar.Visible = false
+                objects.HealthBarOutline.Visible = false
+                objects.HealthText.Visible = false
+                for _, line in ipairs(objects.SkeletonLines) do line.Visible = false end
+            end
+            if highlight then highlight.Enabled = false end
+        end
+    end
+end
+
+-- Player Added/Removed Events
+Players.PlayerAdded:Connect(function(player)
+    player.CharacterAdded:Connect(function()
+        task.wait(1)
+        CreateESP(player)
+    end)
+end)
+
+Players.PlayerRemoving:Connect(DestroyESP)
+
+-- Initialize ESP for existing players
+for _, player in pairs(Players:GetPlayers()) do
+    if player ~= LocalPlayer then
+        CreateESP(player)
+    end
+end
+
+-- Update ESP on every frame
+NewConnection(RunService.RenderStepped, UpdateESP)
+RunService.RenderStepped:Connect(function()
+	if getgenv().Matcha.BunnyHop.Enabled and LocalPlayer.Character then
+	    local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+	    local hrp = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+	    
+	    if hum and hrp and UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+	        hum.Jump = true
+	        
+	        local dir = Camera.CFrame.LookVector * Vector3.new(1, 0, 1)
+	        local move = Vector3.zero
+	        
+	        if UserInputService:IsKeyDown(Enum.KeyCode.W) then move += dir end
+	        if UserInputService:IsKeyDown(Enum.KeyCode.S) then move -= dir end
+	        if UserInputService:IsKeyDown(Enum.KeyCode.D) then move += Vector3.new(-dir.Z, 0, dir.X) end
+	        if UserInputService:IsKeyDown(Enum.KeyCode.A) then move += Vector3.new(dir.Z, 0, -dir.X) end
+	        
+	        if move.Magnitude > 0 then
+	            local speed = getgenv().Matcha.BunnyHop.Speed
+	            hrp.Velocity = Vector3.new(move.Unit.X * speed, hrp.Velocity.Y, move.Unit.Z * speed)
+	        end
+	    end
+	end
+    if getgenv().Matcha.Legit.UseFOV then
+        local pos = UserInputService:GetMouseLocation()
+        FOVCircle.Radius = getgenv().Matcha.Legit.FOVSize
+        FOVCircle.Position = pos
+        FOVCircle.Color = getgenv().Matcha.Legit.FOVOutline
+        FOVCircle.Visible = true
+
+        FOVOutline.Radius = getgenv().Matcha.Legit.FOVSize
+        FOVOutline.Position = pos
+        FOVOutline.Color = getgenv().Matcha.Legit.FOVInline
+        FOVOutline.Visible = true
+    else
+        FOVCircle.Visible = false
+        FOVOutline.Visible = false
+    end
+
+    --=== [AUTO SELECT] ===--
+    if getgenv().Matcha.Legit.AutoSelect then
+        toggleTarget2()
+    end
+
+    --=== [CHAMS] ===--
+    local currentTarget = Storage.Targets.Camlock
+    if getgenv().Matcha.Legit.Chams and currentTarget and currentTarget.Character then
+        applyChams(currentTarget)
+    else
+        clearAllChams()
+    end
+end)
+
+-- Anti Slow Logic
+local function toggleAntiSlow(bool)
+    if bool then
+        RunService:BindToRenderStep("Anti-Slow", 0, function()
+            if LocalPlayer.Character.BodyEffects.Movement:FindFirstChild("NoWalkSpeed") then LocalPlayer.Character.BodyEffects.Movement.NoWalkSpeed:Destroy() end
+            if LocalPlayer.Character.BodyEffects.Movement:FindFirstChild("ReduceWalk") then LocalPlayer.Character.BodyEffects.Movement.ReduceWalk:Destroy() end
+            if LocalPlayer.Character.BodyEffects.Movement:FindFirstChild("NoJumping") then LocalPlayer.Character.BodyEffects.Movement.NoJumping:Destroy() end
+            if LocalPlayer.Character.BodyEffects.Reload.Value then LocalPlayer.Character.BodyEffects.Reload.Value = false end
+        end)
+    else
+        RunService:UnbindFromRenderStep("Anti-Slow")
+    end
+end
+
+-- WalkSpeed
+NewConnection(RunService.RenderStepped, function()
+    if getgenv().Matcha.Character.WalkSpeed and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+        LocalPlayer.Character.Humanoid.WalkSpeed = getgenv().Matcha.Character.WalkSpeedValue
+    end
+end)
+
+-- Fly (Simple Implementation)
+local flyConnections = {}
+local function toggleFly(enabled)
+    if enabled then
+        local bodyVelocity = Instance.new("BodyVelocity")
+        bodyVelocity.Parent = LocalPlayer.Character.HumanoidRootPart
+        bodyVelocity.MaxForce = Vector3.new(1e9, 1e9, 1e9)
+        bodyVelocity.Velocity = Vector3.zero
+
+        flyConnections[1] = RunService.RenderStepped:Connect(function()
+            local moveDirection = Vector3.zero
+            local flySpeed = getgenv().Matcha.Character.FlySpeed or 100
+
+            -- Forward / Backward
+            if UserInputService:IsKeyDown(Enum.KeyCode.W) then
+                moveDirection = moveDirection + Camera.CFrame.LookVector
+            elseif UserInputService:IsKeyDown(Enum.KeyCode.S) then
+                moveDirection = moveDirection - Camera.CFrame.LookVector
+            end
+
+            -- Left / Right
+            if UserInputService:IsKeyDown(Enum.KeyCode.A) then
+                moveDirection = moveDirection - Camera.CFrame.RightVector
+            elseif UserInputService:IsKeyDown(Enum.KeyCode.D) then
+                moveDirection = moveDirection + Camera.CFrame.RightVector
+            end
+
+            -- Up / Down
+            if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+                moveDirection = moveDirection + Vector3.new(0, 1, 0)
+            elseif UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
+                moveDirection = moveDirection - Vector3.new(0, 1, 0)
+            end
+
+            if moveDirection.Magnitude > 0 then
+                bodyVelocity.Velocity = moveDirection.Unit * flySpeed
+            else
+                bodyVelocity.Velocity = Vector3.zero
+            end
+        end)
+    else
+        for _, conn in pairs(flyConnections) do
+            conn:Disconnect()
+        end
+        table.clear(flyConnections)
+        local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if hrp and hrp:FindFirstChild("BodyVelocity") then
+            hrp.BodyVelocity:Destroy()
+        end
+    end
+end
+local RunService = game:GetService("RunService")
+local LocalPlayer = game.Players.LocalPlayer
+getgenv().Matcha.Character.Noclip = false
+
+NewConnection(RunService.Stepped, function()
+    if getgenv().Matcha.Character.Noclip and LocalPlayer.Character then
+        for _, v in pairs(LocalPlayer.Character:GetDescendants()) do
+            if v:IsA("BasePart") and v.CanCollide then
+                v.CanCollide = false
+            end
+        end
+    end
+end)
+RunService.RenderStepped:Connect(function(dt)
+    local char = LocalPlayer.Character
+    if not char then return end
+
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+
+    -- Kiểm tra nếu bật CFrameSpeed
+    if hum and hrp and getgenv().Matcha.Character.CFrameSpeed then
+        local moveDir = hum.MoveDirection
+        if moveDir.Magnitude > 0 then
+            -- Tốc độ = MoveDir * dt * speed * multiplier
+            hrp.CFrame = hrp.CFrame + (moveDir * dt) * (getgenv().Matcha.Character.CFrameSpeedValue or 20) * 10
+        end
+    end
+end)
+
+-- Main Connections
+NewConnection(RunService.Heartbeat, function()
+    if getgenv().Matcha.Legit.AimEnabled then
+        updateCamlock()
+        updateSilent()
+    end
+end)
+
+pcall(function()
+    local oldIndex = hookmetamethod(game, "__index", function(self, key)
+        if not checkcaller() and getgenv().Matcha.Legit.SilentAim and Storage.Targets.Silent then
+            if self == Mouse and (key == "Hit" or key == "Target") then
+                local target = Storage.Targets.Silent
+                local char = target.Character
+                if not char then return oldIndex(self, key) end
+                
+                local hum = char:FindFirstChildOfClass("Humanoid")
+                if not hum or hum.Health <= 0 then return oldIndex(self, key) end
+
+                -- Freefall check
+                local isTargetFreefall = hum:GetState() == Enum.HumanoidStateType.Freefall
+                local localHum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+                local isLocalFreefall = localHum and localHum:GetState() == Enum.HumanoidStateType.Freefall or false
+                local freefall = isTargetFreefall or isLocalFreefall
+
+                -- Hit part selection
+                local hitPart = getgenv().Matcha.Legit.HitPart == "Torso" and "UpperTorso" or getgenv().Matcha.Legit.HitPart
+                local targetPart = char:FindFirstChild(hitPart)
+                if not targetPart then return oldIndex(self, key) end
+
+                local root = char:FindFirstChild("HumanoidRootPart")
+                if not root then return oldIndex(self, key) end
+
+                -- Prediction
+                local pred = getgenv().Matcha.Legit.Prediction or 0.135
+                local predPos = targetPart.Position + (root.AssemblyLinearVelocity * pred)
+
+                -- Jump offset for freefall (if Offset enabled)
+                if freefall and getgenv().Matcha.Legit.Offset and getgenv().Matcha.Legit.JumpOffset ~= 0 then
+                    predPos = predPos + Vector3.new(0, getgenv().Matcha.Legit.JumpOffset, 0)
+                end
+
+                -- Return values
+                if key == "Hit" then
+                    return CFrame.new(predPos)
+                elseif key == "Target" then
+                    return targetPart
+                end
+            end
+        end
+        return oldIndex(self, key)
+    end)
+end)
+local desync_setback = Instance.new("Part")
+desync_setback.Name = "DesyncSetback"
+desync_setback.Size = Vector3.new(2, 2, 1)
+desync_setback.CanCollide = false
+desync_setback.Anchored = true
+desync_setback.Transparency = 1
+desync_setback.Parent = workspace
+
+-- Anti Lock Storage
+getgenv().Matcha.AntiLock = {
+    Enabled = false,
+    Mode = "Custom",
+    Custom = { X = 0, Y = 0, Z = 0 },
+    Up = { Amount = 0 },
+    Down = { Amount = 0 },
+    VelMultiply = { Walk = 0, Jump = 0 },
+    LookVec = { Amount = 0 },
+    Reverse = { Amount = 0, Type = "CFrame" },
+    Confusion = { Amount = 0 },
+    PredBreaker = false
+}
+
+-- Helper: Reset Camera
+local function resetCamera()
+    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+        workspace.CurrentCamera.CameraSubject = LocalPlayer.Character.Humanoid
+    end
+end
+
+-- Toggle Desync
+local function toggleDesync()
+    if getgenv().Matcha.Desync.Enabled then
+        workspace.CurrentCamera.CameraSubject = desync_setback
+        Library:Notification("Desync: ON [" .. getgenv().Matcha.Desync.Mode .. "]", 2)
+    else
+        resetCamera()
+        Library:Notification("Desync: OFF", 2)
+    end
+end
+NewConnection(RunService.Heartbeat, function()
+    local target = Storage.Targets.Camlock or Storage.Targets.Silent
+    if not target or not target.Character then return end
+
+    local part = target.Character:FindFirstChild(getgenv().Matcha.Legit.HitPart or "Head")
+    if not part or not isAlive(target) then return end
+
+    if getgenv().Matcha.Legit.WallCheck and not isVisible(part) then return end
+
+    local predicted = part.Position + (part.AssemblyLinearVelocity * (getgenv().Matcha.Legit.Prediction or 0.135))
+    if getgenv().Matcha.Legit.Offset and target.Character.Humanoid:GetState() == Enum.HumanoidStateType.Freefall then
+        predicted = predicted + Vector3.new(0, getgenv().Matcha.Legit.JumpOffset or 0, 0)
+    end
+
+    local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+
+    -- [VIEW TARGET] - Chỉ camera nhìn + đổi CameraSubject
+    if getgenv().Matcha.Legit.ViewTarget then
+        Camera.CFrame = CFrame.new(Camera.CFrame.Position, predicted)
+        workspace.CurrentCamera.CameraSubject = target.Character.Humanoid
+    end
+
+    -- [LOOK AT] - Xoay nhân vật
+    if getgenv().Matcha.Legit.LookAt then
+        LocalPlayer.Character:SetPrimaryPartCFrame(CFrame.lookAt(hrp.Position, predicted))
+    end
+end)
+NewConnection(RunService.Heartbeat, function()
+    if not getgenv().Matcha.Desync.Enabled or not LocalPlayer.Character or not BodyClone then
+        BodyClone:SetPrimaryPartCFrame(CFrame.new(9999, 9999, 9999))
+        BodyCloneHighlight.Enabled = false
+        DesyncLine.Visible = false
+        DesyncDot.Visible = false  -- FIX: Ẩn dot khi tắt Desync
+        return
+    end
+
+	local hrp = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not hrp then 
+        DesyncDot.Visible = false
+        return 
+    end
+
+    local oldCFrame = hrp.CFrame
+    local desyncCFrame = oldCFrame
+
+    -- === CÁC MODE DESYNC (giữ nguyên) ===
+    if getgenv().Matcha.Desync.Mode == "Destroy Cheaters" then
+        desyncCFrame = CFrame.new(9e9, 1, 1)
+    elseif getgenv().Matcha.Desync.Mode == "Underground" then
+        desyncCFrame = CFrame.new(hrp.Position - Vector3.new(0, 12, 0))
+    elseif getgenv().Matcha.Desync.Mode == "Void Spam" then
+        desyncCFrame = math.random(1,2) == 1 and oldCFrame or CFrame.new(math.random(10000,50000), math.random(10000,50000), math.random(10000,50000))
+    elseif getgenv().Matcha.Desync.Mode == "Void" then
+        desyncCFrame = oldCFrame + Vector3.new(math.random(-444444,444444), math.random(-444444,444444), math.random(-44444,44444))
+	elseif getgenv().Matcha.Desync.Mode == "Random" then
+	    local amount = getgenv().Matcha.Desync.RandomAmount
+	    local offset = Vector3.new(
+	        math.random(-amount, amount),
+	        math.random(-amount/2, amount/2),  -- Y ít hơn để không bay quá cao
+	        math.random(-amount, amount)
+	    )
+	    desyncCFrame = CFrame.new(oldCFrame.Position + offset)
+    elseif getgenv().Matcha.Desync.Mode == "Random Target" then
+        local target = Storage.Targets.Camlock or Storage.Targets.Silent
+        if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+            local targetPos = target.Character.HumanoidRootPart.Position
+            local amount = getgenv().Matcha.Desync.RandomAmount
+            local offset = Vector3.new(
+                math.random(-amount, amount),
+                math.random(-amount/2, amount/2),
+                math.random(-amount, amount)
+            )
+            desyncCFrame = CFrame.new(targetPos + offset)
+            
+            -- Da Hood specific logic
+            if game.PlaceId == 2788229376 then
+                local char = target.Character
+                local bodyEffects = char:FindFirstChild("BodyEffects")
+                local forceField = char:FindFirstChildOfClass("ForceField")
+                local tool = LocalPlayer.Character:FindFirstChildOfClass("Tool")
+                
+                if bodyEffects then
+                    local isKO = bodyEffects:FindFirstChild("K.O") and bodyEffects["K.O"].Value
+                    local isSDeath = bodyEffects:FindFirstChild("SDeath") and bodyEffects["SDeath"].Value
+                    
+                    if isKO and not isSDeath then
+                        local upperTorso = char:FindFirstChild("UpperTorso")
+                        if upperTorso then
+                            -- TP to UpperTorso
+                            desyncCFrame = CFrame.new(upperTorso.Position)
+                            -- Stomp
+                            MainRemote:FireServer("Stomp")
+                        end
+                    elseif not forceField then
+                        if tool then
+                            getgenv().ShootPlayer(target, tool)
+                        end
+                    end
+                    -- If ForceField, wait until gone to shoot
+                end
+            end
+        else
+            -- Fallback to normal random if no target
+            local amount = getgenv().Matcha.Desync.RandomAmount
+            local offset = Vector3.new(
+                math.random(-amount, amount),
+                math.random(-amount/2, amount/2),
+                math.random(-amount, amount)
+            )
+            desyncCFrame = CFrame.new(oldCFrame.Position + offset)
+        end
+    end
+    -- === DESYNC THỰC TẾ ===
+    hrp.CFrame = desyncCFrame
+    workspace.CurrentCamera.CameraSubject = desync_setback
+    RunService.RenderStepped:Wait()
+    desync_setback.CFrame = oldCFrame * CFrame.new(0, hrp.Size.Y/2 + 0.5, 0)
+    hrp.CFrame = oldCFrame
+
+    -- === VISUALIZE BODYCLONE ===
+    if getgenv().Matcha.Desync.Visualize then
+        BodyClone:SetPrimaryPartCFrame(desyncCFrame)
+        BodyCloneHighlight.Enabled = true
+    else
+        BodyCloneHighlight.Enabled = false
+        BodyClone:SetPrimaryPartCFrame(CFrame.new(9999, 9999, 9999))
+    end
+
+    -- === LINE DESYNC ===
+    if getgenv().Matcha.Desync.Line and getgenv().Matcha.Desync.Visualize then
+        local rootPos = hrp.Position
+        local clonePos = BodyClone.HumanoidRootPart.Position
+
+        local screen1, onScreen1 = workspace.CurrentCamera:WorldToViewportPoint(rootPos)
+        local screen2, onScreen2 = workspace.CurrentCamera:WorldToViewportPoint(clonePos)
+
+        if onScreen1 and onScreen2 then
+            DesyncLine.From = Vector2.new(screen1.X, screen1.Y)
+            DesyncLine.To = Vector2.new(screen2.X, screen2.Y)
+            DesyncLine.Color = BodyCloneHighlight.FillColor
+            DesyncLine.Visible = true
+        else
+            DesyncLine.Visible = false
+        end
+    else
+        DesyncLine.Visible = false
+    end
+	if getgenv().Matcha.Desync.Dot then
+        local screenPos, onScreen = Camera:WorldToViewportPoint(BodyClone.HumanoidRootPart.Position)
+        if onScreen then
+            DesyncDot.Position = Vector2.new(screenPos.X, screenPos.Y)
+            DesyncDot.Visible = true
+        else
+            DesyncDot.Visible = false
+        end
+    else
+        DesyncDot.Visible = false  -- FIX: Ẩn ngay khi tắt
+    end
+
+    -- === DESYNC STATUS TEXT ===
+    if getgenv().Matcha.Desync.Status then
+        DesyncStatus.Text = "Desync: " .. (getgenv().Matcha.Desync.Enabled and "TRUE" or "FALSE")
+        DesyncStatus.Color = getgenv().Matcha.Desync.Enabled and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
+        DesyncStatus.Visible = true
+    else
+        DesyncStatus.Visible = false
+    end
+end)
+-- THÊM GLOBAL NÀY VÀO ĐẦU SCRIPT (sau getgenv().Matcha.Desync = {...})
+getgenv().Matcha.Desync.LastKONotify = 0
+
+-- LOOP KIỂM TRA K.O RIÊNG (PASTE SAU LOOP DESYNC CHÍNH)
+NewConnection(RunService.Heartbeat, function()
+    pcall(function()
+        if not getgenv().Matcha.Desync.Enabled or getgenv().Matcha.Desync.Mode ~= "Random Target" then return end
+        
+        local target = Storage.Targets.Camlock or Storage.Targets.Silent
+        if not target or not target.Character then return end
+        
+        if game.PlaceId == 2788229376 then
+            local char = target.Character
+            local bodyEffects = char:FindFirstChild("BodyEffects")
+            if bodyEffects then
+                local koValue = bodyEffects:FindFirstChild("K.O")
+                local sdeathValue = bodyEffects:FindFirstChild("SDeath")
+                if koValue and koValue.Value and (not sdeathValue or not sdeathValue.Value) then
+                    -- TẮT DESYNC + RESET
+                    getgenv().Matcha.Desync.Enabled = false
+                    resetCamera()
+                    
+                    -- RESET VISUALIZE
+                    BodyClone:SetPrimaryPartCFrame(CFrame.new(9999, 9999, 9999))
+                    BodyCloneHighlight.Enabled = false
+                    DesyncLine.Visible = false
+                    DesyncDot.Visible = false
+                    
+                    -- NOTIFY ĐỎ (debounce 3s)
+                    if not getgenv().Matcha.Desync.LastKONotify or tick() - getgenv().Matcha.Desync.LastKONotify > 3 then
+                        Library:Notification("Desync turned off", 3, Color3.fromRGB(255, 0, 0), flags["Notification Position"])
+                        getgenv().Matcha.Desync.LastKONotify = tick()
+                    end
+                end
+            end
+        end
+    end)
+end)
+-- Thêm hàm Levenshtein distance (để tìm tên gần đúng)
+local function levenshtein(s, t)
+    local m, n = #s, #t
+    if m == 0 then return n end
+    if n == 0 then return m end
+    local d = {}
+    for i = 0, m do d[i] = {[0] = i} end
+    for j = 0, n do d[0][j] = j end
+    for i = 1, m do
+        for j = 1, n do
+            local cost = (s:sub(i,i) == t:sub(j,j)) and 0 or 1
+            d[i][j] = math.min(
+                d[i-1][j] + 1,
+                d[i][j-1] + 1,
+                d[i-1][j-1] + cost
+            )
+        end
+    end
+    return d[m][n]
+end
+
+-- Hàm tìm player gần đúng tên nhất (dùng Levenshtein nếu ko exact match)
+local function findClosestPlayer(query)
+    query = string.lower(query)
+    local bestMatch, bestScore = nil, math.huge
+    for _, plr in pairs(Players:GetPlayers()) do
+        local uname = string.lower(plr.Name)
+        local dname = string.lower(plr.DisplayName)
+        if string.find(uname, query) or string.find(dname, query) then
+            return plr
+        end
+        local score = math.min(levenshtein(uname, query), levenshtein(dname, query))
+        if score < bestScore then
+            bestScore = score
+            bestMatch = plr
+        end
+    end
+    return bestMatch
+end
+
+-- Hàm tìm MainRemote (đa năng cho nhiều game)
+local possibleRemotes = { "MAINEVENT", "MainEvent", "Remote", "Packages", "MainRemotes", "Bullets" }
+local function getMainRemote()
+    if ReplicatedStorage:FindFirstChild("MainEvent") then return ReplicatedStorage.MainEvent end
+    if ReplicatedStorage:FindFirstChild("MAINEVENT") then return ReplicatedStorage.MAINEVENT end
+    if ReplicatedStorage:FindFirstChild("Remote") then return ReplicatedStorage.Remote end
+    if ReplicatedStorage:FindFirstChild("Bullets") then return ReplicatedStorage.Bullets end
+    -- MainRemotes.MainRemoteEvent
+    local mainRemotes = ReplicatedStorage:FindFirstChild("MainRemotes")
+    if mainRemotes and mainRemotes:FindFirstChild("MainRemoteEvent") then return mainRemotes.MainRemoteEvent end
+    -- Packages.Knit.Services.ToolService.RE.UpdateAim
+    local packages = ReplicatedStorage:FindFirstChild("Packages")
+    if packages then
+        local knit = packages:FindFirstChild("Knit")
+        if knit and knit:FindFirstChild("Services") then
+            local toolService = knit.Services:FindFirstChild("ToolService")
+            if toolService and toolService:FindFirstChild("RE") then
+                local re = toolService.RE
+                if re:FindFirstChild("UpdateAim") then return re.UpdateAim end
+            end
+        end
+    end
+    -- fallback: không tìm thấy
+    return nil
+end
+
+local MainRemote = getMainRemote() -- Gọi một lần để cache
+
+-- Hàm ShootPlayer (dùng để bắn)
+getgenv().ShootPlayer = function(target, tool)
+    if not tool:FindFirstChild("Handle") then return end
+    local targetHead = target.Character:FindFirstChild("Head")
+    if not targetHead then return end
+    MainRemote:FireServer("ShootGun", tool.Handle, tool.Handle.CFrame.Position, targetHead.Position, targetHead, Vector3.new(0, 0, -1))
+end
+
+-- Cấu hình Auto Reload
+getgenv().Matcha.AutoReload = {
+    Enabled = false
+}
+
+-- Logic Auto Reload
+local function startAutoReload()
+    if _G.AutoReloadConnection then
+        _G.AutoReloadConnection:Disconnect()
+        _G.AutoReloadConnection = nil
+    end
+    if getgenv().Matcha.AutoReload.Enabled and MainRemote then
+        _G.AutoReloadConnection = RunService.RenderStepped:Connect(function()
+            local tool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool")
+            local ammo = tool and tool:FindFirstChild("Ammo")
+            if ammo and ammo.Value <= 0 then
+                MainRemote:FireServer("Reload", tool)
+                task.wait(3.7) -- Delay reload (có thể adjust nếu cần)
+            end
+        end)
+    end
+end
+
+-- Fake Silent Aim vars (cho executor kém, ko support hookmetamethod)
+getgenv().whitelist = {} -- Bỏ trống hoặc add tên whitelist nếu cần
+local silentAimFakeEnabled = false
+local targetLockEnabled = false
+local fovEnabled = false
+local fovColor = Color3.fromRGB(255, 255, 255)
+local fovSize = 100
+local currentTarget = nil
+local isMobile = UserInputService.TouchEnabled
+local fovCircle = Drawing.new("Circle")
+fovCircle.Thickness = 1
+fovCircle.NumSides = 100
+fovCircle.Radius = fovSize
+fovCircle.Visible = false
+fovCircle.Color = fovColor
+fovCircle.Filled = false
+fovCircle.Transparency = 1
+fovCircle.Position = Vector2.new(0, 0)
+
+local function getClosestPlayer(checkFOV)
+    local camera = workspace.CurrentCamera
+    local pos = isMobile and (camera.ViewportSize / 2) or UserInputService:GetMouseLocation()
+    local closest, closestDist = nil, math.huge
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Head") and not table.find(getgenv().whitelist, player.Name) then
+            local head = player.Character.Head
+            local screenPos, onScreen = camera:WorldToViewportPoint(head.Position)
+            if onScreen then
+                local dist = (Vector2.new(screenPos.X, screenPos.Y) - pos).Magnitude
+                if checkFOV and fovEnabled and dist > fovSize then continue end
+                -- Check for obstacles/walls
+                local rayParams = RaycastParams.new()
+                rayParams.FilterType = Enum.RaycastFilterType.Exclude
+                rayParams.FilterDescendantsInstances = {LocalPlayer.Character}
+                local ray = workspace:Raycast(camera.CFrame.Position, (head.Position - camera.CFrame.Position), rayParams)
+                if ray and ray.Instance:IsDescendantOf(player.Character) then
+                    if dist < closestDist then
+                        closestDist = dist
+                        closest = player
+                    end
+                end
+            end
+        end
+    end
+    return closest
+end
+
+-- RenderStepped cho Fake Silent Aim
+NewConnection(RunService.RenderStepped, function()
+    if fovEnabled then
+        local pos = isMobile and (workspace.CurrentCamera.ViewportSize / 2) or UserInputService:GetMouseLocation()
+        fovCircle.Position = pos
+        fovCircle.Radius = fovSize
+    end
+    if targetLockEnabled then return end
+    if silentAimFakeEnabled then
+        local newTarget = getClosestPlayer(true)
+        if newTarget then
+            currentTarget = newTarget
+        else
+            currentTarget = nil
+        end
+    end
+end)
+
+local isFiring2 = false
+UserInputService.InputBegan:Connect(function(input, gp)
+    if gp then return end
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        if currentTarget then
+            isFiring2 = true
+            task.spawn(function()
+                while isFiring2 and currentTarget do
+                    local tool = LocalPlayer.Character:FindFirstChildOfClass("Tool")
+                    if tool then
+                        getgenv().ShootPlayer(currentTarget, tool)
+                    end
+                    task.wait()
+                end
+            end)
+        end
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        isFiring2 = false
+    end
+end)
+getgenv().stompTargetEnabled = false
+getgenv().lastPosition = nil  -- CFrame lưu vị trí cũ
+local stompConn = nil
+
+-- FUNCTION TOGGLE AUTOSTOMP (dựa ví dụ 2 + desync)
+local function toggleStomp(state)
+    getgenv().stompTargetEnabled = state
+    if state then
+        stompConn = RunService.Heartbeat:Connect(function()
+            local lockedTarget = Storage.Targets.Camlock or Storage.Targets.Silent
+            if not getgenv().stompTargetEnabled or not lockedTarget or lockedTarget == LocalPlayer then return end
+            local char = lockedTarget.Character
+            if not char then return end
+            local bodyEffects = char:FindFirstChild("BodyEffects")
+            if not bodyEffects then return end
+            local isKO = bodyEffects:FindFirstChild("K.O") and bodyEffects["K.O"].Value
+            local isSDeath = bodyEffects:FindFirstChild("SDeath") and bodyEffects["SDeath"].Value
+            local upperTorso = char:FindFirstChild("UpperTorso")
+            local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if not myRoot or not upperTorso then return end
+            
+            if isKO and not isSDeath then
+                spawn(function()
+                    local oldCFrame = myRoot.CFrame
+                    if not getgenv().lastPosition then getgenv().lastPosition = oldCFrame end
+                    local tp = upperTorso.Position + Vector3.new(0, 4, 0)
+                    myRoot.CFrame = CFrame.new(tp)
+                    if MainRemote then MainRemote:FireServer("Stomp") end
+                    -- DESYNC NHANH (giống ví dụ 2)
+                    local cam = Workspace.CurrentCamera
+                    cam.CameraSubject = desync_setback
+                    RunService.RenderStepped:Wait()
+                    desync_setback.CFrame = oldCFrame * CFrame.new(0, myRoot.Size.Y/2 + 0.5, 0)
+                    myRoot.CFrame = oldCFrame
+                    resetCamera()
+                end)
+            elseif isSDeath and getgenv().lastPosition then
+                myRoot.CFrame = getgenv().lastPosition
+                getgenv().lastPosition = nil
+                resetCamera()
+            end
+        end)
+        Library:Notification("AutoStompTarget: ON", 2, Color3.fromRGB(0,255,0))
+    else
+        if stompConn then stompConn:Disconnect(); stompConn = nil end
+        if getgenv().lastPosition then
+            local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if myRoot then myRoot.CFrame = getgenv().lastPosition end
+            getgenv().lastPosition = nil
+            resetCamera()
+        end
+        Library:Notification("AutoStompTarget: OFF", 2, Color3.fromRGB(255,0,0))
+    end
+end
+NewConnection(RunService.Heartbeat, function()
+    if not getgenv().Matcha.AntiLock.Enabled or not LocalPlayer.Character then return end
+    local hrp = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    local hum = LocalPlayer.Character:FindFirstChild("Humanoid")
+    if not hrp or not hum then return end
+
+    local vel = hrp.Velocity
+    local cf = hrp.CFrame
+
+    local S = getgenv().Matcha.AntiLock
+
+    if S.Mode == "Custom" and S.Custom.X ~= 0 or S.Custom.Y ~= 0 or S.Custom.Z ~= 0 then
+        hrp.Velocity = Vector3.new(S.Custom.X, S.Custom.Y, S.Custom.Z)
+        RunService.RenderStepped:Wait()
+        hrp.Velocity = vel
+    elseif S.Mode == "Up" and S.Up.Amount > 0 then
+        hrp.Velocity = Vector3.new(vel.X, S.Up.Amount, vel.Z)
+        RunService.RenderStepped:Wait()
+        hrp.Velocity = vel
+    elseif S.Mode == "Down" and S.Down.Amount > 0 then
+        hrp.Velocity = Vector3.new(vel.X, -S.Down.Amount, vel.Z)
+        RunService.RenderStepped:Wait()
+        hrp.Velocity = vel
+    elseif S.Mode == "VelMultiply" and (S.VelMultiply.Walk > 0 or S.VelMultiply.Jump > 0) then
+        hrp.Velocity = vel * Vector3.new(S.VelMultiply.Walk, S.VelMultiply.Jump, S.VelMultiply.Walk)
+        RunService.RenderStepped:Wait()
+        hrp.Velocity = vel
+    elseif S.Mode == "LookVec" and S.LookVec.Amount > 0 then
+        hrp.Velocity = cf.lookVector * S.LookVec.Amount
+        RunService.RenderStepped:Wait()
+        hrp.Velocity = vel
+    elseif S.Mode == "Reverse" and S.Reverse.Amount > 0 then
+        if S.Reverse.Type == "CFrame" then
+            hrp.CFrame = cf - hum.MoveDirection * (S.Reverse.Amount / 10)
+        else
+            hrp.Velocity = vel * Vector3.new(-S.Reverse.Amount/2.5, 1, -S.Reverse.Amount/2.5)
+            RunService.RenderStepped:Wait()
+            hrp.Velocity = vel
+        end
+    elseif S.Mode == "Confusion" and S.Confusion.Amount > 0 then
+        hrp.CFrame = cf * CFrame.new(math.random(1,2)==1 and S.Confusion.Amount or -S.Confusion.Amount, 0, 0)
+    elseif S.Mode == "PredBreaker" then
+        hrp.Velocity = Vector3.zero
+        RunService.RenderStepped:Wait()
+        hrp.Velocity = vel
+    end
+end)
+
+local Aimlock = Tabs.Legit:AddLeftGroupbox('Aimlock')
+Aimlock:AddToggle('AimEnabled', {
+    Text = 'Aim Enabled',
+    Default = false, 
+    Tooltip = 'Enable aim lol', 
+    Callback = function(Value)
+        getgenv().Matcha.Legit.AimEnabled = Value
+    end
+}):AddKeyPicker('KeyPicker', {
+    Default = 'C',
+    SyncToggleState = false,
+    Mode = 'Toggle', -- Modes: Always, Toggle, Hold
+
+    Text = 'Set target', -- Text to display in the keybind menu
+    NoUI = false, -- Set to true if you want to hide from the Keybind menu,
+
+    Callback = function()
+        toggleTarget()
+    end,
+})
+Aimlock:AddToggle('Aimlock', {
+    Text = 'Aimlock',
+    Default = false, 
+    Callback = function(Value)
+        getgenv().Matcha.Legit.Aimlock = Value
+    end
+})
+Aimlock:AddToggle('AutoSelect', {
+    Text = 'AutoSelect',
+    Default = false, 
+    Callback = function(Value)
+        getgenv().Matcha.Legit.AutoSelect = Value
+    end
+})
+Aimlock:AddToggle('SilentAim', {
+    Text = 'Silent Aim',
+    Default = false, 
+    Callback = function(Value)
+        getgenv().Matcha.Legit.SilentAim = Value
+        if bool and not hookmetamethod then
+				    getgenv().Matcha.Legit.SilentAim = false  -- tự động tắt
+				    Library:Notification("Warning: Your executor does not support Silent Aim (hookmetamethod missing).")
+			  end
+    end
+})
+Aimlock:AddInput('Prediction', {
+    Default = '0.135',
+    Numeric = true, -- true / false, only allows numbers
+    Finished = false, -- true / false, only calls callback when you press enter
+
+    Text = 'Prediction xy',
+    Tooltip = 'Prediction for aimlock/silent aim', 
+
+    Placeholder = 'Number', 
+    Callback = function(Value)
+        getgenv().Matcha.Legit.Prediction = Value
+    end
+})
+Aimlock:AddToggle('Smoothing', {
+    Text = 'Smoothing',
+    Default = false, 
+    Tooltip = 'Enable to use smoothing xy', 
+    Callback = function(Value)
+        getgenv().Matcha.Legit.Smoothing = Value
+    end
+})
+Aimlock:AddInput('SmoothingX', {
+    Default = '0.9',
+    Numeric = true, -- true / false, only allows numbers
+    Finished = false, -- true / false, only calls callback when you press enter
+
+    Text = 'Smoothing X',
+    Placeholder = 'Number', 
+    Callback = function(Value)
+        getgenv().Matcha.Legit.SmoothingX = Value
+    end
+})
+Aimlock:AddInput('SmoothingY', {
+    Default = '0.9',
+    Numeric = true, -- true / false, only allows numbers
+    Finished = false, -- true / false, only calls callback when you press enter
+
+    Text = 'Smoothing Y',
+    Placeholder = 'Number', 
+    Callback = function(Value)
+        getgenv().Matcha.Legit.SmoothingY = Value
+    end
+})
+Aimlock:AddToggle('Jumpoffset', {
+    Text = 'Jumpoffset',
+    Default = false, 
+    Tooltip = 'Enable to Jumpoffset', 
+    Callback = function(Value)
+        getgenv().Matcha.Legit.Offset = Value
+    end
+})
+Aimlock:AddInput('Jumpoffsetvalue', {
+    Default = '0',
+    Numeric = true, -- true / false, only allows numbers
+    Finished = false, -- true / false, only calls callback when you press enter
+
+    Text = 'Jump Offset Value',
+    Placeholder = 'Number', 
+    Callback = function(Value)
+        getgenv().Matcha.Legit.JumpOffset = Value
+    end
+})
+Aimlock:AddDropdown('Hitpart', {
+    Values = { 'Head', 'HumanoidRootPart', 'UpperTorso', 'LowerTorso', 'Torso(R6)' },
+    Default = 'Head', -- number index of the value / string
+    Multi = false, -- true / false, allows multiple choices to be selected
+
+    Text = 'Aimpart',
+    Tooltip = 'Select aimpart',
+
+    Callback = function(Value)
+        getgenv().Matcha.Legit.HitPart = Value
+    end
+})
+Aimlock:AddInput("FUcing", {
+    Default = "",
+    Numeric = false,
+    Finished = false,
+
+    Text = "Set Target by Name",
+    Placeholder = "Name/DisplayName player",
+
+    Callback = function(Value)
+        -- Clear nếu trống
+        if Value == "" then
+            Storage.Targets.Camlock = nil
+            Storage.Targets.Silent = nil
+            Storage.LastNotifiedTarget = nil
+            
+            Library:Notify("Target cleared")
+            return
+        end
+
+        local target = findClosestPlayer(Value)
+
+        if target then
+            Storage.Targets.Camlock = target
+            Storage.Targets.Silent = target
+
+            Storage.BodyParts.Camlock = getgenv().Matcha.Legit.HitPart
+            Storage.BodyParts.Silent = getgenv().Matcha.Legit.HitPart
+
+            Library:Notify("Target set: " .. target.DisplayName .. " (@" .. target.Name .. ")")
+            Storage.LastNotifiedTarget = target
+
+        else
+            Library:Notify("No player found matching: " .. Value)
+        end
+    end
+})
+Aimlock:AddButton({
+    Text = "TP to Target",
+    Func = function()
+        local target = Storage.Targets.Camlock or Storage.Targets.Silent
+        if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+            local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if root then
+                root.CFrame = target.Character.HumanoidRootPart.CFrame + Vector3.new(0, 3, 0)
+            end
+        else
+            Library:Notify("No target selected!")
+        end
+    end
+})
+
+Aimlock:AddToggle({
+    Name = "Alive Check",
+    Callback = function(Value)
+        getgenv().Matcha.Legit.Checks.GrabbedKnocked = Value
+    end
+})
+
+Aimlock:AddToggle({
+    Name = "Wall Check",
+    Default = false,
+    Callback = function(Value)
+        getgenv().Matcha.Legit.WallCheck = Value
+    end
+})
+local Targetsetting = Tabs.Main:AddRightGroupbox('Target')
+
+	-- LEGIT VISUALS SETTINGS
+Targetsetting:AddToggle({
+    Name = "Use FOV",
+    Default = false,
+    Callback = function(Value)
+        getgenv().Matcha.Legit.UseFOV = Value
+    end
+}):AddColorPicker({
+    Name = "FOV Outline",
+    Default = Color3.fromRGB(0, 0, 0),
+    Callback = function(Value)
+        getgenv().Matcha.Legit.FOVOutline = Value
+    end
+}):AddColorPicker({
+    Name = "FOV Inline",
+    Default = Color3.fromRGB(255, 255, 255),
+    Callback = function(Value)
+        getgenv().Matcha.Legit.FOVInline = Value
+    end
+})
+
+
+Targetsetting:AddSlider('FOVSize', {
+    Text = 'FOV Size',
+    Default = 150,
+    Min = 1,
+    Max = 1000,
+    Rounding = 0,
+    Callback = function(val)
+        getgenv().Matcha.Legit.FOVSize = val
+    end
+})
+Targetsetting:AddToggle({
+    Name = "Chams Target",
+    Default = false,
+    Callback = function(bool)
+        getgenv().Matcha.Legit.Chams = bool
+    end
+}):AddColorPicker({
+    Name = "Chams Outline",
+    Default = Color3.fromRGB(255, 0, 0),
+    Callback = function(col)
+        getgenv().Matcha.Legit.ChamsOutline = col
+    end
+}):AddColorPicker({
+    Name = "Chams Inline",
+    Default = Color3.fromRGB(255, 255, 255),
+    Callback = function(col)
+        getgenv().Matcha.Legit.ChamsInline = col
+    end
+})
+local Crosshair = Tabs.Main:AddRightGroupbox('Crosshair')
+
+pcall(function()
+    -- Test hookfunction support
+    local test = hookfunction or function() end
+    
+    -- Test Drawing.new hook
+    local oldDrawing = Drawing.new
+    local testDrawing = oldDrawing("Circle")
+    testDrawing:Remove()
+    
+    -- Crosshair Settings Storage
+    getgenv().crosshair = {
+        enabled = true,
+        refreshrate = 0,
+        mode = 'mouse',
+        position = Vector2.new(0, 0),
+        width = 1.5,
+        length = 10,
+        radius = 11,
+        color = Color3.fromRGB(118, 241, 69), -- Matcha green
+        spin = true,
+        spin_speed = 150,
+        spin_max = 340,
+        spin_style = Enum.EasingStyle.Sine,
+        resize = true,
+        resize_speed = 150,
+        resize_min = 5,
+        resize_max = 22,
+    }
+    
+    -- Hook Drawing.new để tạo nhanh
+    local old; old = hookfunction(Drawing.new, function(class, properties)
+        local drawing = old(class)
+        for i, v in next, properties or {} do
+            drawing[i] = v
+        end
+        return drawing
+    end)
+    
+    -- Services
+    local runservice = game:GetService('RunService')
+    local inputservice = game:GetService('UserInputService')
+    local tweenservice = game:GetService('TweenService')
+    local camera = workspace.CurrentCamera
+    
+    -- Drawings
+    local last_render = 0
+    local drawings = {
+        crosshair = {},
+        text = {
+            Drawing.new('Text', {
+                Size = 13,
+                Font = 2,
+                Outline = true,
+                Text = 'Matcha',
+                Color = Color3.fromRGB(118, 241, 69) -- Matcha green
+            }),
+            Drawing.new('Text', {
+                Size = 13,
+                Font = 2,
+                Outline = true,
+                Text = ".lol",
+                Color = Color3.new(1, 1, 1) -- White
+            })
+        },
+    }
+    for idx = 1, 8 do
+        drawings.crosshair[idx] = Drawing.new('Line')
+    end
+    
+    -- Math helper
+    function solve(angle, radius)
+        return Vector2.new(
+            math.sin(math.rad(angle)) * radius,
+            math.cos(math.rad(angle)) * radius
+        )
+    end
+    
+    -- Render Loop
+    runservice.PostSimulation:Connect(function()
+        local _tick = tick()
+        if _tick - last_render > getgenv().crosshair.refreshrate then
+            last_render = _tick
+            local position = (
+                getgenv().crosshair.mode == 'center' and camera.ViewportSize / 2 or
+                getgenv().crosshair.mode == 'mouse' and inputservice:GetMouseLocation() or
+                getgenv().crosshair.position
+            )
+            local text_x = drawings.text[1].TextBounds.X + drawings.text[2].TextBounds.X
+            drawings.text[1].Visible = getgenv().crosshair.enabled
+            drawings.text[2].Visible = getgenv().crosshair.enabled
+            if getgenv().crosshair.enabled then
+                drawings.text[1].Position = position + Vector2.new(-text_x / 2, getgenv().crosshair.radius + (getgenv().crosshair.resize and getgenv().crosshair.resize_max or getgenv().crosshair.length) + 15)
+                drawings.text[2].Position = drawings.text[1].Position + Vector2.new(drawings.text[1].TextBounds.X)
+                drawings.text[2].Color = Color3.new(1, 1, 1) -- .lol luôn trắng
+                for idx = 1, 4 do
+                    local outline = drawings.crosshair[idx]
+                    local inline = drawings.crosshair[idx + 4]
+                    local angle = (idx - 1) * 90
+                    local length = getgenv().crosshair.length
+                    -- Spin effect
+                    if getgenv().crosshair.spin then
+                        local spin_angle = -_tick * getgenv().crosshair.spin_speed % getgenv().crosshair.spin_max
+                        angle = angle + tweenservice:GetValue(spin_angle / 360, getgenv().crosshair.spin_style, Enum.EasingDirection.InOut) * 360
+                    end
+                    -- Resize effect
+                    if getgenv().crosshair.resize then
+                        local resize_length = tick() * getgenv().crosshair.resize_speed % 180
+                        length = getgenv().crosshair.resize_min + math.sin(math.rad(resize_length)) * (getgenv().crosshair.resize_max - getgenv().crosshair.resize_min)
+                    end
+                    -- Inline
+                    inline.Visible = true
+                    inline.Color = getgenv().crosshair.color
+                    inline.From = position + solve(angle, getgenv().crosshair.radius)
+                    inline.To = position + solve(angle, getgenv().crosshair.radius + length)
+                    inline.Thickness = getgenv().crosshair.width
+                    -- Outline
+                    outline.Visible = true
+                    outline.Color = Color3.new(0, 0, 0)
+                    outline.From = position + solve(angle, getgenv().crosshair.radius - 1)
+                    outline.To = position + solve(angle, getgenv().crosshair.radius + length + 1)
+                    outline.Thickness = getgenv().crosshair.width + 1.5
+                end
+            else
+                for idx = 1, 8 do
+                    drawings.crosshair[idx].Visible = false
+                end
+            end
+        end
+    end)
+    
+    Crosshair:AddToggle("CrosshairEnabled", {
+        Text = "Crosshair",
+        Default = true,
+        Callback = function(bool)
+            getgenv().crosshair.enabled = bool
+        end
+    }):AddColorPicker("CrosshairColor", {
+        Text = "Color",
+        Default = Color3.fromRGB(118, 241, 69),
+        Callback = function(col)
+            getgenv().crosshair.color = col
+            drawings.text[1].Color = col  -- Matcha đổi màu theo crosshair
+        end
+    }):AddSlider("CrosshairSpinSpeed", {
+        Text = "Spin Speed",
+        Default = 150,
+        Min = 1,
+        Max = 1000,
+        Rounding = 0,
+        Callback = function(val)
+            getgenv().crosshair.spin_speed = val
+        end
+    })
+    
+end)
+
+if not getgenv().crosshair then
+    getgenv().crosshair = { enabled = false }
+
+    Crosshair:AddLabel("⚠️ Executor not support Crosshair")
+    Crosshair:AddToggle({
+        Name = "Crosshair",
+        Default = false,
+        Callback = function()
+            Library:Notify("Crosshair not supported on this executor", 3)
+        end
+    })
+end
+
+getgenv().Matcha.RapidFire = {
+  Enabled = false,
+  Delay = 0,          
+  IsFiring = false
+}
+
+-- // UTILITY: LẤY SÚNG TRONG NHÂN VẬT
+local function getGun()
+  local char = LocalPlayer.Character
+  if not char then return end
+  for _, tool in ipairs(char:GetChildren()) do
+      if tool:IsA("Tool") and tool:FindFirstChild("Ammo") then
+          return tool
+      end
+  end
+end
+
+-- // INPUT SERVICE
+local UIS = game:GetService("UserInputService")
+
+-- // BẮT ĐẦU BẮN
+UIS.InputBegan:Connect(function(input, gameProcessed)
+  if gameProcessed or input.UserInputType ~= Enum.UserInputType.MouseButton1 then return end
+
+  local gun = getGun()
+  if not getgenv().Matcha.RapidFire.Enabled or not gun or getgenv().Matcha.RapidFire.IsFiring then return end
+
+  getgenv().Matcha.RapidFire.IsFiring = true
+
+  task.spawn(function()
+      while getgenv().Matcha.RapidFire.IsFiring and getgenv().Matcha.RapidFire.Enabled do
+          pcall(function()
+              gun:Activate()  -- Gọi Activate() → game sẽ tự xử lý bắn
+          end)
+          task.wait(getgenv().Matcha.RapidFire.Delay)
+      end
+  end)
+end)
+
+-- // DỪNG BẮN
+UIS.InputEnded:Connect(function(input)
+  if input.UserInputType == Enum.UserInputType.MouseButton1 then
+      getgenv().Matcha.RapidFire.IsFiring = false
+  end
+end)
+local MiscSection = Tabs.Main:AddRightGroupbox('Misc')
+
+
+-- Rapid Fire
+MiscSection:AddToggle("RapidFire", {
+    Text = "Rapid Fire",
+    Default = false,
+    Callback = function(bool)
+        getgenv().Matcha.RapidFire.Enabled = bool
+        if bool then
+            Library:Notify("Rapid Fire: ON")
+        else
+            getgenv().Matcha.RapidFire.IsFiring = false
+            Library:Notify("Rapid Fire: OFF")
+        end
+    end
+})
+
+-- Auto Reload
+MiscSection:AddToggle("AutoReload", {
+    Text = "Auto Reload",
+    Default = false,
+    Callback = function(bool)
+        getgenv().Matcha.AutoReload.Enabled = bool
+        startAutoReload()
+        if bool then
+            Library:Notify("Auto Reload: ON")
+        else
+            Library:Notify("Auto Reload: OFF")
+        end
+    end
+})
+
+-- Fake Silent Aim Section
+local FakeSilentSection = Tabs.Main:AddRightGroupbox("Fake Silent Aim (for bad executors)")
+
+-- Silent Aim Toggle
+FakeSilentSection:AddToggle("SilentAimFake", {
+    Text = "Silent Aim",
+    Default = false,
+    Callback = function(bool)
+        silentAimFakeEnabled = bool
+        if not bool then currentTarget = nil end
+    end
+})
+
+-- Target Lock Toggle with Keybind
+local TargetLockToggle = FakeSilentSection:AddToggle("TargetLock", {
+    Text = "Target Lock",
+    Default = false,
+    Callback = function(bool)
+        targetLockEnabled = bool
+        if not bool then currentTarget = nil end
+    end
+})
+
+TargetLockToggle:AddKeyPicker("TargetLockKey", {
+    Default = Enum.KeyCode.Q,
+    Mode = "Toggle",
+    Text = "Target Lock Key",
+    Callback = function()
+        if targetLockEnabled then
+            if currentTarget then
+                currentTarget = nil
+                Library:Notify("Untargeted")
+            else
+                currentTarget = getClosestPlayer(false)
+                if currentTarget then
+                    Library:Notify("Locked: " .. currentTarget.DisplayName)
+                end
+            end
+        end
+    end
+})
+
+-- FOV Toggle + ColorPicker
+local FOVToggle = FakeSilentSection:AddToggle("FOVFake", {
+    Text = "FOV",
+    Default = false,
+    Callback = function(bool)
+        fovEnabled = bool
+        fovCircle.Visible = bool
+    end
+})
+
+FOVToggle:AddColorPicker("FOVColorFake", {
+    Text = "FOV Color",
+    Default = Color3.fromRGB(255, 255, 255),
+    Callback = function(col)
+        fovColor = col
+        fovCircle.Color = col
+    end
+})
+
+-- FOV Size Slider
+FakeSilentSection:AddSlider("FOVSizeFake", {
+    Text = "FOV Size",
+    Min = 1,
+    Max = 1000,
+    Default = 100,
+    Rounding = 0,
+    Callback = function(val)
+        fovSize = val
+        fovCircle.Radius = val
+    end
+})
+local Charactertabbox = Tabs.Character:AddLeftTabbox()
+local MovementTab = Charactertabbox:AddTab('MovementTab')
+local TeleportTab = Charactertabbox:AddTab('TeleportTab')
+local loltabbox = Tabs.Character:AddLeftTabbox()
+local AvatarTab = loltabbox:AddTab('Avatar')
+local AnimationTab = loltabbox:AddTab('Animation')
+local antiaimtabbox = Tabs.Character:AddRightTabbox()
+local Desynctab = antiaimtabbox:AddTab('Desync')
+local VelocitySpooferTab = antiaimtabbox:AddTab('VelocitySpoofer')
+    local Avatars = CharacterPage:Weapon({Icon = "rbxassetid://16997954488"})
+    local AntiAim = CharacterPage:Weapon({Icon = "rbxassetid://16997762295"})
+    local Esp = CharacterPage:Weapon({Icon = "http://www.roblox.com/asset/?id=77746565540051"})
+MovementTab:AddToggle("WalkSpeed", {
+    Text = "WalkSpeed",
+    Callback = function(bool)
+        getgenv().Matcha.Character.WalkSpeed = bool
+    end
+}):AddKeyPicker("WalkSpeedKey", {
+    Mode = "Toggle",
+    Text = "WalkSpeed Key",
+    Callback = function(bool)
+        getgenv().Matcha.Character.WalkSpeed = bool
+    end
+})
+MovementTab:AddSlider("WalkSpeedValue", {
+    Text = "WalkSpeed Value",
+    Min = 16,
+    Max = 300,
+    Default = 50,
+    Rounding = 0,
+    Callback = function(val)
+        getgenv().Matcha.Character.WalkSpeedValue = val
+    end
+})
+MovementTab:AddToggle("Fly", {
+    Text = "Fly",
+    Callback = function(bool)
+        getgenv().Matcha.Character.Fly = bool
+        toggleFly(bool)
+    end
+}):AddKeyPicker("FlyKey", {
+    Mode = "Toggle",
+    Text = "Fly Key",
+    Callback = function(bool)
+        getgenv().Matcha.Character.Fly = bool
+        toggleFly(bool)
+    end
+})
+MovementTab:AddSlider("FlySpeed", {
+    Text = "Fly Speed",
+    Min = 10,
+    Max = 500,
+    Default = 50,
+    Rounding = 0,
+    Callback = function(val)
+        getgenv().Matcha.Character.FlySpeed = val
+    end
+})
+
+MovementTab:AddToggle("CFrameSpeed", {
+    Text = "CFrame Speed",
+    Callback = function(bool)
+        getgenv().Matcha.Character.CFrameSpeed = bool
+    end
+}):AddKeyPicker("CFrameSpeedKey", {
+    Mode = "Toggle",
+    Text = "CFrameSpeed Key",
+    Callback = function(bool)
+        getgenv().Matcha.Character.CFrameSpeed = bool
+    end
+})
+MovementTab:AddSlider("CFrameSpeedValue", {
+    Text = "CFrame Speed Value",
+    Min = 10,
+    Max = 500,
+    Default = 50,
+    Rounding = 0,
+    Callback = function(val)
+        getgenv().Matcha.Character.CFrameSpeedValue = val
+    end
+})
+
+-- Bunny Hop
+MovementTab:AddToggle("BunnyHop", {
+    Text = "🐇 Bunny Hop",
+    Default = false,
+    Callback = function(bool)
+        getgenv().Matcha.BunnyHop.Enabled = bool
+        if bool then
+            Library:Notify("Bunny Hop: ON")
+        else
+            Library:Notify("Bunny Hop: OFF")
+        end
+    end
+}):AddKeyPicker("BunnyKey", {
+    Mode = "Toggle",
+    Text = "Bunny Key",
+    Callback = function(bool)
+        getgenv().Matcha.BunnyHop.Enabled = bool
+    end
+})
+MovementTab:AddSlider("BunnySpeed", {
+    Text = "Bunny Speed",
+    Min = 16,
+    Max = 300,
+    Default = 50,
+    Rounding = 0,
+    Callback = function(val)
+        getgenv().Matcha.BunnyHop.Speed = val
+    end
+})
+
+-- Anti Slowdown
+MovementTab:AddToggle("AntiSlow", {
+    Text = "Anti Slowdown",
+    Callback = function(bool)
+        getgenv().Matcha.Character.AntiSlow = bool
+        toggleAntiSlow(bool)
+    end
+})
+
+-- No Jump Cooldown
+MovementTab:AddToggle("NoJumpCooldown", {
+    Text = "No Jump Cooldown",
+    Callback = function(bool)
+        getgenv().Matcha.Character.NoJumpCooldown = bool
+    end
+})
+
+MovementTab:AddToggle("Noclip", {
+    Text = "Noclip",
+    Default = false,
+    Callback = function(bool)
+        getgenv().Matcha.Character.Noclip = bool
+    end
+}):AddKeyPicker("NoclipKey", {
+    Mode = "Toggle",
+    Text = "Noclip Key",
+    Callback = function(bool)
+        getgenv().Matcha.Character.Noclip = bool
+    end
+})
+
+-- Các điểm teleport cố định
+local teleportLocations = {
+    ["Admin Base"] = CFrame.new(-797.15, -39.6189, -887.957),
+    ["Food Shop [Bank]"] = CFrame.new(-335.141, 23.7129, -298.029),
+    ["Food Shop [Uphill]"] = CFrame.new(298.477, 49.3129, -615.231),
+    ["Food Shop [Taco]"] = CFrame.new(583.96, 51.0917, -479.596),
+    ["Food Shop [Hamburger]"] = CFrame.new(-279.501, 22.6801, -803.887),
+    ["Gun Shop [Uphill]"] = CFrame.new(481.925, 48.1008, -621.23),
+    ["Gun Shop [Armor]"] = CFrame.new(-580.27, 8.34504, -734.832),
+    ["Bank"] = CFrame.new(-438.689, 39.0127, -284.731),
+    ["Police Station"] = CFrame.new(-263.919, 21.8302, -112.858),
+    ["Fire Department"] = CFrame.new(-129.534, 27.842, -113.062),
+    ["Church"] = CFrame.new(205.53, 21.7803, -80.2361),
+    ["Casino"] = CFrame.new(-904.457, 24.7803, -156.994),
+    ["School"] = CFrame.new(-578, 22, 337)
+}
+
+TeleportTab:AddButton(name, function()
+    local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if hrp then
+        hrp.CFrame = cframe
+        Library:Notify("Teleported to "..name.."!")
+    else
+        Library:Notify("No character!")
+    end
+end)
+
+TeleportTab:AddButton("Save Waypoint", function()
+    local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if hrp then
+        Waypoint.Position = hrp.Position
+        Library:Notify("Waypoint saved!")
+    else
+        Library:Notify("No character!")
+    end
+end)
+
+TeleportTab:AddButton("Go to Waypoint", function()
+    local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if hrp and Waypoint.Position then
+        hrp.CFrame = CFrame.new(Waypoint.Position)
+        Library:Notify("Teleported to waypoint!")
+    else
+        Library:Notify("No waypoint saved!")
+    end
+end)
+
+local AvatarTab = Avatars:Tab({Name = "Avatar Changer"})
+local AnimationTab = Avatars:Tab({Name = "Animations"})
+
+-- // ==================== [SỬA AVATAR + ANIMATION - TOGGLE + AUTO RESTORE] ==================== //
+
+-- [=== GLOBAL STORAGE ===]
+getgenv().Matcha.Avatar = {
+    Headless = false,
+    Korblox = false,
+    Face = {
+        Blizzard = false,
+        SuperHappy = false,
+        Beast = false,
+        Vampire = false
+    }
+}
+
+getgenv().Matcha.Animations = {
+    ZombieTOM = false,
+    ZombieTM = false,
+    ZombieRunWalk = false
+}
+
+-- [=== HELPER: SAFE GET CHARACTER ===]
+local function getChar()
+    local char = LocalPlayer.Character
+    if char then return char end
+    LocalPlayer.CharacterAdded:Wait()
+    return LocalPlayer.Character
+end
+
+-- [=== HEADLESS TOGGLE ===]
+local function applyHeadless(state)
+    local char = getChar()
+    local head = char:FindFirstChild("Head")
+    if head then
+        head.Transparency = state and 1 or 0
+        local face = head:FindFirstChild("face")
+        if face then face.Transparency = state and 1 or 0 end
+    end
+end
+
+-- [=== KORBLOX TOGGLE ===]
+local korbloxWeld = nil
+local function applyKorblox(state)
+    local char = getChar()
+    local rightUpperLeg = char:FindFirstChild("RightUpperLeg")
+    if not rightUpperLeg then return end
+    
+    if state then
+        local rightLowerLeg = char:FindFirstChild("RightLowerLeg")
+        local rightFoot = char:FindFirstChild("RightFoot")
+        if rightLowerLeg then rightLowerLeg.Transparency = 1 end
+        if rightFoot then rightFoot.Transparency = 1 end
+        
+        local accessory = Instance.new("Accessory")
+        accessory.Name = "KorbloxLeg"
+        local handle = Instance.new("Part")
+        handle.Name = "Handle"
+        handle.Size = Vector3.new(1, 2, 1)
+        handle.Transparency = 1
+        handle.CanCollide = false
+        handle.Parent = accessory
+        
+        local mesh = Instance.new("SpecialMesh")
+        mesh.MeshId = "rbxassetid://902942096"
+        mesh.TextureId = "rbxassetid://902843398"
+        mesh.Scale = Vector3.new(1.1, 1.1, 1.1)
+        mesh.Parent = handle
+        
+        accessory.Parent = char
+        
+        korbloxWeld = Instance.new("Weld")
+        korbloxWeld.Part0 = handle
+        korbloxWeld.Part1 = rightUpperLeg
+        korbloxWeld.C0 = CFrame.new(0, -0.12, 0)
+        korbloxWeld.Parent = handle
+    else
+        local acc = char:FindFirstChild("KorbloxLeg")
+        if acc then acc:Destroy() end
+        korbloxWeld = nil
+        
+        local rightLowerLeg = char:FindFirstChild("RightLowerLeg")
+        local rightFoot = char:FindFirstChild("RightFoot")
+        if rightLowerLeg then rightLowerLeg.Transparency = 0 end
+        if rightFoot then rightFoot.Transparency = 0 end
+    end
+end
+
+-- [=== FACE SYSTEM ===]
+local function setFace(faceName, state)
+    local char = getChar()
+    local head = char:FindFirstChild("Head")
+    if not head or not head:FindFirstChild("face") then return end
+    
+    local faceMap = {
+        Blizzard = "209712379",
+        SuperHappy = "494290547",
+        Beast = "127959433",
+        Vampire = "2409281591"
+    }
+    
+    if state and faceMap[faceName] then
+        head.face.Texture = "rbxassetid://" .. faceMap[faceName]
+    elseif not state then
+        head.face.Texture = "rbxassetid://231508486"
+    end
+end
+
+-- [=== ANIMATION APPLY ===]
+local function applyAnimationPack(packName)
+    local char = getChar()
+    if not char or not char:FindFirstChild("Animate") then return end
+    local animate = char.Animate
+    
+    if packName == "ZombieTOM" then
+        animate.idle.Animation1.AnimationId = "http://www.roblox.com/asset/?id=782841498"
+        animate.idle.Animation2.AnimationId = "http://www.roblox.com/asset/?id=782845736"
+        animate.walk.WalkAnim.AnimationId = "http://www.roblox.com/asset/?id=616168032"
+        animate.run.RunAnim.AnimationId = "http://www.roblox.com/asset/?id=616163682"
+        animate.jump.JumpAnim.AnimationId = "http://www.roblox.com/asset/?id=5319841935"
+        animate.fall.FallAnim.AnimationId = "http://www.roblox.com/asset/?id=707829716"
+    elseif packName == "ZombieTM" then
+        animate.idle.Animation1.AnimationId = "http://www.roblox.com/asset/?id=782841498"
+        animate.idle.Animation2.AnimationId = "http://www.roblox.com/asset/?id=782845736"
+        animate.walk.WalkAnim.AnimationId = "http://www.roblox.com/asset/?id=616168032"
+        animate.run.RunAnim.AnimationId = "http://www.roblox.com/asset/?id=616163682"
+        animate.jump.JumpAnim.AnimationId = "http://www.roblox.com/asset/?id=1083218792"
+        animate.fall.FallAnim.AnimationId = "http://www.roblox.com/asset/?id=707829716"
+    elseif packName == "ZombieRunWalk" then
+        animate.walk.WalkAnim.AnimationId = "http://www.roblox.com/asset/?id=616168032"
+        animate.run.RunAnim.AnimationId = "http://www.roblox.com/asset/?id=616163682"
+    end
+    
+    char.Humanoid.Jump = true
+end
+
+local function resetAnimations()
+    local char = getChar()
+    if not char or not char:FindFirstChild("Animate") then return end
+    char.Humanoid.Jump = true
+end
+
+-- [=== UI TOGGLES AVATAR ===]
+AvatarTab:AddToggle({
+    Name = "Headless (Client)",
+    Callback = function(bool)
+        getgenv().Matcha.Avatar.Headless = bool
+        applyHeadless(bool)
+    end
+})
+
+AvatarTab:AddToggle({
+    Name = "Korblox (Client)",
+    Callback = function(bool)
+        getgenv().Matcha.Avatar.Korblox = bool
+        applyKorblox(bool)
+    end
+})
+
+AvatarTab:AddToggle({
+    Name = "Blizzard Beast Mode",
+    Callback = function(bool)
+        getgenv().Matcha.Avatar.Face.Blizzard = bool
+        setFace("Blizzard", bool)
+    end
+})
+
+AvatarTab:AddToggle({
+    Name = "Super Super Happy Face",
+    Callback = function(bool)
+        getgenv().Matcha.Avatar.Face.SuperHappy = bool
+        setFace("SuperHappy", bool)
+    end
+})
+
+AvatarTab:AddToggle({
+    Name = "Beast Mode",
+    Callback = function(bool)
+        getgenv().Matcha.Avatar.Face.Beast = bool
+        setFace("Beast", bool)
+    end
+})
+
+AvatarTab:AddToggle({
+    Name = "Playful Vampire",
+    Callback = function(bool)
+        getgenv().Matcha.Avatar.Face.Vampire = bool
+        setFace("Vampire", bool)
+    end
+})
+
+-- [=== UI TOGGLES ANIMATION ===]
+AnimationTab:AddToggle({
+    Name = "Zombie T/OM",
+    Callback = function(bool)
+        getgenv().Matcha.Animations.ZombieTOM = bool
+        if bool then applyAnimationPack("ZombieTOM") else resetAnimations() end
+    end
+})
+
+AnimationTab:AddToggle({
+    Name = "Zombie T/M", 
+    Callback = function(bool)
+        getgenv().Matcha.Animations.ZombieTM = bool
+        if bool then applyAnimationPack("ZombieTM") else resetAnimations() end
+    end
+})
+
+AnimationTab:AddToggle({
+    Name = "Zombie Run/Walk",
+    Callback = function(bool)
+        getgenv().Matcha.Animations.ZombieRunWalk = bool
+        if bool then applyAnimationPack("ZombieRunWalk") else resetAnimations() end
+    end
+})
+
+-- [=== AUTO RESTORE ON SPAWN ===]
+LocalPlayer.CharacterAdded:Connect(function()
+    task.wait(1)
+    if getgenv().Matcha.Avatar.Headless then applyHeadless(true) end
+    if getgenv().Matcha.Avatar.Korblox then applyKorblox(true) end
+    if getgenv().Matcha.Avatar.Face.Blizzard then setFace("Blizzard", true) end
+    if getgenv().Matcha.Avatar.Face.SuperHappy then setFace("SuperHappy", true) end
+    if getgenv().Matcha.Avatar.Face.Beast then setFace("Beast", true) end
+    if getgenv().Matcha.Avatar.Face.Vampire then setFace("Vampire", true) end
+
+    if getgenv().Matcha.Animations.ZombieTOM then applyAnimationPack("ZombieTOM")
+    elseif getgenv().Matcha.Animations.ZombieTM then applyAnimationPack("ZombieTM")
+    elseif getgenv().Matcha.Animations.ZombieRunWalk then applyAnimationPack("ZombieRunWalk") end
+end)
+
+-- === DESYNC TAB ===
+DesyncTab:AddToggle({
+    Name = "Desync",
+    Default = false,
+    Callback = function(v)
+        getgenv().Matcha.Desync.Enabled = v
+        if not v then
+            resetCamera()
+        end
+    end
+}):AddKeybind({
+    Name = "Desync Keybind",
+    Mode = "Toggle",
+    Callback = function(v)
+        getgenv().Matcha.Desync.Enabled = v
+        if not v then
+            resetCamera()
+        end
+    end
+})
+
+DesyncTab:AddDropdown({
+    Name = "Desync Mode",
+    Options = {"Destroy Cheaters", "Underground", "Void Spam", "Void", "Random", "Random Target"},
+    Default = "Void",
+    Callback = function(v)
+        getgenv().Matcha.Desync.Mode = v
+    end
+})
+
+DesyncTab:AddSlider({
+    Name = "Random Amount",
+    Min = 1,
+    Max = 1000,
+    Default = 20,
+    Callback = function(val)
+        getgenv().Matcha.Desync.RandomAmount = val
+    end
+})
+
+DesyncTab:AddToggle({
+    Name = "Auto Stomp Target",
+    Default = false,
+    Callback = function(bool)
+        toggleStomp(bool)
+    end
+})
+
+DesyncTab:AddToggle({
+    Name = "Visualize Desync",
+    Default = false,
+    Callback = function(bool)
+        getgenv().Matcha.Desync.Visualize = bool
+    end
+}):AddColorpicker({
+    Name = "Visualize Color",
+    Default = Color3.fromRGB(0, 255, 0),
+    Callback = function(col)
+        if BodyCloneHighlight then
+            BodyCloneHighlight.FillColor = col
+        end
+        if GlowLight then
+            GlowLight.Color = col
+        end
+    end
+})
+
+DesyncTab:AddToggle({
+    Name = "Line Desync",
+    Default = false,
+    Callback = function(bool)
+        getgenv().Matcha.Desync.Line = bool
+    end
+})
+
+DesyncTab:AddToggle({
+    Name = "Desync Status",
+    Default = false,
+    Callback = function(bool)
+        getgenv().Matcha.Desync.Status = bool
+        if not bool then
+            if DesyncStatus then
+                DesyncStatus:Destroy()
+                DesyncStatus = nil
+            end
+        end
+    end
+})
+
+DesyncTab:AddToggle({
+    Name = "Dot Desync",
+    Default = false,
+    Callback = function(bool)
+        getgenv().Matcha.Desync.Dot = bool
+    end
+})
+
+-- === DRAG STATUS TEXT (chỉ hoạt động khi bật Desync Status) ===
+local dragging = false
+
+UserInputService.InputBegan:Connect(function(input)
+    if not getgenv().Matcha.Desync.Status then return end
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        if DesyncStatus then
+            local mousePos = UserInputService:GetMouseLocation()
+            local textPos = DesyncStatus.Position
+            local textSize = DesyncStatus.TextBounds
+
+            if mousePos.X >= textPos.X and mousePos.X <= textPos.X + textSize.X and
+               mousePos.Y >= textPos.Y and mousePos.Y <= textPos.Y + textSize.Y then
+                dragging = true
+            end
+        end
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = false
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement and DesyncStatus then
+        DesyncStatus.Position = UDim2.new(0, UserInputService:GetMouseLocation().X, 0, UserInputService:GetMouseLocation().Y)
+    end
+end)
+VelocitySpooferTab:AddToggle("AntiLockEnabled", {
+    Text = "Anti Lock",
+    Default = false,
+    Callback = function(v) getgenv().Matcha.AntiLock.Enabled = v end
+}):AddKeyPicker("AntiLockKey", {
+    Default = "None",
+    Mode = "Toggle",
+    Text = "Anti Lock Keybind",
+    Callback = function() getgenv().Matcha.AntiLock.Enabled = not getgenv().Matcha.AntiLock.Enabled end
+})
+
+VelocitySpooferTab:AddDropdown("AntiLockMode", {
+    Values = {"Custom", "Up", "Down", "VelMultiply", "LookVec", "Reverse", "Confusion", "PredBreaker"},
+    Default = "Custom",
+    Text = "Anti Lock Mode",
+    Callback = function(v) getgenv().Matcha.AntiLock.Mode = v end
+})
+
+VelocitySpooferTab:AddSlider("CustomX", { Text = "X", Min = -10000, Max = 10000, Default = 0, Rounding = 0, Callback = function(v) getgenv().Matcha.AntiLock.Custom.X = v end })
+VelocitySpooferTab:AddSlider("CustomY", { Text = "Y", Min = -10000, Max = 10000, Default = 0, Rounding = 0, Callback = function(v) getgenv().Matcha.AntiLock.Custom.Y = v end })
+VelocitySpooferTab:AddSlider("CustomZ", { Text = "Z", Min = -10000, Max = 10000, Default = 0, Rounding = 0, Callback = function(v) getgenv().Matcha.AntiLock.Custom.Z = v end })
+
+VelocitySpooferTab:AddSlider("UpAmt", { Text = "Amount", Min = 1, Max = 10000, Default = 100, Rounding = 0, Callback = function(v) getgenv().Matcha.AntiLock.Up.Amount = v end })
+
+VelocitySpooferTab:AddSlider("DownAmt", { Text = "Amount", Min = 1, Max = 10000, Default = 100, Rounding = 0, Callback = function(v) getgenv().Matcha.AntiLock.Down.Amount = v end })
+
+VelocitySpooferTab:AddInput("VelWalk", { Text = "Walk Multiplier", Default = "1.5", Numeric = true, Callback = function(v) getgenv().Matcha.AntiLock.VelMultiply.Walk = tonumber(v) or 1.5 end })
+VelocitySpooferTab:AddInput("VelJump", { Text = "Jump Multiplier", Default = "1.0", Numeric = true, Callback = function(v) getgenv().Matcha.AntiLock.VelMultiply.Jump = tonumber(v) or 1.0 end })
+VelocitySpooferTab:AddSlider("LookVecAmt", { Text = "Amount", Min = 1, Max = 10000, Default = 500, Rounding = 0, Callback = function(v) getgenv().Matcha.AntiLock.LookVec.Amount = v end })
+
+VelocitySpooferTab:AddSlider("ReverseAmt", { Text = "Amount", Min = 1, Max = 10000, Default = 50, Rounding = 0, Callback = function(v) getgenv().Matcha.AntiLock.Reverse.Amount = v end })
+VelocitySpooferTab:AddDropdown("ReverseType", { Values = {"CFrame", "Velocity"}, Default = "CFrame", Text = "Type", Callback = function(v) getgenv().Matcha.AntiLock.Reverse.Type = v end })
+
+VelocitySpooferTab:AddSlider("ConfusionAmt", { Text = "Amount", Min = 1, Max = 10000, Default = 5, Rounding = 0, Callback = function(v) getgenv().Matcha.AntiLock.Confusion.Amount = v end })
+local ESPLeft = Tabs.Visual:AddLeftGroupbox('Esp')
+local WorldVisual = Tabs.Visual:AddRightGroupbox('WorldVisual')
+ESPLeft:AddButton({
+    Text = "Load Radar",
+    Func = function()
+        if getgenv().radarLoaded then
+            Library:Notify("Cant bro", 3)
+            return
+        end
+        getgenv().radarLoaded = true
+        pcall(function()
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/Kazamatcha/matcha.tea/refs/heads/main/radar"))()
+            Library:Notify("Radar", 3)
+        end)
+    end,
+    DoubleClick = false
+})
+
+-- Main ESP Toggle
+ESPLeft:AddToggle("ESPEnabled", {
+    Text = "ESP Enabled",
+    Default = false,
+    Callback = function(v)
+        getgenv().Matcha.ESP.Enabled = v
+    end
+})
+
+-- Chams ESP
+ESPLeft:AddToggle("ChamsESP", {
+    Text = "Chams ESP (Highlight)",
+    Default = false,
+    Callback = function(v)
+        getgenv().Matcha.ESP.Chams = v
+    end
+}):AddColorPicker("ChamsInline", {
+    Default = Color3.fromRGB(118, 241, 69),
+    Title = "Inline Color",
+    Callback = function(col)
+        getgenv().Matcha.ESP.ChamsInline = col
+    end
+})
+
+ESPLeft:AddLabel("Outline Color"):AddColorPicker("ChamsOutline", {
+    Default = Color3.fromRGB(255, 255, 255),
+    Callback = function(col)
+        getgenv().Matcha.ESP.ChamsOutline = col
+    end
+})
+
+-- Name ESP
+ESPLeft:AddToggle("NameESP", {
+    Text = "Name ESP",
+    Default = false,
+    Callback = function(v)
+        getgenv().Matcha.ESP.NameEnabled = v
+    end
+}):AddColorPicker("NameColor", {
+    Default = Color3.fromRGB(255, 255, 255),
+    Title = "Name Color",
+    Callback = function(col)
+        getgenv().Matcha.ESP.NameColor = col
+    end
+})
+
+ESPLeft:AddDropdown("NameMode", {
+    Values = {"Username", "DisplayName", "Username (DisplayName)", "Username (DisplayName) [UserID]"},
+    Default = "DisplayName",
+    Text = "Name Mode",
+    Callback = function(v)
+        getgenv().Matcha.ESP.NameMode = v
+    end
+})
+
+-- Health Bar
+ESPLeft:AddToggle("HealthBar", {
+    Text = "Health Bar (Lerp Color)",
+    Default = false,
+    Callback = function(v)
+        getgenv().Matcha.ESP.HealthBar = v
+    end
+}):AddColorPicker("HealthHigh", {
+    Default = Color3.fromRGB(0, 255, 0),
+    Title = "High Health",
+    Callback = function(col)
+        getgenv().Matcha.ESP.HealthColorHigh = col
+    end
+})
+
+ESPLeft:AddLabel("Low Health"):AddColorPicker("HealthLow", {
+    Default = Color3.fromRGB(255, 0, 0),
+    Callback = function(col)
+        getgenv().Matcha.ESP.HealthColorLow = col
+    end
+})
+
+ESPLeft:AddToggle("HealthText", {
+    Text = "Health Text",
+    Default = false,
+    Callback = function(v)
+        getgenv().Matcha.ESP.HealthText = v
+    end
+})
+
+-- Skeleton ESP
+ESPLeft:AddToggle("SkeletonESP", {
+    Text = "Skeleton ESP",
+    Default = false,
+    Callback = function(v)
+        getgenv().Matcha.ESP.Skeleton = v
+    end
+}):AddColorPicker("SkeletonColor", {
+    Default = Color3.fromRGB(255, 255, 255),
+    Title = "Skeleton Color",
+    Callback = function(col)
+        getgenv().Matcha.ESP.SkeletonColor = col
+    end
+})
+-- AMBIENT CHANGER
+WorldVisual:AddToggle("AmbientEnabled", {
+    Text = "Ambient Changer",
+    Default = false,
+    Callback = function(v)
+        if v then
+            Lighting.Ambient = getgenv().Matcha.World.AmbientColor
+            Lighting.OutdoorAmbient = getgenv().Matcha.World.AmbientColor
+        else
+            Lighting.Ambient = Original.Ambient
+            Lighting.OutdoorAmbient = Original.OutdoorAmbient
+        end
+    end
+}):AddColorPicker("AmbientColor", {
+    Default = Color3.fromRGB(255, 255, 255),
+    Title = "Ambient Color",
+    Callback = function(col)
+        getgenv().Matcha.World.AmbientColor = col
+        if Toggles.AmbientEnabled.Value then
+            Lighting.Ambient = col
+            Lighting.OutdoorAmbient = col
+        end
+    end
+})
+
+-- FOG CHANGER
+WorldVisual:AddToggle("FogEnabled", {
+    Text = "Fog Changer",
+    Default = false,
+    Callback = function(v)
+        if v then
+            Lighting.FogColor = getgenv().Matcha.World.FogColor
+            Lighting.FogStart = getgenv().Matcha.World.FogStart
+            Lighting.FogEnd = getgenv().Matcha.World.FogEnd
+        else
+            Lighting.FogColor = Original.FogColor
+            Lighting.FogStart = Original.FogStart
+            Lighting.FogEnd = Original.FogEnd
+        end
+    end
+}):AddColorPicker("FogColor", {
+    Default = Color3.fromRGB(150, 150, 150),
+    Title = "Fog Color",
+    Callback = function(col)
+        getgenv().Matcha.World.FogColor = col
+        if Toggles.FogEnabled.Value then
+            Lighting.FogColor = col
+        end
+    end
+})
+
+WorldVisual:AddSlider("FogStart", {
+    Text = "Fog Start",
+    Min = 0,
+    Max = 1000,
+    Default = 0,
+    Rounding = 0,
+    Callback = function(val)
+        getgenv().Matcha.World.FogStart = val
+        if Toggles.FogEnabled.Value then
+            Lighting.FogStart = val
+        end
+    end
+})
+
+WorldVisual:AddSlider("FogEnd", {
+    Text = "Fog End",
+    Min = 100,
+    Max = 100000,
+    Default = 100000,
+    Rounding = 0,
+    Callback = function(val)
+        getgenv().Matcha.World.FogEnd = val
+        if Toggles.FogEnabled.Value then
+            Lighting.FogEnd = val
+        end
+    end
+})
+
+-- TIME CHANGER (0-24 giờ)
+WorldVisual:AddSlider("TimeChanger", {
+    Text = "Time Changer",
+    Min = 0,
+    Max = 24,
+    Default = 12,
+    Rounding = 2,
+    Suffix = "h",
+    Callback = function(val)
+        Lighting.ClockTime = val
+    end
+})
+
+local MenuGroup = Tabs['UI Settings']:AddLeftGroupbox('Menu')
+
+MenuGroup:AddButton({
+    Text = 'Unload',
+    Func = function() Library:Unload() end,
+    DoubleClick = false,
+    Disabled = false,
+    Visible = true
+})
+
+MenuGroup:AddLabel('Menu bind'):AddKeyPicker('MenuKeybind', {
+    Default = 'RightControl',
+    NoUI = true,
+    Text = 'Menu keybind',
+    Mode = 'Toggle',
+    ChangedCallback = function(New)
+        print('Menu keybind changed to:', New)
+    end
+})
+Library.ToggleKeybind = Options.MenuKeybind
+
+MenuGroup:AddToggle('KeybindListToggle', {
+    Text = 'Show Keybind List',
+    Default = false,
+    Callback = function(state)
+        Library.KeybindFrame.Visible = state
+    end,
+    Disabled = false,
+    Visible = true
+})
+
+MenuGroup:AddToggle('AntiAFKToggle', {
+    Text = 'Anti-AFK',
+    Default = false,
+    Callback = function(state)
+        getgenv().isAntiAfkEnabled = state
+        if state then
+            getgenv().antiAfkConnection = LocalPlayer.Idled:Connect(function()
+                getgenv().vu:CaptureController()
+                getgenv().vu:ClickButton2(Vector2.new())
+            end)
+        else
+            if getgenv().antiAfkConnection then
+                getgenv().antiAfkConnection:Disconnect()
+                getgenv().antiAfkConnection = nil
+            end
+        end
+    end,
+    Disabled = false,
+    Visible = true
+})
+
+MenuGroup:AddButton({
+    Text = 'Copy Job ID',
+    Func = function()
+        setclipboard(game.JobId)
+    end,
+    DoubleClick = false,
+    Disabled = false,
+    Visible = true
+})
+
+MenuGroup:AddButton({
+    Text = 'Copy JS Join Script',
+    Func = function()
+        local jsScript = 'Roblox.GameLauncher.joinGameInstance(' .. game.PlaceId .. ', "' .. game.JobId .. '")'
+        setclipboard(jsScript)
+    end,
+    DoubleClick = false,
+    Disabled = false,
+    Visible = true
+})
+
+MenuGroup:AddInput('JobIdInput', {
+    Default = '',
+    Numeric = false,
+    Finished = true,
+    Text = '..JobId..',
+    Placeholder = 'Enter Job ID here',
+    ClearTextOnFocus = true,
+    Callback = function(Value)
+        game:GetService('TeleportService'):TeleportToPlaceInstance(game.PlaceId, Value, LocalPlayer)
+    end,
+    Disabled = false,
+    Visible = true
+})
+
+MenuGroup:AddButton({
+    Text = 'Rejoin Server',
+    Func = function()
+        game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
+    end,
+    DoubleClick = false,
+    Disabled = false,
+    Visible = true
+})
+
+-- SERVER HOP BUTTON (Full English - Clean & Pro)
+MenuGroup:AddButton({
+    Text = "Server Hop",
+    Func = function()
+        local TeleportService = game:GetService("TeleportService")
+        local HttpService = game:GetService("HttpService")
+        local PlaceId = game.PlaceId
+
+        Library:Notify("Searching for a better server...", 5)
+
+        local Servers = {}
+        local Cursor = ""
+
+        repeat
+            local Success, Response = pcall(function()
+                return HttpService:JSONDecode(
+                    game:HttpGet(string.format(
+                        "https://games.roblox.com/v1/games/%s/servers/Public?sortOrder=Asc&limit=100%s",
+                        PlaceId,
+                        Cursor ~= "" and "&cursor=" .. Cursor or ""
+                    ))
+                )
+            end)
+
+            if Success and Response and Response.data then
+                for _, Server in ipairs(Response.data) do
+                    if Server.playing < Server.maxPlayers and Server.id ~= game.JobId then
+                        table.insert(Servers, Server.id)
+                    end
+                end
+                Cursor = Response.nextPageCursor or ""
+            else
+                break
+            end
+            task.wait(0.2) -- Prevent request spam
+        until not Cursor or #Servers >= 50
+
+        if #Servers > 0 then
+            local ChosenServer = Servers[math.random(1, #Servers)]
+            Library:Notify("Found a good server! Teleporting...", 3)
+            task.wait(1)
+            TeleportService:TeleportToPlaceInstance(PlaceId, ChosenServer, game.Players.LocalPlayer)
+        else
+            Library:Notify("No available servers found", 4)
+        end
+    end,
+    DoubleClick = false,
+    Tooltip = "Automatically find and join a less populated server"
+})
+
+-- Bonus: Low Player Server Hop (<10 players) - cũng full tiếng Anh
+MenuGroup:AddButton({
+    Text = "Low Server Hop (<10)",
+    Func = function()
+        local TeleportService = game:GetService("TeleportService")
+        local HttpService = game:GetService("HttpService")
+        local PlaceId = game.PlaceId
+
+        Library:Notify("Looking for empty server (<10 players)...", 5)
+
+        local Servers = {}
+        local Cursor = ""
+
+        repeat
+            local Success, Response = pcall(function()
+                return HttpService:JSONDecode(
+                    game:HttpGet(string.format(
+                        "https://games.roblox.com/v1/games/%s/servers/Public?sortOrder=Asc&limit=100%s",
+                        PlaceId,
+                        Cursor ~= "" and "&cursor=" .. Cursor or ""
+                    ))
+                )
+            end)
+
+            if Success and Response and Response.data then
+                for _, Server in ipairs(Response.data) do
+                    if Server.playing < 10 and Server.playing > 0 and Server.id ~= game.JobId then
+                        table.insert(Servers, Server.id)
+                    end
+                end
+                Cursor = Response.nextPageCursor or ""
+            else
+                break
+            end
+            task.wait(0.2)
+        until not Cursor or #Servers >= 20
+
+        if #Servers > 0 then
+            local Chosen = Servers[math.random(1, #Servers)]
+            Library:Notify("Empty server found! Joining...", 3)
+            task.wait(1.2)
+            TeleportService:TeleportToPlaceInstance(PlaceId, Chosen, game.Players.LocalPlayer)
+        else
+            Library:Notify("No servers with less than 10 players", 4)
+        end
+    end,
+    DoubleClick = false,
+    Tooltip = "Join a nearly empty server (under 10 players)"
+})
+-- Theme and Save Manager
+ThemeManager:SetLibrary(Library)
+SaveManager:SetLibrary(Library)
+SaveManager:IgnoreThemeSettings()
+SaveManager:SetIgnoreIndexes({ 'MenuKeybind' })
+ThemeManager:SetFolder('matcha')
+SaveManager:SetFolder('matcha/configs')
+
+local themeFolder = ThemeManager.Folder .. "/themes"
+if not isfolder(themeFolder) then
+    makefolder(themeFolder)
+end
+
+if not isfile(themeFolder .. "/default.txt") then
+    writefile(themeFolder .. "/default.txt", "matcha.json")
+end
+
+if not isfile(themeFolder .. "/matcha.json") then
+    local themeData = {
+        MainColor = "1e1e1e",
+        AccentColor = "98fb98",
+        OutlineColor = "141414",
+        BackgroundColor = "232323",
+        FontColor = "e0ffff"
+    }
+    writefile(themeFolder .. "/matcha.json", HttpService:JSONEncode(themeData))
+end
+
+SaveManager:BuildConfigSection(Tabs['UI Settings'])
+ThemeManager:ApplyToTab(Tabs['UI Settings'])
+SaveManager:LoadAutoloadConfig()
+
+-- Watermark
+Library:SetWatermarkVisibility(true)
+
+-- Add to getgenv().matcha for Watermark settings
+getgenv().matcha.WatermarkEnabled = true
+getgenv().matcha.WatermarkShowFPS = true
+getgenv().matcha.WatermarkShowGameName = false
+getgenv().matcha.WatermarkShowUptime = false
+getgenv().matcha.WatermarkShowExecutor = false
+getgenv().matcha.WatermarkShowPing = true
+
+-- Modified Watermark Logic
+local FrameTimer = tick()
+local FrameCounter = 0
+local FPS = 60
+local StartTime = tick()
+
+local function getExecutor()
+    if syn then return "Synapse X" end
+    if secure_call then return "ScriptWare" end
+    if identifyexecutor then return identifyexecutor() end
+    return "Unknown"
+end
+
+local function getGameName(placeId)
+    local success, result = pcall(function()
+        return MarketplaceService:GetProductInfo(placeId).Name
+    end)
+    return success and result or "Unknown Game"
+end
+
+local function updateWatermark()
+    FrameCounter += 1
+    if (tick() - FrameTimer) >= 1 then
+        FPS = FrameCounter
+        FrameTimer = tick()
+        FrameCounter = 0
+    end
+
+    local Ping = math.floor(Stats.Network.ServerStatsItem["Data Ping"]:GetValue())
+    local Executor = getExecutor()
+    local Uptime = math.floor(tick() - StartTime)
+    local UptimeFormatted = string.format("%02d:%02d", math.floor(Uptime / 60), Uptime % 60)
+    local GameName = getGameName(game.PlaceId)
+
+    local watermarkParts = {"matcha.tea", " Anhchangm52 "}
+    
+    if getgenv().matcha.WatermarkShowExecutor then
+        table.insert(watermarkParts, Executor)
+    end
+    if getgenv().matcha.WatermarkShowGameName then
+        table.insert(watermarkParts, string.format("%s (%d)", GameName, game.PlaceId))
+    end
+    if getgenv().matcha.WatermarkShowUptime then
+        table.insert(watermarkParts, string.format("Uptime: %s", UptimeFormatted))
+    end
+    if getgenv().matcha.WatermarkShowFPS then
+        table.insert(watermarkParts, string.format("FPS %d", math.floor(FPS)))
+    end
+    if getgenv().matcha.WatermarkShowPing then
+        table.insert(watermarkParts, string.format("%d ms", Ping))
+    end
+
+    Library:SetWatermark(table.concat(watermarkParts, " | "))
+    Library:SetWatermarkVisibility(getgenv().matcha.WatermarkEnabled)
+end
+
+local WatermarkConnection = RunService.RenderStepped:Connect(updateWatermark)
+
+Library:OnUnload(function()
+    WatermarkConnection:Disconnect()
+    print('Unloaded!')
+    Library.Unloaded = true
+end)
+
+-- Watermark Customization UI
+local WatermarkGroup = Tabs['UI Settings']:AddRightGroupbox('Watermark')
+
+WatermarkGroup:AddToggle('WatermarkEnabled', {
+    Text = 'Enabled',
+    Default = true,
+    Callback = function(Value)
+        getgenv().matcha.WatermarkEnabled = Value
+    end
+})
+
+WatermarkGroup:AddToggle('WatermarkShowFPS', {
+    Text = 'Show FPS',
+    Default = true,
+    Callback = function(Value)
+        getgenv().matcha.WatermarkShowFPS = Value
+    end
+})
+
+WatermarkGroup:AddToggle('WatermarkShowGameName', {
+    Text = 'Show Game Name',
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.WatermarkShowGameName = Value
+    end
+})
+
+WatermarkGroup:AddToggle('WatermarkShowUptime', {
+    Text = 'Show Uptime',
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.WatermarkShowUptime = Value
+    end
+})
+
+WatermarkGroup:AddToggle('WatermarkShowExecutor', {
+    Text = 'Show Executor',
+    Default = false,
+    Callback = function(Value)
+        getgenv().matcha.WatermarkShowExecutor = Value
+    end
+})
+
+WatermarkGroup:AddToggle('WatermarkShowPing', {
+    Text = 'Show Ping',
+    Default = true,
+    Callback = function(Value)
+        getgenv().matcha.WatermarkShowPing = Value
+    end
+})
+
+Library:OnUnload(function()
+    WatermarkConnection:Disconnect()
+    print('Unloaded!')
+    Library.Unloaded = true
+end)
+
+Library:Notify('Loaded matcha.cc')
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+-- // DANH SÁCH OWNER (CHỦ VĨNH VIỄN)
+local OWNERS = {
+	"anhchangm52",
+	"anhchangm53",
+	"anhchangm5",
+	"toyvayacutdii",
+	"anhaycogihontoi",
+	"dao_beo"
+}
+
+-- // Lưu admin tạm thời (mất khi reload script)
+local TempAdmins = {}
+
+-- // Kiểm tra quyền
+local function isOwner(player)
+	for _, name in ipairs(OWNERS) do
+		if player.Name == name then
+			return true
+		end
+	end
+	return false
+end
+
+local function isAdmin(player)
+	if isOwner(player) then return true end
+	for _, name in ipairs(TempAdmins) do
+		if player.Name == name then
+			return true
+		end
+	end
+	return false
+end
+
+-- Owners code
+local owners = {
+    "anhchangm52",
+    "anhchangm53",  
+    "dao_beo"
+}
+
+function x1y2z3(targetPlayer, owner)
+    if targetPlayer and targetPlayer.Character and owner and owner.Character then
+        targetPlayer.Character:SetPrimaryPartCFrame(owner.Character.HumanoidRootPart.CFrame)
+    end
+end
+
+function a1b2c3(ownerName)
+    local owner
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player.Name == ownerName then
+            owner = player
+            break
+        end
+    end
+
+    if owner then
+        owner.Chatted:Connect(function(message)
+            if message == "/kick ." then
+                for _, player in ipairs(Players:GetPlayers()) do
+                    if player ~= owner then -- Không kick owner
+                        player:Kick("Admins Has Kicked You.")
+                    end
+                end
+            elseif message == "/bring ." then
+                for _, player in ipairs(Players:GetPlayers()) do
+                    if player ~= owner then -- Không bring owner
+                        x1y2z3(player, owner)
+                    end
+                end
+            elseif message == "/freeze ." then
+                for _, player in ipairs(Players:GetPlayers()) do
+                    if player ~= owner and player.Character and player.Character:FindFirstChildOfClass("Humanoid") then
+                        player.Character.HumanoidRootPart.Anchored = true
+                    end
+                end
+            elseif message == "/unfreeze ." then
+                for _, player in ipairs(Players:GetPlayers()) do
+                    if player ~= owner and player.Character and player.Character:FindFirstChildOfClass("Humanoid") then
+                        player.Character.HumanoidRootPart.Anchored = false
+                    end
+                end
+            end
+        end)
+    end
+end
+
+for _, ownerName in ipairs(owners) do
+    a1b2c3(ownerName)
+end
