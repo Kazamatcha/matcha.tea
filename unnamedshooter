@@ -1,0 +1,219 @@
+--// MATCHA UNNAMED SCRIPT \\--
+getgenv().matchaunnamed = {
+    Enabled = true,
+    Chams = true,
+    TargetStats = true
+}
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local CoreGui = game:GetService("CoreGui")
+local Camera = workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RaycastModule = require(ReplicatedStorage:WaitForChild("Events"):WaitForChild("Modules"):WaitForChild("RaycastModule"))
+
+--// MÀU THEME MATCHA ĐẸP
+local MATCHA_DARK = Color3.fromRGB(110, 145, 100)   -- Outline
+local MATCHA_LIGHT = Color3.fromRGB(170, 210, 150)  -- Fill (nhạt hơn)
+local MATCHA_GLOW = Color3.fromRGB(180, 230, 160)
+
+--// BIẾN TOÀN CẦU
+local CurrentTarget = nil
+local ChamsFolder = Instance.new("Folder", CoreGui)
+ChamsFolder.Name = "MatchaChams"
+
+--// TẠO SCREEN GUI CHÍNH
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "MatchaUnnamed_UI"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.Parent = CoreGui
+
+--// LƯU VỊ TRÍ NÚT (nếu có)
+local savedPositions = {}
+
+--// HÀM TẠO NÚT ĐẸP
+local function CreateButton(name, pos, callback)
+    local Button = Instance.new("TextButton")
+    Button.Name = name
+    Button.Size = UDim2.new(0, 120, 0, 46)
+    Button.Position = savedPositions[name] or pos
+    Button.BackgroundColor3 = Color3.fromRGB(35, 40, 35)
+    Button.BorderSizePixel = 0
+    Button.Text = name .. (getgenv().matchaunnamed[name] and "  [ON]" or "  [OFF]")
+    Button.TextColor3 = Color3.new(1,1,1)
+    Button.Font = Enum.Font.GothamBold
+    Button.TextSize = 16
+    Button.AutoButtonColor = false
+    Button.Parent = ScreenGui
+
+    local Corner = Instance.new("UICorner", Button)
+    Corner.CornerRadius = UDim.new(0, 10)
+
+    local Glow = Instance.new("Frame", Button)
+    Glow.Size = UDim2.new(1, 8, 1, 8)
+    Glow.Position = UDim2.new(0, -4, 0, -4)
+    Glow.BackgroundColor3 = getgenv().matchaunnamed[name] and MATCHA_GLOW or Color3.fromRGB(80, 80, 80)
+    Glow.BackgroundTransparency = 0.6
+    Glow.ZIndex = 0
+    local GlowCorner = Instance.new("UICorner", Glow)
+    GlowCorner.CornerRadius = UDim.new(0, 12)
+
+    Button.MouseButton1Click:Connect(function()
+        getgenv().matchaunnamed[name] = not getgenv().matchaunnamed[name]
+        Button.Text = name .. (getgenv().matchaunnamed[name] and "  [ON]" or "  "  [OFF]")
+        TweenService:Create(Glow, TweenInfo.new(0.3), {
+            BackgroundColor3 = getgenv().matchaunnamed[name] and MATCHA_GLOW or Color3.fromRGB(80,80,80)
+        }):Play()
+        if callback then callback(getgenv().matchaunnamed[name]) end
+    end)
+
+    -- Drag
+    local dragging, dragInput, dragStart, startPos
+    Button.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            dragStart = input.Position
+            startPos = Button.Position
+        end
+    end)
+    Button.InputChanged:Connect(function(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            local delta = input.Position - dragStart
+            Button.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+    Button.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = false
+            savedPositions[name] = {X = Button.Position.X.Offset, Y = Button.Position.Y.Offset}
+        end
+    end)
+
+    return Button
+end
+
+--// TẠO CÁC NÚT
+CreateButton("Enabled", UDim2.new(0, 20, 0, 20))
+CreateButton("Chams", UDim2.new(0, 20, 0, 80))
+CreateButton("TargetStats", UDim2.new(0, 20, 0, 140))
+
+--// TARGET STATS GUI
+local StatsGui = Instance.new("ScreenGui", CoreGui)
+StatsGui.Name = "MatchaTargetStats"
+
+local StatsFrame = Instance.new("Frame", StatsGui)
+StatsFrame.Size = UDim2.new(0, 320, 0, 70)
+StatsFrame.Position = UDim2.new(0.5, 0, 0.92, 0)
+StatsFrame.AnchorPoint = Vector2.new(0.5, 1)
+StatsFrame.BackgroundColor3 = Color3.fromRGB(20, 25, 20)
+StatsFrame.BackgroundTransparency = 0.35
+StatsFrame.Visible = false
+
+local StatsCorner = Instance.new("UICorner", StatsFrame)
+StatsCorner.CornerRadius = UDim.new(0, 12)
+
+local StatsLabel = Instance.new("TextLabel", StatsFrame)
+StatsLabel.Size = UDim2.new(1, -16, 1, -16)
+StatsLabel.Position = UDim2.new(0, 8, 0, 8)
+StatsLabel.BackgroundTransparency = 1
+StatsLabel.TextColor3 = Color3.new(1,1,1)
+StatsLabel.Font = Enum.Font.GothamBold
+StatsLabel.TextSize = 18
+StatsLabel.Text = ""
+
+--// CHAMS LOGIC
+local function UpdateChams()
+    for _, v in pairs(ChamsFolder:GetChildren()) do v:Destroy() end
+    if not getgenv().matchaunnamed.Chams then return end
+
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr == LocalPlayer or (plr.Team and plr.Team == LocalPlayer.Team) then continue end
+        local char = plr.Character
+        if not char then continue end
+
+        local highlight = Instance.new("Highlight")
+        highlight.FillColor = MATCHA_LIGHT
+        highlight.FillTransparency = 0.7
+        highlight.OutlineColor = MATCHA_DARK
+        highlight.OutlineTransparency = 0.5
+        highlight.Adornee = char
+        highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+        highlight.Parent = ChamsFolder
+    end
+end
+
+RunService.RenderStepped:Connect(UpdateChams)
+
+--// SILENT AIM + TARGET DETECTION
+local AIM_CONE = 85
+local PREDICTION = 0.045
+
+local function GetClosestTarget()
+    local closest, shortest = nil, math.huge
+    local camPos = Camera.CFrame.Position
+    local camLook = Camera.CFrame.LookVector
+    local center = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr == LocalPlayer or (plr.Team and plr.Team == LocalPlayer.Team) then continue end
+        local char = plr.Character
+        if not char then continue end
+        local head = char:FindFirstChild("Head")
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if not (head and hum and hum.Health > 0) then continue end
+
+        local dir = (head.Position - camPos).Unit
+        local angle = math.deg(math.acos(camLook:Dot(dir)))
+        if angle > AIM_CONE then continue end
+
+        local screenPos, onScreen = Camera:WorldToViewportPoint(head.Position)
+        if not onScreen then continue end
+
+        local dist = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
+        if dist < shortest then
+            shortest = dist
+            closest = head
+            CurrentTarget = plr -- lưu target hiện tại
+        end
+    end
+    return closest
+end
+
+--// HOOK RAYCAST MODULE
+for i, f in pairs(RaycastModule) do
+    if typeof(f) == "function" then
+        RaycastModule[i] = function(...)
+            if not getgenv().matchaunnamed.Enabled then return f(...) end
+
+            local targetHead = GetClosestTarget()
+            if not targetHead then return f(...) end
+
+            local predicted = targetHead.Position + (targetHead.Velocity * PREDICTION)
+            return targetHead, predicted, Vector3.zero
+        end
+    end
+end
+
+--// UPDATE TARGET STATS UI
+RunService.Heartbeat:Connect(function()
+    if getgenv().matchaunnamed.TargetStats and CurrentTarget and CurrentTarget.Character then
+        local hum = CurrentTarget.Character:FindFirstChildOfClass("Humanoid")
+        if hum then
+            StatsFrame.Visible = true
+            StatsLabel.Text = string.format("🎯 %s  |  ❤️ %d/%d", 
+                CurrentTarget.DisplayName or CurrentTarget.Name,
+                math.floor(hum.Health), 
+                hum.MaxHealth
+            )
+            return
+        end
+    end
+    StatsFrame.Visible = false
+    CurrentTarget = nil
+end)
+
+print("MatchaUnnamed Loaded! - Theme: Fresh Matcha Latte")
