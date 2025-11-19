@@ -15,7 +15,36 @@ local LocalPlayer       = Players.LocalPlayer
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local RaycastModule = require(ReplicatedStorage:WaitForChild("Events"):WaitForChild("Modules"):WaitForChild("RaycastModule"))
+--// SERVICES THÊM \\
+local HttpService = game:GetService("HttpService")
 
+--// LƯU VỊ TRÍ NÚT \\
+local posFileName = "matchaunnamedshooter_button_positions.json"
+local savedPositions = {}
+
+local function isfile_safe(name)   local s = pcall(function() return isfile(name) end)   return s and isfile(name) end
+local function readfile_safe(name) local s, r = pcall(function() return readfile(name) end) return s and r or nil end
+local function writefile_safe(name, content) pcall(function() writefile(name, content) end) end
+
+local function LoadPositions()
+    if isfile_safe(posFileName) then
+        local data = readfile_safe(posFileName)
+        if data then
+            local success, decoded = pcall(function() return HttpService:JSONDecode(data) end)
+            if success and type(decoded) == "table" then
+                savedPositions = decoded
+            end
+        end
+    end
+end
+
+local function SavePositions()
+    pcall(function()
+        writefile_safe(posFileName, HttpService:JSONEncode(savedPositions))
+    end)
+end
+
+LoadPositions() -- Load ngay khi script chạy
 --// CÀI ĐẶT \\--
 local AIM_FOV      = 85
 local PREDICTION   = 0.045
@@ -173,89 +202,92 @@ ScreenGui.Name = "MatchaUnnamed_UI"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = CoreGui
 
-local function CreateButton(name, pos, callback)
+local function CreateButton(name, defaultPosition, callback)
     local Button = Instance.new("TextButton")
+    Button.Name = name
     Button.Size = UDim2.new(0, 120, 0, 44)
-    Button.Position = pos
+    
+    -- Load vị trí đã lưu, nếu không có thì dùng default
+    if savedPositions[name] then
+        Button.Position = UDim2.new(0, savedPositions[name].X, 0, savedPositions[name].Y)
+    else
+        Button.Position = defaultPosition
+    end
+    
     Button.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
     Button.Text = name
     Button.TextColor3 = Color3.fromRGB(220, 255, 200)
     Button.Font = Enum.Font.Code
     Button.TextSize = 15
+    Button.AutoButtonColor = false
     Button.Parent = ScreenGui
 
     local Corner = Instance.new("UICorner", Button)
     Corner.CornerRadius = UDim.new(0, 10)
 
     local Shadow = Instance.new("Frame", Button)
-    Shadow.Size = UDim2.new(1, 6, 1, 6)
+    Shadow.Size = UDim2.new(1, 6, 6)
     Shadow.Position = UDim2.new(0, -3, 0, -3)
     Shadow.BackgroundColor3 = Color3.fromRGB(120, 180, 100)
     Shadow.BackgroundTransparency = 0.6
     Shadow.ZIndex = Button.ZIndex - 1
-    
-    local ShadowCorner = Instance.new("UICorner", Shadow)
-    ShadowCorner.CornerRadius = UDim.new(0, 10)
+    Instance.new("UICorner", Shadow).CornerRadius = UDim.new(0, 10)
 
-    local Active = getgenv().matchaunnamed[name:gsub(" ", "")] or false
+    -- Trạng thái bật/tắt
+    local key = name:gsub(" ", "") -- SilentAim, Chams, TargetUI,...
+    local isActive = getgenv().matchaunnamed[key] == true
 
-    local function Update()
+    local function updateVisual()
         TweenService:Create(Shadow, TweenInfo.new(0.3), {
-            BackgroundColor3 = Active and Color3.fromRGB(100, 220, 140) or Color3.fromRGB(120, 180, 100)
+            BackgroundColor3 = isActive and Color3.fromRGB(100, 220, 140) or Color3.fromRGB(120, 180, 100)
         }):Play()
     end
-    Update()
+    updateVisual()
 
     Button.MouseButton1Click:Connect(function()
-        -- Chặn click khi vừa kéo (mobile/pc)
-        if dragging then return end
-
-        Active = not Active
-        getgenv().matchaunnamed[name:gsub(" ", "")] = Active
-        Update()
-        if callback then callback(Active) end
+        isActive = not isActive
+        getgenv().matchaunnamed[key] = isActive
+        updateVisual()
+        if callback then pcall(callback, isActive) end
     end)
 
-    ------------------------------------------------------------
-    ---------------------- DRAG FIXED ---------------------------
-    ------------------------------------------------------------
-    dragging = false
+    --// DRAG + LƯU VỊ TRÍ CHUẨN \\
     local dragStart, startPos
-
     Button.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or 
-           input.UserInputType == Enum.UserInputType.Touch then
-            
-            dragging = true
-            dragStart = UserInputService:GetMouseLocation()
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragStart = input.Position
             startPos = Button.Position
+
+            local connection
+            connection = input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    connection:Disconnect()
+                    dragStart = nil
+                    startPos = nil
+
+                    -- Lưu vị trí mới
+                    savedPositions[name] = {
+                        X = Button.Position.X.Offset,
+                        Y = Button.Position.Y.Offset
+                    }
+                    SavePositions()
+                end
+            end)
         end
     end)
 
-    UserInputService.InputChanged:Connect(function(input)
-        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or 
-                         input.UserInputType == Enum.UserInputType.Touch) then
-
-            local delta = UserInputService:GetMouseLocation() - dragStart
+    Button.InputChanged:Connect(function(input)
+        if dragStart and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            local delta = input.Position - dragStart
             Button.Position = UDim2.new(
-                startPos.X.Scale,
-                startPos.X.Offset + delta.X,
-                startPos.Y.Scale,
-                startPos.Y.Offset + delta.Y
+                startPos.X.Scale, startPos.X.Offset + delta.X,
+                startPos.Y.Scale, startPos.Y.Offset + delta.Y
             )
-        end
-    end)
-
-    UserInputService.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or
-           input.UserInputType == Enum.UserInputType.Touch then
-            dragging = false
         end
     end)
 
     return Button
 end
-
 -- Tạo các nút
 CreateButton("Silent Aim", UDim2.new(0, 20, 0, 20), function(state) getgenv().matchaunnamed.Enabled = state end)
 CreateButton("Chams",      UDim2.new(0, 20, 0, 80), function(state) getgenv().matchaunnamed.Chams = state end)
