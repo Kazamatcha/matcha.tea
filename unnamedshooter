@@ -139,9 +139,6 @@ Frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 Frame.BackgroundTransparency = 0.4
 Frame.BorderSizePixel = 0
 Frame.Visible = false
-Frame.Active = true
-Frame.Dragging = true
-
 local Corner = Instance.new("UICorner", Frame)
 Corner.CornerRadius = UDim.new(0, 12)
 
@@ -168,6 +165,7 @@ RunService.Heartbeat:Connect(function()
         Frame.Visible = false
     end
 end)
+local UserInputService = game:GetService("UserInputService")
 
 --// UI \\--
 local ScreenGui = Instance.new("ScreenGui")
@@ -195,6 +193,7 @@ local function CreateButton(name, pos, callback)
     Shadow.BackgroundColor3 = Color3.fromRGB(120, 180, 100)
     Shadow.BackgroundTransparency = 0.6
     Shadow.ZIndex = Button.ZIndex - 1
+    
     local ShadowCorner = Instance.new("UICorner", Shadow)
     ShadowCorner.CornerRadius = UDim.new(0, 10)
 
@@ -208,29 +207,48 @@ local function CreateButton(name, pos, callback)
     Update()
 
     Button.MouseButton1Click:Connect(function()
+        -- Chặn click khi vừa kéo (mobile/pc)
+        if dragging then return end
+
         Active = not Active
         getgenv().matchaunnamed[name:gsub(" ", "")] = Active
         Update()
         if callback then callback(Active) end
     end)
 
-    -- Drag
-    local dragging, dragStart, startPos
-    Button.InputBegan:Connect(function(inp)
-        if inp.UserInputType == Enum.UserInputType.MouseButton1 then
+    ------------------------------------------------------------
+    ---------------------- DRAG FIXED ---------------------------
+    ------------------------------------------------------------
+    dragging = false
+    local dragStart, startPos
+
+    Button.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or 
+           input.UserInputType == Enum.UserInputType.Touch then
+            
             dragging = true
-            dragStart = inp.Position
+            dragStart = UserInputService:GetMouseLocation()
             startPos = Button.Position
         end
     end)
-    Button.InputChanged:Connect(function(inp)
-        if dragging and (inp.UserInputType == Enum.UserInputType.MouseMovement or inp.UserInputType == Enum.UserInputType.Touch) then
-            local delta = inp.Position - dragStart
-            Button.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or 
+                         input.UserInputType == Enum.UserInputType.Touch) then
+
+            local delta = UserInputService:GetMouseLocation() - dragStart
+            Button.Position = UDim2.new(
+                startPos.X.Scale,
+                startPos.X.Offset + delta.X,
+                startPos.Y.Scale,
+                startPos.Y.Offset + delta.Y
+            )
         end
     end)
-    Button.InputEnded:Connect(function(inp)
-        if inp.UserInputType == Enum.UserInputType.MouseButton1 then
+
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or
+           input.UserInputType == Enum.UserInputType.Touch then
             dragging = false
         end
     end)
