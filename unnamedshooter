@@ -73,45 +73,52 @@ for i, f in pairs(RaycastModule) do
 end
 
 --// CHAMS (Highlight) \\--
+local BLUE_TEAM_OUTLINE = Color3.fromRGB(0, 120, 255)   -- outline team mình
+local BLUE_TEAM_FILL    = Color3.fromRGB(135, 206, 250) -- inline team mình
+
 local function UpdateChams()
     for _, Player in ipairs(Players:GetPlayers()) do
-        if Player == LocalPlayer or (Player.Team and Player.Team == LocalPlayer.Team) then continue end
+        if Player == LocalPlayer then continue end
+        
         local Char = Player.Character
-        if Char then
-            if getgenv().matchaunnamed.Chams then
-                for _, Part in ipairs(Char:GetDescendants()) do
-                    if Part:IsA("BasePart") and Part.Name ~= "HumanoidRootPart" then
-                        if not Part:FindFirstChild("MatchaChamsOutline") then
-                            local outline = Instance.new("BoxHandleAdornment")
-                            outline.Name = "MatchaChamsOutline"
-                            outline.Adornee = Part
-                            outline.AlwaysOnTop = true
-                            outline.ZIndex = 10
-                            outline.Size = Part.Size + Vector3.new(0.1, 0.1, 0.1)
-                            outline.Color3 = MATCHA_DARK
-                            outline.Transparency = 0.5
-                            outline.Parent = Part
-                        end
-                        if not Part:FindFirstChild("MatchaChamsFill") then
-                            local fill = Instance.new("BoxHandleAdornment")
-                            fill.Name = "MatchaChamsFill"
-                            fill.Adornee = Part
-                            fill.AlwaysOnTop = false
-                            fill.ZIndex = 5
-                            fill.Size = Part.Size
-                            fill.Color3 = MATCHA_LIGHT
-                            fill.Transparency = 0.7
-                            fill.Parent = Part
-                        end
-                    end
-                end
-            else
-                for _, v in ipairs(Char:GetDescendants()) do
-                    if v.Name == "MatchaChamsOutline" or v.Name == "MatchaChamsFill" then
-                        v:Destroy()
-                    end
-                end
+        if not Char then continue end
+        
+        -- Lấy highlight nếu có
+        local HL = Char:FindFirstChild("MatchaHighlight")
+
+        if getgenv().matchaunnamed.Chams then
+            
+            -- Nếu chưa có highlight thì tạo
+            if not HL then
+                HL = Instance.new("Highlight")
+                HL.Name = "MatchaHighlight"
+                HL.Adornee = Char
+                HL.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+                HL.Parent = Char
             end
+
+            -- TEAM CHECK
+            local sameTeam = false
+            if Player.Team and LocalPlayer.Team then
+                sameTeam = (Player.Team == LocalPlayer.Team)
+            end
+
+            if sameTeam then
+                -- TEAM MÌNH
+                HL.OutlineColor = BLUE_TEAM_OUTLINE
+                HL.FillColor    = BLUE_TEAM_FILL
+            else
+                -- TEAM ĐỊCH (mặc định matcha)
+                HL.OutlineColor = MATCHA_DARK
+                HL.FillColor    = MATCHA_LIGHT
+            end
+
+            HL.FillTransparency = 0.7
+            HL.OutlineTransparency = 0.25
+
+        else
+            -- Nếu tắt Chams thì xóa highlight
+            if HL then HL:Destroy() end
         end
     end
 end
@@ -132,6 +139,8 @@ Frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 Frame.BackgroundTransparency = 0.4
 Frame.BorderSizePixel = 0
 Frame.Visible = false
+Frame.Active = true
+Frame.Dragging = true
 
 local Corner = Instance.new("UICorner", Frame)
 Corner.CornerRadius = UDim.new(0, 12)
