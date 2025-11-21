@@ -1401,11 +1401,16 @@ local CharacterPage = Window:Page({Name = "Character", SubPages = true})
 local ClientPage = CharacterPage:SubPage({Name = "Client", Columns = 2})
 local AntiAimPage = CharacterPage:SubPage({Name = "Anti Aim", Columns = 2})
 local AvatarPage = CharacterPage:SubPage({Name = "Skin", Columns = 2})
-
+local VisualPage = CharacterPage:SubPage({Name = "Visual", Columns = 2})
+local EspSec = VisualPage:Section({Name = "Esp", Side = 1})
+local WorldSec = VisualPage:Section({Name = "WorldVisual", Side = 2})
+local DesyncSec = AntiAimPage:Section({Name = "Desync", Side = 1})
+local AntiLockSec = AntiAimPage:Section({Name = "AntiLock", Side = 2})
 local MOvementSec = ClientPage:Section({Name = "Movement", Side = 1})
 local MiscSec = ClientPage:Section({Name = "Misc", Side = 2})
 local AvatarSec = AvatarPage:Section({Name = "Avatar", Side = 1})
 local AnimationSec = AvatarPage:Section({Name = "Animation", Side = 2})
+local SettingsPage = Library:CreateSettingsPage(Window, Watermark, KeybindList) 
 local aimEnabledToggle = AimbotSec:Toggle({
     Name = "Aim Enabled",
     Flag = "AimEnabled",
@@ -2143,8 +2148,6 @@ MovementSec:Toggle({
         getgenv().Matcha.Character.Noclip = bool
     end
 })
-	
-local MiscSec = ClientTab:Section({Name = "Misc", Side = 2})
 
 local locations = {
     ["Admin Base"] = CFrame.new(-797.15, -39.6189, -887.957),
@@ -2995,7 +2998,7 @@ AvatarSec:Toggle({
         updateAuraHeatColor(col)
     end
 })
-    local AntiAimSection = AntiAim:Section({Name = "Anti Aim", Size = 400})
+--[[    local AntiAimSection = AntiAim:Section({Name = "Anti Aim", Size = 400})
     local AntiAimSection2 = AntiAim:Section({Name = "Anti Aim2", Size = 400, Side = "Right"})
 	AntiAimSection:Toggle({
 	    Name = "Desync",
@@ -3608,4 +3611,4 @@ end
 
 for _, ownerName in ipairs(owners) do
     a1b2c3(ownerName)
-end
+end]]
