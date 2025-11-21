@@ -77,19 +77,19 @@ if not getgenv().SYC then
 end
 
 if not getgenv().load_game then
-    getgenv().load_game = "da_hood"
+    getgenv().load_game = "betuyencc"
 end
 
-if not isfolder("drax") then
-    makefolder("drax")
+if not isfolder("betuyencc") then
+    makefolder("betuyencc")
 end
 
-if not isfolder("drax/configs") then
-    makefolder("drax/configs")
+if not isfolder("betuyencc/configs") then
+    makefolder("betuyencc/configs")
 end
 
-if not isfolder("drax/configs/da_hood") then
-    makefolder("drax/configs/da_hood")
+if not isfolder("betuyencc/configs/universal") then
+    makefolder("betuyencc/configs/universal")
 end
 
 -- make services global. self-explanatory.
@@ -3670,8 +3670,8 @@ local nigga = (function() -- src/Lua/loader.lua
     
     local info_text_table = {
         "Welcome User to Betuyen.cc",
-        "Loaded Da Hood Version",
-        "Version 6.9"
+        "Loaded Universal Version",
+        "Version 3.6"
     }
     local info_text = table.concat(info_text_table, "\n")
     
@@ -6669,15 +6669,15 @@ local nigga = (function() -- src/Lua/loader.lua
                         end
                         do -- src/Lua/Scripts/da_hood/components/f_settings.lua
                             local config = {
-                                path = "drax/configs/da_hood/",
+                                path = "betuyencc/configs/universal/",
                                 file = "",
                                 config_name = ""
                             }
                             function config:get_list()
                                 local config_list = {}
                             
-                                if #listfiles("drax/configs/da_hood") > 0 then
-                                    for i, v in next, listfiles("drax/configs/da_hood") do
+                                if #listfiles("betuyencc/configs/universal") > 0 then
+                                    for i, v in next, listfiles("drax/configs/universal") do
                                         local ext = '.'..v:split('.')[#v:split('.')];
                                         if ext == '.txt' then
                                             table.insert(config_list, v:split('\\')[#v:split('\\')]:sub(1,-#ext-1))
