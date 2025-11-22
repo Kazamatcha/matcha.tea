@@ -807,7 +807,75 @@ UserInputService.InputEnded:Connect(function(input)
         M1Down = false
     end
 end)
+if useDesync and hrp then
+    if matchacc.TargetAim.Strafe and matchacc.TargetAim.Target ~= "None" and TargetPlayer and TargetPlayer.Character and TargetPlayer.Character:FindFirstChild("Head") and Tool then
+        if not TargetPlayer.Character:FindFirstChild("ForceField") or Tool.Name == "[Rifle]" then
+            if not KnockCheck(TargetPlayer) and localPlayer.Character.BodyEffects.Reload.Value == false then
+                if matchacc.TargetAim.VoidResolver and (TargetPlayer.Character.HumanoidRootPart.Position - Vector3.new(0, 0, 0)).Magnitude > 5000 then return end
+                local currentPosition = TargetPlayer.Character.Head.Position
+                local lastPosition = previousPositions[TargetPlayer] or currentPosition
+                local estimatedVelocity = (currentPosition - lastPosition) / dt
+                local alpha = 0.5
+                customVelocities[TargetPlayer] = (customVelocities[TargetPlayer] or Vector3.zero) * alpha + estimatedVelocity * (1 - alpha)
+                previousPositions[TargetPlayer] = currentPosition
+                if matchacc.TargetAim.StrafeMethod == "Orbit" then
+                    desyncCFrame = CFrame.lookAt(currentPosition + (customVelocities[TargetPlayer] * PredictionValue) + Vector3.new(math.cos(tick()*10)*10, 0, math.sin(tick()*10)*10), currentPosition)
+                elseif matchacc.TargetAim.StrafeMethod == "Randomize" then
+                    desyncCFrame = CFrame.lookAt(currentPosition + (customVelocities[TargetPlayer] * PredictionValue) + Vector3.new(math.random(-15,15), math.random(-15,15), math.random(-15,15)), currentPosition)
+                end
+                local PredictedAimingPosition = currentPosition + (customVelocities[TargetPlayer] * PredictionValue)
+                local args = {
+                    [1] = "ShootGun",
+                    [2] = Tool.Handle,
+                    [3] = Tool.Handle.Position,
+                    [4] = PredictedAimingPosition,
+                    [5] = TargetPlayer.Character.Head,
+                    [6] = Vector3.new(0, 0, 0)
+                }
+                if matchacc.TargetAim.AutoFire then
+                    MainEvent:FireServer(unpack(args))
+                elseif M1Down then
+                    MainEvent:FireServer(unpack(args))
+                end
+            end
+        else
+            game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame += Vector3.new(math.random(-80000,80000), math.random(0,80000), math.random(-80000,80000))
+        end
+    end
+end
 
+local pingvalue = nil
+local split = nil
+local ping = nil
+local PredictionValue = nil
+
+local GlobalPredictionMultiplier = 0.80
+
+local basePredictionTable = {
+    {ping = 130, value = 0.51},
+    {ping = 125, value = 0.49},
+    {ping = 110, value = 0.46},
+    {ping = 105, value = 0.38},
+    {ping = 90,  value = 0.36},
+    {ping = 80,  value = 0.34},
+    {ping = 70,  value = 0.31},
+    {ping = 60,  value = 0.229},
+    {ping = 50,  value = 0.225},
+    {ping = 40,  value = 0.256}
+}
+
+game:GetService("RunService").Stepped:Connect(function()
+    pingvalue = game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValueString()
+    split = string.split(pingvalue, '(')
+    ping = tonumber(split[1])
+
+    for _, data in ipairs(basePredictionTable) do
+        if ping < data.ping then
+            PredictionValue = data.value * GlobalPredictionMultiplier
+            break
+        end
+    end
+end)
 -- Main Logic
 RunService.Heartbeat:Connect(function(dt)
     local TargetPlayer = players:FindFirstChild(matchacc.TargetAim.Target)
@@ -823,24 +891,18 @@ RunService.Heartbeat:Connect(function(dt)
             if not TargetPlayer.Character:FindFirstChild("ForceField") or Tool.Name == "[Rifle]" then
                 if not KnockCheck(TargetPlayer) and localPlayer.Character.BodyEffects.Reload.Value == false then
                     if matchacc.TargetAim.VoidResolver and (TargetPlayer.Character.HumanoidRootPart.Position - Vector3.new(0, 0, 0)).Magnitude > 5000 then return end
-
                     local currentPosition = TargetPlayer.Character.Head.Position
                     local lastPosition = previousPositions[TargetPlayer] or currentPosition
                     local estimatedVelocity = (currentPosition - lastPosition) / dt
                     local alpha = 0.5
                     customVelocities[TargetPlayer] = (customVelocities[TargetPlayer] or Vector3.zero) * alpha + estimatedVelocity * (1 - alpha)
                     previousPositions[TargetPlayer] = currentPosition
-
-                    local PredictionValue = matchacc.TargetAim.StrafePrediction
-
                     if matchacc.TargetAim.StrafeMethod == "Orbit" then
                         desyncCFrame = CFrame.lookAt(currentPosition + (customVelocities[TargetPlayer] * PredictionValue) + Vector3.new(math.cos(tick()*10)*10, 0, math.sin(tick()*10)*10), currentPosition)
                     elseif matchacc.TargetAim.StrafeMethod == "Randomize" then
                         desyncCFrame = CFrame.lookAt(currentPosition + (customVelocities[TargetPlayer] * PredictionValue) + Vector3.new(math.random(-15,15), math.random(-15,15), math.random(-15,15)), currentPosition)
                     end
-
                     local PredictedAimingPosition = currentPosition + (customVelocities[TargetPlayer] * PredictionValue)
-
                     local args = {
                         [1] = "ShootGun",
                         [2] = Tool.Handle,
@@ -849,14 +911,17 @@ RunService.Heartbeat:Connect(function(dt)
                         [5] = TargetPlayer.Character.Head,
                         [6] = Vector3.new(0, 0, 0)
                     }
-
                     if matchacc.TargetAim.AutoFire then
                         MainEvent:FireServer(unpack(args))
                     elseif M1Down then
                         MainEvent:FireServer(unpack(args))
                     end
                 end
+            else
+                game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame += Vector3.new(math.random(-80000,80000), math.random(0,80000), math.random(-80000,80000))
             end
+        elseif TargetPlayer.Character:FindFirstChild("ForceField") or not Tool then
+            game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame += Vector3.new(math.random(-80000,80000), math.random(0,80000), math.random(-80000,80000))
         elseif matchacc.TargetAim.AutoStomp and TargetPlayer and KnockCheck(TargetPlayer) and localPlayer.Character.BodyEffects.Reload.Value == false then
             local bodyEffects = TargetPlayer.Character:FindFirstChild("BodyEffects")
             local isDead = bodyEffects and bodyEffects:FindFirstChild("SDeath") and bodyEffects.SDeath.Value
@@ -892,54 +957,56 @@ RunService.Heartbeat:Connect(function(dt)
                     MainEvent:FireServer("Stomp")
                 end
             end
-        elseif matchacc.KillAura.Active and matchacc.KillAura.Enabled and Tool and Tool:FindFirstChild("Handle") then
-            if localPlayer.Character.BodyEffects:FindFirstChild("K.O") and not localPlayer.Character.BodyEffects["K.O"].Value then
-                local closest = math.huge
-                local ka_target = nil
-                for _, player in pairs(players:GetPlayers()) do
-                    if player ~= localPlayer and not matchacc.KillAura.Whitelist[player.Name] and player.Character and player.Character:FindFirstChild("Head") and not player.Character:FindFirstChild("GRABBING_CONSTRAINT") then
-                        if player.Character.BodyEffects:FindFirstChild("K.O") and not player.Character.BodyEffects["K.O"].Value then
-                            local dist = (hrp.Position - player.Character.Head.Position).Magnitude
-                            if dist < closest and dist <= matchacc.KillAura.Range then
-                                closest = dist
-                                ka_target = player
+        elseif matchacc.KillAura.Active and matchacc.KillAura.Enabled then
+            if Tool and Tool:FindFirstChild("Handle") then
+                if localPlayer.Character.BodyEffects:FindFirstChild("K.O") and not localPlayer.Character.BodyEffects["K.O"].Value then
+                    local closest = math.huge
+                    local ka_target = nil
+                    for _, player in pairs(players:GetPlayers()) do
+                        if player ~= localPlayer and not matchacc.KillAura.Whitelist[player.Name] and player.Character and player.Character:FindFirstChild("Head") and not player.Character:FindFirstChild("GRABBING_CONSTRAINT") then
+                            if player.Character.BodyEffects:FindFirstChild("K.O") and not player.Character.BodyEffects["K.O"].Value then
+                                local dist = (hrp.Position - player.Character.Head.Position).Magnitude
+                                if dist < closest and dist <= matchacc.KillAura.Range then
+                                    closest = dist
+                                    ka_target = player
+                                end
                             end
                         end
                     end
-                end
-                if ka_target and ka_target.Character and ka_target.Character:FindFirstChild("Head") then
-                    desyncCFrame = CFrame.lookAt(hrp.Position, ka_target.Character.Head.Position)
-                    if matchacc.KillAura.Visualize then
-                        ka_tracer.Transparency = 0
-                        ka_tracer.Size = Vector3.new(0.2, 0.2, (hrp.Position - ka_target.Character.Head.Position).Magnitude)
-                        ka_tracer.CFrame = CFrame.lookAt(hrp.Position, ka_target.Character.Head.Position) * CFrame.new(0, 0, -ka_tracer.Size.Z / 2)
+                    if ka_target and ka_target.Character and ka_target.Character:FindFirstChild("Head") then
+                        desyncCFrame = CFrame.lookAt(hrp.Position, ka_target.Character.Head.Position)
+                        if matchacc.KillAura.Visualize then
+                            ka_tracer.Transparency = 0
+                            ka_tracer.Size = Vector3.new(0.2, 0.2, (hrp.Position - ka_target.Character.Head.Position).Magnitude)
+                            ka_tracer.CFrame = CFrame.lookAt(hrp.Position, ka_target.Character.Head.Position) * CFrame.new(0, 0, -ka_tracer.Size.Z / 2)
+                        else
+                            ka_tracer.Transparency = 1
+                        end
+                        local humanoid = ka_target.Character:FindFirstChild("Humanoid")
+                        if humanoid then
+                            if not ka_lastHealth[ka_target.Name] then
+                                ka_lastHealth[ka_target.Name] = humanoid.Health
+                            end
+                            if humanoid.Health < ka_lastHealth[ka_target.Name] then
+                                createHitSound()
+                            end
+                            ka_lastHealth[ka_target.Name] = humanoid.Health
+                        end
+                        local offset = matchacc.KillAura.Silent and Vector3.new(0, -12, 0) or Vector3.new(0, 0, 0)
+                        MainEvent:FireServer(
+                            "ShootGun",
+                            Tool:FindFirstChild("Handle"),
+                            Tool:FindFirstChild("Handle").CFrame.Position + offset,
+                            ka_target.Character.Head.Position + offset,
+                            ka_target.Character.Head,
+                            Vector3.new(0, 0, -1)
+                        )
                     else
                         ka_tracer.Transparency = 1
                     end
-
-                    local humanoid = ka_target.Character:FindFirstChild("Humanoid")
-                    if humanoid then
-                        if not ka_lastHealth[ka_target.Name] then
-                            ka_lastHealth[ka_target.Name] = humanoid.Health
-                        end
-                        if humanoid.Health < ka_lastHealth[ka_target.Name] then
-                            createHitSound()
-                        end
-                        ka_lastHealth[ka_target.Name] = humanoid.Health
-                    end
-
-                    local offset = matchacc.KillAura.Silent and Vector3.new(0, -12, 0) or Vector3.new(0, 0, 0)
-                    MainEvent:FireServer(
-                        "ShootGun",
-                        Tool:FindFirstChild("Handle"),
-                        Tool:FindFirstChild("Handle").CFrame.Position + offset,
-                        ka_target.Character.Head.Position + offset,
-                        ka_target.Character.Head,
-                        Vector3.new(0, 0, -1)
-                    )
-                else
-                    ka_tracer.Transparency = 1
                 end
+            else
+                ka_tracer.Transparency = 1
             end
         end
 
