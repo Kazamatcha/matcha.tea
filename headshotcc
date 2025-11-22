@@ -5462,7 +5462,6 @@ game:GetService("RunService").Heartbeat:Connect(function(dt)
 
     SavedPosition = game:GetService("Players").LocalPlayer.Character.HumanoidRootPart.CFrame
 
-    game:GetService("Players").LocalPlayer.Character.HumanoidRootPart.CFrame = game:GetService("Players").LocalPlayer.Character.HumanoidRootPart.CFrame + Vector3.new(math.random(-50, 50), math.random(0, 50), math.random(-50, 50))
         
     game:GetService("RunService"):BindToRenderStep("RestoreCFrame", 199, function()
         game:GetService("Players").LocalPlayer.Character.HumanoidRootPart.CFrame = SavedPosition
