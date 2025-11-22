@@ -6496,19 +6496,15 @@ game:GetService("RunService").Heartbeat:Connect(function(dt)
 
                 if humanoidRootPart and head and toolHandle and targetHRP and targetHead then
                     if not KnockCheck(Target) then
-                        if not Target.Character:FindFirstChild("ForceField") or tool.Name == "[Rifle]" then
-            
-                            -- Kill Target
-                            localPlayer.Character.HumanoidRootPart.CFrame = CFrame.lookAt(Target.Character.Head.Position + Vector3.new(math.random(-15,15), math.random(-15,15), math.random(-15,15)), Target.Character.Head.Position)
-                            library:notification({ text = "Matcha.cc - Shooting Target.", time = 1 })
-                            MainEvent:FireServer("ShootGun", toolHandle, toolHandle.Position, Target.Character.Head.Position, targetHead, Vector3.new(0, 1, 0))
-                        else
-                            -- Spawn Protection
-                            game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame += Vector3.new(math.random(-80000,80000), math.random(0,80000), math.random(-80000,80000))
-                            library:notification({ text = "Matcha.cc - Waiting.. Target has spawn protection.", time = 1 })
-                            MainEvent:FireServer("Reload", tool)
-                        end
-
+						if not Target.Character:FindFirstChild("ForceField") then
+							localPlayer.Character.HumanoidRootPart.CFrame = CFrame.lookAt(Target.Character.Head.Position + Vector3.new(math.random(-15,15), math.random(-15,15), math.random(-15,15)), Target.Character.Head.Position)
+							library:notification({ text = "Matcha.cc - Shooting Target.", time = 1 })
+							MainEvent:FireServer("ShootGun", toolHandle, toolHandle.Position, Target.Character.Head.Position, targetHead, Vector3.new(0, 1, 0))
+						else
+							game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame += Vector3.new(math.random(-80000,80000), math.random(0,80000), math.random(-80000,80000))
+							library:notification({ text = "Matcha.cc - Waiting.. Target has spawn protection.", time = 1 })
+							MainEvent:FireServer("Reload", tool)
+						end
                         if headshots.Target.AutoKillDesync then
                             game:GetService("RunService"):BindToRenderStep("RestoreCFrame", 199, function()
                                 game:GetService("Players").LocalPlayer.Character.HumanoidRootPart.CFrame = SavedPosition
