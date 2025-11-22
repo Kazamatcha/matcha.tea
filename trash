@@ -1,581 +1,858 @@
-local UserInputService = game:GetService("UserInputService")
+local rs = game:GetService("RunService")
+local uis = game:GetService("UserInputService")
+local lp = game.Players.LocalPlayer
+local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
-local Workspace = game:GetService("Workspace")
-local Stats = game:GetService("Stats")
-local CoreGui = game:GetService("CoreGui")
-local StarterGui = game:GetService("StarterGui")
-local SoundService = game:GetService("SoundService")
-
-local LocalPlayer = Players.LocalPlayer
-
-local TargBindEnabled = true
-local TargetPlr
-local TargResolvePos
-
--- ⚙️ Hai biến prediction được đưa ra ngoài
-getgenv().Prediction = 0.07
-getgenv().RealPrediction = 0.07
-
-if not getgenv().TargetAimbot then
-    getgenv().TargetAimbot = {
-        Enabled = true,
-        Keybind = Enum.KeyCode.Q,
-        Autoselect = false,
-        Resolver = true,
-        ResolverType = "MoveDirection",
-        JumpOffset = 0.00,
-        RealJumpOffset = 0.00,
-        HitParts = {"Head"},
-        RealHitPart = "Head",
-        KoCheck = true,
-        LookAt = false,
-        ViewAt = false,
-        Tracer = true,
-        TracerColor = Color3.fromRGB(255, 255, 255),
-        Highlight = true,
-        FillingColor = Color3.fromRGB(255, 255, 255),
-        OutliningColor = Color3.fromRGB(255, 255, 255),
-        HitEffect = true,
-        HitEffectType = "Electric", -- Options: Dots, Electric
-        HitEffectColor = Color3.fromRGB(255, 255, 255),
-    }
-end
-
-
+local Camera = workspace.CurrentCamera
+local TeleportService = game:GetService("TeleportService")
 local UserInputService = game:GetService("UserInputService")
-getgenv().mobile = false
--- 🔍 Kiểm tra nếu là thiết bị mobile hoặc tablet
-if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled and getgenv().mobile then
-    getgenv().keytoclick = TargetAimbot.Keybind
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TextChatService = game:GetService("TextChatService")
 
-    local tool = Instance.new("Tool")
-    tool.RequiresHandle = false
-    tool.Name = getgenv().keytoclick
-    tool.Activated:Connect(function()
-        local vim = game:GetService("VirtualInputManager")
-        vim:SendKeyEvent(true, getgenv().keytoclick, false, game)
-    end)
-    tool.Parent = game.Players.LocalPlayer.Backpack
-
-    local player = game.Players.LocalPlayer
-
-    -- Khi spawn nhân vật mới → tool vẫn có trong backpack
-    player.CharacterAdded:Connect(function()
-        tool.Parent = player.Backpack
-    end)
-
-    -- Khi nhân vật bị xóa → đảm bảo tool vẫn lưu lại
-    player.CharacterRemoving:Connect(function()
-        tool.Parent = player.Backpack
-    end)
+local chatWindow = TextChatService:FindFirstChild("ChatWindowConfiguration")
+if chatWindow then
+    chatWindow.Enabled = true -- Bật lại chat window
+end
+-- MainEvent detection
+local MainEvent = nil
+if ReplicatedStorage:FindFirstChild("MainEvent") then -- Da Hood
+    MainEvent = ReplicatedStorage.MainEvent
+elseif ReplicatedStorage:FindFirstChild("MAINEVENT") then -- Idk Da Hood
+    MainEvent = ReplicatedStorage.MAINEVENT
+elseif ReplicatedStorage:FindFirstChild("MainRemotes") and ReplicatedStorage.MainRemotes:FindFirstChild("MainRemoteEvent") then -- Der Hood
+    MainEvent = ReplicatedStorage.MainRemotes.MainRemoteEvent
+else
+    print("Couldn't find MainEvent, game not supported.")
 end
 
-local TargHighlight = Instance.new("Highlight")
-TargHighlight.Parent = CoreGui
-TargHighlight.FillColor = Color3.new(1, 1, 1)
-TargHighlight.OutlineColor = Color3.new(0, 0, 0)
-TargHighlight.FillTransparency = 0.5
-TargHighlight.OutlineTransparency = 0
-TargHighlight.Enabled = false
-
-local Tracer = Drawing.new("Line")
-Tracer.Visible = false
-Tracer.Color = Color3.new(1, 1, 1)
-Tracer.Thickness = 1
-Tracer.Transparency = 1
-
-local HitEffectModule = {
-    Locals = {
-        Type = {
-            ["Dots"] = nil,
-            ["Electric"] = nil,
-        },
-    },
-    Functions = {},
-    Settings = {HitEffect = {Color = TargetAimbot.HitEffectColor}}
+local animations = {
+	C = "http://www.roblox.com/asset/?id=15609995579",
 }
 
-do --// Dots
+local currentTrack = nil
+local currentKey = nil
+local renderConnection = nil
+local inputConnection = nil
+local prediction = 0
+local resolverEnabled = true
+local function setup(char)
+	local hum = char:WaitForChild("Humanoid", 5)
+	if not hum then return end
 
-    local character = game.Players.LocalPlayer.Character or game.Players.LocalPlayer.CharacterAdded:Wait()
+	local animator = hum:FindFirstChildOfClass("Animator") or Instance.new("Animator", hum)
 
-    local Attachment = Instance.new("Attachment")
-    Attachment.Name = "RightFootAttachment"
-    Attachment.Parent = character:WaitForChild("RightFoot")
+	-- Ngắt kết nối cũ
+	if renderConnection then renderConnection:Disconnect() end
+	if inputConnection then inputConnection:Disconnect() end
 
-    HitEffectModule.Locals.Type["Dots"] = Attachment
+	-- Dừng animation nếu di chuyển
+	renderConnection = rs.RenderStepped:Connect(function()
+		if currentTrack and hum.MoveDirection.Magnitude > 0 then
+			currentTrack:Stop()
+			currentTrack = nil
+			currentKey = nil
+		end
+	end)
 
-    local Specs = Instance.new("ParticleEmitter")
-    Specs.Name = "Specs"
-    Specs.Lifetime = NumberRange.new(0.5, 1.6)
-    Specs.SpreadAngle = Vector2.new(45, 45)
-    Specs.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
-        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 255, 255)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 255, 255))
-    })
-    Specs.Drag = 5
-    Specs.VelocitySpread = 40
-    Specs.Speed = NumberRange.new(10, 30)
-    Specs.Brightness = 7
-    Specs.Size = NumberSequence.new({
-        NumberSequenceKeypoint.new(0, 0),
-        NumberSequenceKeypoint.new(0.5, 2),
-        NumberSequenceKeypoint.new(1, 0)
-    })
-    Specs.Transparency = NumberSequence.new(0, 1)
-    Specs.Enabled = false
-    Specs.Acceleration = Vector3.new(0, 2, 0)
-    Specs.Rate = 100
-    Specs.Texture = "rbxassetid://8030760338"
-    Specs.EmissionDirection = Enum.NormalId.Top
-    Specs.Parent = Attachment
-
-    local Specs1 = Instance.new("ParticleEmitter")
-    Specs1.Name = "Specs1"
-    Specs1.Lifetime = NumberRange.new(0.33, 2)
-    Specs1.SpreadAngle = Vector2.new(60, 60)
-    Specs1.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 255, 255))
-    })
-    Specs1.Drag = 3
-    Specs1.VelocitySpread = 60
-    Specs1.Speed = NumberRange.new(10, 30)
-    Specs1.Brightness = 9
-    Specs1.Size = NumberSequence.new({
-        NumberSequenceKeypoint.new(0, 0),
-        NumberSequenceKeypoint.new(0.5, 2),
-        NumberSequenceKeypoint.new(1, 0)
-    })
-    Specs1.Transparency = NumberSequence.new(0, 1)
-    Specs1.Enabled = false
-    Specs1.Acceleration = Vector3.new(0, 5, 0)
-    Specs1.Rate = 75
-    Specs1.Texture = "rbxassetid://8030760338"
-    Specs1.EmissionDirection = Enum.NormalId.Top
-    Specs1.Parent = Attachment
-    
-    end
-
-do --// Electric
-local Part = Instance.new("Part")
-Part.Parent = ReplicatedStorage
-
-local Attachment = Instance.new("Attachment")
-Attachment.Parent = Part
-
-HitEffectModule.Locals.Type["Electric"] = Attachment
-
-local ParticleEmitter2 = Instance.new("ParticleEmitter")
-ParticleEmitter2.Name = "ParticleEmitter2"
-ParticleEmitter2.FlipbookFramerate = NumberRange.new(20, 20)
-ParticleEmitter2.Lifetime = NumberRange.new(0.19, 0.38)
-ParticleEmitter2.FlipbookLayout = Enum.ParticleFlipbookLayout.Grid4x4
-ParticleEmitter2.SpreadAngle = Vector2.new(360, 360)
-ParticleEmitter2.Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.209842, 0.5), NumberSequenceKeypoint.new(0.503842, 0.263333), NumberSequenceKeypoint.new(0.799842, 0.5), NumberSequenceKeypoint.new(1, 1)})
-ParticleEmitter2.LightEmission = 1
-ParticleEmitter2.Color = ColorSequence.new(Color3.fromRGB(103, 192, 253))
-ParticleEmitter2.VelocitySpread = 360
-ParticleEmitter2.Speed = NumberRange.new(0.0161231, 0.0161231)
-ParticleEmitter2.Size = NumberSequence.new({NumberSequenceKeypoint.new(0, 4.3125), NumberSequenceKeypoint.new(0.3985056, 7.9375), NumberSequenceKeypoint.new(1, 10)})
-ParticleEmitter2.Enabled = false
-ParticleEmitter2.ZOffset = 0.15
-ParticleEmitter2.Rate = 100
-ParticleEmitter2.Texture = "http://www.roblox.com/asset/?id=12394566430"
-ParticleEmitter2.FlipbookMode = Enum.ParticleFlipbookMode.OneShot
-ParticleEmitter2.Rotation = NumberRange.new(39, 999)
-ParticleEmitter2.Orientation = Enum.ParticleOrientation.VelocityParallel
-ParticleEmitter2.Parent = Attachment
-
-Part.Parent = workspace
+	inputConnection = uis.InputBegan:Connect(function(input, gp)
+		if gp then return end
+		local key = input.KeyCode.Name
+		local animId = animations[key]
+		if animId and hum.MoveDirection.Magnitude == 0 then
+			-- Dừng animation cũ nếu đang chạy
+			if currentTrack then
+				currentTrack:Stop()
+				currentTrack = nil
+				currentKey = nil
+			end
+			local anim = Instance.new("Animation")
+			anim.AnimationId = animId
+			local track = animator:LoadAnimation(anim)
+			track:Play()
+			currentTrack = track
+			currentKey = key
+		end
+	end)
 end
 
-do --// Atomic Slash
-
-local Part = Instance.new("Part")
-
-Part.Parent = ReplicatedStorage
-
-local Attachment = Instance.new("Attachment")
-Attachment.Parent = Part
-
-HitEffectModule.Locals.Type["Atomic Slash"] = Attachment
-
-local Crescents = Instance.new("ParticleEmitter")
-Crescents.Name = "Crescents"
-Crescents.Lifetime = NumberRange.new(0.19, 0.38)
-Crescents.SpreadAngle = Vector2.new(-360, 360)
-Crescents.Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.1932907, 0), NumberSequenceKeypoint.new(0.778754, 0), NumberSequenceKeypoint.new(1, 1)})
-Crescents.LightEmission = 10
-Crescents.Color = ColorSequence.new(Color3.fromRGB(160, 96, 255))
-Crescents.VelocitySpread = -360
-Crescents.Speed = NumberRange.new(0.0826858, 0.0826858)
-Crescents.Brightness = 4
-Crescents.Size = NumberSequence.new({NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(0.398774, 8.8026266, 2.2834616), NumberSequenceKeypoint.new(1, 11.477972, 1.860431)})
-Crescents.Enabled = false
-Crescents.ZOffset = 0.4542207
-Crescents.Rate = 50
-Crescents.Texture = "rbxassetid://12509373457"
-Crescents.RotSpeed = NumberRange.new(800, 1000)
-Crescents.Rotation = NumberRange.new(-360, 360)
-Crescents.Orientation = Enum.ParticleOrientation.VelocityPerpendicular
-Crescents.Parent = Attachment
-
-local Glow = Instance.new("ParticleEmitter")
-Glow.Name = "Glow"
-Glow.Lifetime = NumberRange.new(0.16, 0.16)
-Glow.Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.1421725, 0.6182796), NumberSequenceKeypoint.new(1, 1)})
-Glow.Color = ColorSequence.new(Color3.fromRGB(173, 82, 252))
-Glow.Speed = NumberRange.new(0, 0)
-Glow.Brightness = 5
-Glow.Size = NumberSequence.new(9.1873131, 16.5032349)
-Glow.Enabled = false
-Glow.ZOffset = -0.0565939
-Glow.Rate = 50
-Glow.Texture = "rbxassetid://8708637750"
-Glow.Parent = Attachment
-
-local Effect = Instance.new("ParticleEmitter")
-Effect.Name = "Effect"
-Effect.Lifetime = NumberRange.new(0.4, 0.7)
-Effect.FlipbookLayout = Enum.ParticleFlipbookLayout.Grid4x4
-Effect.SpreadAngle = Vector2.new(360, -360)
-Effect.LockedToPart = true
-Effect.Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.1070999, 0.19375), NumberSequenceKeypoint.new(0.7761194, 0.88125), NumberSequenceKeypoint.new(1, 1)})
-Effect.LightEmission = 1
-Effect.Color = ColorSequence.new(Color3.fromRGB(173, 82, 252))
-Effect.Drag = 1
-Effect.VelocitySpread = 360
-Effect.Speed = NumberRange.new(0.0036749, 0.0036749)
-Effect.Brightness = 2.0999999
-Effect.Size = NumberSequence.new(6.9680691, 9.9213123)
-Effect.Enabled = false
-Effect.ZOffset = 0.4777403
-Effect.Rate = 50
-Effect.Texture = "rbxassetid://9484012464"
-Effect.RotSpeed = NumberRange.new(-150, -150)
-Effect.FlipbookMode = Enum.ParticleFlipbookMode.OneShot
-Effect.Rotation = NumberRange.new(50, 50)
-Effect.Orientation = Enum.ParticleOrientation.VelocityPerpendicular
-Effect.Parent = Attachment
-
-local Gradient1 = Instance.new("ParticleEmitter")
-Gradient1.Name = "Gradient1"
-Gradient1.Lifetime = NumberRange.new(0.3, 0.3)
-Gradient1.Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.15, 0.3), NumberSequenceKeypoint.new(1, 1)})
-Gradient1.Color = ColorSequence.new(Color3.fromRGB(173, 82, 252))
-Gradient1.Speed = NumberRange.new(0, 0)
-Gradient1.Brightness = 6
-Gradient1.Size = NumberSequence.new(0, 11.6261358)
-Gradient1.Enabled = false
-Gradient1.ZOffset = 0.9187313
-Gradient1.Rate = 50
-Gradient1.Texture = "rbxassetid://8196169974"
-Gradient1.Parent = Attachment
-
-local Shards = Instance.new("ParticleEmitter")
-Shards.Name = "Shards"
-Shards.Lifetime = NumberRange.new(0.19, 0.7)
-Shards.SpreadAngle = Vector2.new(-90, 90)
-Shards.Color = ColorSequence.new(Color3.fromRGB(179, 145, 253))
-Shards.Drag = 10
-Shards.VelocitySpread = -90
-Shards.Squash = NumberSequence.new({NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.5705521, 0.4125001), NumberSequenceKeypoint.new(1, -0.9375)})
-Shards.Speed = NumberRange.new(97.7530136, 146.9970093)
-Shards.Brightness = 4
-Shards.Size = NumberSequence.new({NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(0.284774, 1.2389833, 0.1534118), NumberSequenceKeypoint.new(1, 0)})
-Shards.Enabled = false
-Shards.Acceleration = Vector3.new(0, -56.961341857910156, 0)
-Shards.ZOffset = 0.5705321
-Shards.Rate = 50
-Shards.Texture = "rbxassetid://8030734851"
-Shards.Rotation = NumberRange.new(90, 90)
-Shards.Orientation = Enum.ParticleOrientation.VelocityParallel
-Shards.Parent = Attachment
-
-Part.Parent = workspace
+-- Nếu đã có character
+if lp.Character then
+	setup(lp.Character)
 end
 
-do
-    local part = Instance.new("Part")
-    part.Parent = ReplicatedStorage
-    local attachment = Instance.new("Attachment")
-    attachment.Name = "Attachment"
-    attachment.Parent = part
-    HitEffectModule.Locals.Type["Nova"] = attachment
-
-    local function createParticleEmitter(acceleration)
-        local emitter = Instance.new("ParticleEmitter")
-        emitter.Name = "ParticleEmitter"
-        emitter.Acceleration = acceleration
-        emitter.Color = ColorSequence.new({
-            ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 0, 0)),
-            ColorSequenceKeypoint.new(0.495, HitEffectModule.Settings.HitEffect.Color),
-            ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 0, 0))
-        })
-        emitter.Lifetime = NumberRange.new(0.5, 0.5)
-        emitter.LightEmission = 1
-        emitter.LockedToPart = true
-        emitter.Rate = 1
-        emitter.Rotation = NumberRange.new(0, 360)
-        emitter.Size = NumberSequence.new({
-            NumberSequenceKeypoint.new(0, 1),
-            NumberSequenceKeypoint.new(1, 10),
-            NumberSequenceKeypoint.new(1, 1)
-        })
-        emitter.Speed = NumberRange.new(0, 0)
-        emitter.Texture = "rbxassetid://1084991215"
-        emitter.Transparency = NumberSequence.new({
-            NumberSequenceKeypoint.new(0, 0),
-            NumberSequenceKeypoint.new(0, 0.1),
-            NumberSequenceKeypoint.new(0.534, 0.25),
-            NumberSequenceKeypoint.new(1, 0.5),
-            NumberSequenceKeypoint.new(1, 0)
-        })
-        emitter.ZOffset = 1
-        emitter.Parent = attachment
-        return emitter
-    end
-
-    createParticleEmitter(Vector3.new(0, 0, 1))
-    local perpendicularEmitter = createParticleEmitter(Vector3.new(0, 1, -0.001))
-    perpendicularEmitter.Orientation = Enum.ParticleOrientation.VelocityPerpendicular
-end
-
-HitEffectModule.Functions.Effect = function(character, color)
-    if not character then return end
-    local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
-    if not humanoidRootPart then return end
-
-    local effectAttachment = HitEffectModule.Locals.Type[TargetAimbot.HitEffectType]:Clone()
-    effectAttachment.Parent = humanoidRootPart
-
-    for _, emitter in pairs(effectAttachment:GetChildren()) do
-        if emitter:IsA("ParticleEmitter") then
-            emitter.Color = ColorSequence.new({
-                ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 0, 0)),
-                ColorSequenceKeypoint.new(0.495, color or HitEffectModule.Settings.HitEffect.Color),
-                ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 0, 0))
-            })
-            emitter:Emit()
-        end
-    end
-
-    task.delay(2, function()
-        effectAttachment:Destroy()
-    end)
-end
-
-local targetHealth = nil
-
-local function updateTargetHealth()
-    if TargBindEnabled and TargetPlr and TargetPlr.Character then
-        local humanoid = TargetPlr.Character:FindFirstChild("Humanoid")
-        if humanoid then
-            local currentHealth = humanoid.Health
-            if currentHealth < targetHealth then
-                HitEffectModule.Functions.Effect(TargetPlr.Character)
-            end
-            targetHealth = currentHealth
-        end
-    end
-end
-
-local function isTyping()
-    return UserInputService:GetFocusedTextBox() ~= nil
-end
-
-local function ClosestPlr(Part)
-    local Closest
-    local Distance = math.huge
-    local ScreenCenter = Vector2.new(Workspace.CurrentCamera.ViewportSize.X / 2, Workspace.CurrentCamera.ViewportSize.Y / 2)
-    for _, Target in pairs(Players:GetPlayers()) do
-        if Target ~= LocalPlayer and Target.Character and Target.Character:FindFirstChild(Part) then
-            local Position = Workspace.CurrentCamera:WorldToViewportPoint(Target.Character[Part].Position)
-            local Magnitude = (Vector2.new(Position.X, Position.Y) - ScreenCenter).Magnitude
-            if Magnitude < Distance then
-                Closest = Target
-                Distance = Magnitude
-            end
-        end
-    end
-    return Closest
-end
-
-local function Resolver(Target, Aimbot)
-    local Part = Target.Character[Aimbot.RealHitPart]
-    local CurrentPosition = Part.Position
-    local CurrentTime = tick()
-    wait()
-    local NewPosition = Part.Position
-    local NewTime = tick()
-    local DistanceTraveled = (NewPosition - CurrentPosition)
-    local TimeInterval = NewTime - CurrentTime
-    local Velocity = DistanceTraveled / TimeInterval
-    CurrentPosition = NewPosition
-    CurrentTime = NewTime
-    if Aimbot.ResolverType == "MoveDirection" then
-        return Target.Character.Humanoid.MoveDirection * Target.Character.Humanoid.WalkSpeed
-    end
-    return Velocity
-end
-
-local function CalculateAutoPrediction(target)
-    if not target or not target.Character or not target.Character:FindFirstChild("HumanoidRootPart") then
-        return 0.1
-    end
-
-    local ping = math.clamp(Stats.Network.ServerStatsItem["Data Ping"]:GetValue() / 1000, 0.01, 1)
-    local root = target.Character.HumanoidRootPart
-    local velocity = root.AssemblyLinearVelocity.Magnitude
-    local distance = (root.Position - Workspace.CurrentCamera.CFrame.Position).Magnitude
-
-    -- công thức prediction dựa theo ping + khoảng cách + vận tốc
-    local predicted_time = (distance / math.max(velocity, 1)) * 0.05 + ping * 0.5
-    predicted_time = math.clamp(predicted_time, 0.05, 0.4)
-    return predicted_time
-end
-
-local function AimRedirect()
-    if not (TargetAimbot.Enabled and TargBindEnabled and TargetPlr and TargetPlr.Character and TargetPlr.Character:FindFirstChild(TargetAimbot.RealHitPart)) then
-        return
-    end
-
-    local cam = Workspace.CurrentCamera
-    local rootPart = TargetPlr.Character[TargetAimbot.RealHitPart]
-    local targetVelocity = rootPart.AssemblyLinearVelocity
-
-    -- Tính toán prediction tự động
-    local predictionTime = CalculateAutoPrediction(TargetPlr)
-    local predictedPosition = rootPart.Position + (targetVelocity * predictionTime)
-
-    -- Nếu có jump offset, áp dụng thêm
-    predictedPosition += Vector3.new(0, TargetAimbot.RealJumpOffset, 0)
-
-    -- ⚡ Đặt camera và hướng aim
-    local newCF = CFrame.lookAt(cam.CFrame.Position, predictedPosition)
-    cam.CFrame = newCF
-
-    -- Nếu muốn quay nhân vật theo hướng aim:
-    if TargetAimbot.LookAt and LocalPlayer.Character and LocalPlayer.Character.PrimaryPart then
-        LocalPlayer.Character:SetPrimaryPartCFrame(CFrame.lookAt(LocalPlayer.Character.PrimaryPart.Position, predictedPosition))
-    end
-end
-
-RunService.Heartbeat:Connect(function()
-    if TargetAimbot.Enabled and TargBindEnabled and TargetPlr then
-        TargResolvePos = Resolver(TargetPlr, TargetAimbot)
-    end
-    updateTargetHealth()
-    if TargetAimbot.Enabled and TargBindEnabled and TargetPlr then
-        AimRedirect()
-    end
+-- Khi respawn
+lp.CharacterAdded:Connect(function(char)
+	currentTrack = nil
+	currentKey = nil
+	task.wait(0.2)
+	setup(char)
 end)
 
-UserInputService.InputBegan:Connect(function(input, gameProcessedEvent)
-    if gameProcessedEvent then return end
+local Locked = false
+local CurrentTarget = nil
+local s = 1
 
-    if input.KeyCode == TargetAimbot.Keybind then
-        if isTyping() then
-            return
+-- Check sống chuẩn cho game + Da Hood
+local function isAlive(plr)
+    if not plr or not plr.Character then return false end
+
+    local hum = plr.Character:FindFirstChildOfClass("Humanoid")
+    if not hum or hum.Health <= 0 then
+        return false
+    end
+
+    -- Da Hood body checks
+    local be = plr.Character:FindFirstChild("BodyEffects")
+    if be then
+        local ko = be:FindFirstChild("K.O")
+        local grabbed = be:FindFirstChild("GRABBING_CONSTRAINT")
+
+        if (ko and ko.Value) or (grabbed and grabbed.Value) then
+            return false
         end
+    end
 
-        if TargetAimbot.Enabled then
-            local Closest = ClosestPlr(TargetAimbot.RealHitPart)
-            if Closest then
-                if TargBindEnabled then
-                    TargBindEnabled = false
-                    targetHealth = nil
-                    if TargetAimbot.LookAt then
-                        LocalPlayer.Character.Humanoid.AutoRotate = true
+    return true
+end
+
+-- Check có bị che tường không
+local function isVisible(part)
+    local origin = Camera.CFrame.Position
+    local direction = (part.Position - origin)
+
+    local params = RaycastParams.new()
+    params.FilterType = Enum.RaycastFilterType.Blacklist
+    params.FilterDescendantsInstances = {lp.Character}
+
+    local hit = workspace:Raycast(origin, direction, params)
+    if not hit then return true end
+
+    return hit.Instance:IsDescendantOf(part.Parent)
+end
+
+-- Lấy target gần chuột nhất, không bị tường
+local function getClosestToMouse()
+    local mousePos = uis:GetMouseLocation()
+    local closest, shortest = nil, math.huge
+
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= lp and isAlive(plr) then
+            local head = plr.Character:FindFirstChild("Head")
+            if head then
+                local screenPos, onScreen = Camera:WorldToViewportPoint(head.Position)
+                if onScreen and isVisible(head) then
+                    local dist = (mousePos - Vector2.new(screenPos.X, screenPos.Y)).Magnitude
+                    if dist < shortest then
+                        closest = plr
+                        shortest = dist
                     end
-                    if TargetAimbot.ViewAt then
-                        Workspace.CurrentCamera.CameraSubject = LocalPlayer.Character.Humanoid
-                    end
-                    StarterGui:SetCore("SendNotification", {
-                        Title = "TapBidi.cc",
-                        Text = "Untargeted: " .. TargetPlr.DisplayName,
-                        Duration = 1
-                    })
-                else
-                    TargBindEnabled = true
-                    TargetPlr = Closest
-                    targetHealth = TargetPlr.Character:FindFirstChild("Humanoid").Health
-                    StarterGui:SetCore("SendNotification", {
-                        Title = "TapBidi.cc",
-                        Text = "Targeting: " .. TargetPlr.DisplayName,
-                        Duration = 1
-                    })
                 end
             end
         end
     end
-end)
 
-RunService.Heartbeat:Connect(function()
-    if TargetAimbot.Enabled and TargBindEnabled and TargetPlr then
-        TargResolvePos = Resolver(TargetPlr, TargetAimbot)
-    end
-    updateTargetHealth()
-end)
+    return closest
+end
 
-RunService.Heartbeat:Connect(function()
-    if TargetAimbot.Enabled and TargetAimbot.Autoselect then
-        TargetPlr = ClosestPlr(TargetAimbot.RealHitPart)
-    end
-end)
-
-RunService.RenderStepped:Connect(function()
-    if TargetAimbot.Enabled and TargBindEnabled and TargetAimbot.Highlight and TargetPlr and TargetPlr.Character then
-        TargHighlight.Adornee = TargetPlr.Character
-        TargHighlight.FillColor = TargetAimbot.FillingColor
-        TargHighlight.OutlineColor = TargetAimbot.OutliningColor
-        TargHighlight.Enabled = true
+uis.InputBegan:Connect(function(input)
+    if input.KeyCode == Enum.KeyCode.Q then
+        CurrentTarget = getClosestToMouse()
     else
-        TargHighlight.Adornee = nil
-        TargHighlight.Enabled = false
+        CurrentTarget = nil
     end
 end)
 
+local function GetVelocity(char)
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return Vector3.zero end
+
+    local oldPos = hrp.Position
+    local oldTick = tick()
+
+    task.wait(0.1)
+
+    local newPos = hrp.Position
+    local newTick = tick()
+
+    local dt = (newTick - oldTick)
+    if dt <= 0 then return Vector3.zero end
+
+    return (newPos - oldPos) / dt
+end
+workspace.FallenPartsDestroyHeight = -math.huge
+local tracerOutline = Drawing.new("Line")
+tracerOutline.Visible = false
+tracerOutline.Color = Color3.fromRGB(0, 0, 0)  -- Màu outline mặc định (đỏ), thay đổi tùy ý
+tracerOutline.Thickness = 4
+
+local tracer = Drawing.new("Line")
+tracer.Visible = false
+tracer.Color = Color3.fromRGB(155, 125, 175)  -- Màu fill mặc định (trắng), thay đổi tùy ý
+tracer.Thickness = 2
 RunService.RenderStepped:Connect(function()
-    if TargetAimbot.Enabled and TargBindEnabled and TargetAimbot.AutoPred then
-        TargetAimbot.RealPrediction = math.round(Stats.Network.ServerStatsItem["Data Ping"]:GetValue()) / 200 * 0.1 + 0.1
-    else
-        TargetAimbot.RealPrediction = TargetAimbot.Prediction
-    end
-end)
-
-RunService.Heartbeat:Connect(function()
-    if LocalPlayer.Character:FindFirstChildOfClass("Tool") and LocalPlayer.Character:FindFirstChildOfClass("Tool").Activated then
-        AimRedirect()
-    end
-end)
-
-RunService.RenderStepped:Connect(function()
-    if getgenv().TargetAimbot.Enabled 
-        and getgenv().TargetAimbot.Tracer 
-        and TargBindEnabled 
-        and TargetPlr 
-        and TargetPlr.Character 
-        and TargetPlr.Character:FindFirstChild(getgenv().TargetAimbot.RealHitPart) then
+    if CurrentTarget and CurrentTarget.Character and isAlive(CurrentTarget) then
+        local head = CurrentTarget.Character:FindFirstChild("Head")
+        local humanoidRootPart = CurrentTarget.Character:FindFirstChild("HumanoidRootPart")
         
-        local MousePos = UserInputService:GetMouseLocation()
-        local TargetPos, onScreen = Workspace.CurrentCamera:WorldToViewportPoint(
-            TargetPlr.Character[getgenv().TargetAimbot.RealHitPart].Position
-        )
-        
-        if onScreen then
-            Tracer.From = Vector2.new(MousePos.X, MousePos.Y)
-            Tracer.To = Vector2.new(TargetPos.X, TargetPos.Y)
-            Tracer.Color = getgenv().TargetAimbot.TracerColor
-            Tracer.Visible = true
+        if head and humanoidRootPart then
+            -- Xóa highlight cũ nếu switch target
+            if lastHighlightedPlayer and lastHighlightedPlayer ~= CurrentTarget then
+                local oldHighlight = lastHighlightedPlayer.Character:FindFirstChild("Highlight")
+                if oldHighlight then oldHighlight:Destroy() end
+            end
+            lastHighlightedPlayer = CurrentTarget
+            
+            -- Highlight mới (update color mỗi frame cho mượt)
+            local highlight = CurrentTarget.Character:FindFirstChild("Highlight")
+            if not highlight then
+                highlight = Instance.new("Highlight")
+                highlight.Parent = CurrentTarget.Character
+                highlight.Adornee = CurrentTarget.Character
+                highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+            end
+            highlight.FillTransparency = 0.5
+            highlight.OutlineTransparency = 0
+            highlight.FillColor = Color3.fromRGB(155, 125, 175)  
+            highlight.OutlineColor = Color3.fromRGB(129, 105, 145)  -- Vàng outline
+            
+            -- Tracer (predict pos để ít flicker hơn khi di chuyển nhanh)
+            local vel = GetVelocity(CurrentTarget.Character)  -- Reuse func có sẵn
+            local predictedHeadPos = head.Position + vel * prediction  -- Sync với aim predict
+            local mouseScreenPosition = UserInputService:GetMouseLocation()
+            local headScreenPosition, onScreen = workspace.CurrentCamera:WorldToViewportPoint(predictedHeadPos)
+            
+            if onScreen or true then  -- Luôn visible nếu target valid (bỏ strict onScreen để fix "biến mất")
+                local adjustedMousePosition = Vector2.new(mouseScreenPosition.X, mouseScreenPosition.Y)
+                
+                tracerOutline.From = adjustedMousePosition
+                tracerOutline.To = Vector2.new(headScreenPosition.X, headScreenPosition.Y)
+                tracerOutline.Visible = true
+                
+                tracer.From = adjustedMousePosition
+                tracer.To = Vector2.new(headScreenPosition.X, headScreenPosition.Y)
+                tracer.Visible = true
+            else
+                tracerOutline.Visible = false
+                tracer.Visible = false
+            end
         else
-            Tracer.Visible = false
+            tracerOutline.Visible = false
+            tracer.Visible = false
         end
     else
-        Tracer.Visible = false
+        -- XÓA highlight + ẩn tracer khi bỏ target (FIX chính)
+        if lastHighlightedPlayer and lastHighlightedPlayer.Character then
+            local highlight = lastHighlightedPlayer.Character:FindFirstChild("Highlight")
+            if highlight then highlight:Destroy() end
+        end
+        lastHighlightedPlayer = nil
+        tracerOutline.Visible = false
+        tracer.Visible = false
     end
+    if Locked and CurrentTarget then
+        if not isAlive(CurrentTarget) or not isAlive(lp) then return end
+
+        local head = CurrentTarget.Character and CurrentTarget.Character:FindFirstChild("Head")
+        if not head then return end
+
+        if not isVisible(head) then return end
+		local vel = GetVelocity(CurrentTarget.Character)
+		local predictedPos = head.Position + vel * prediction
+        -- Aim vào đầu
+        Camera.CFrame = Camera.CFrame:Lerp(CFrame.lookAt(Camera.CFrame.Position, predictedPos), s)
+    end
+end)
+-- Lệnh .re để rejoin
+lp.Chatted:Connect(function(msg)
+    msg = msg:lower()
+
+    if msg == ".rej" or msg == ".rejoin" then
+        TeleportService:Teleport(game.PlaceId, lp)
+    elseif msg == ".re" or msg == ".killlocal" then
+        local char = lp.Character
+        if char and char:FindFirstChild("Humanoid") then
+            char.Humanoid.Health = 0
+        end
+    end
+end)
+
+-- Playerlist GUI (from previous version, keeping it professional black-purple theme)
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "PlayerListGUI"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = game.CoreGui
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 200, 0, 370)
+MainFrame.Position = UDim2.new(0.5, -100, 0.5, -150)
+MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)  -- Đen
+MainFrame.BorderSizePixel = 0
+MainFrame.Parent = ScreenGui
+MainFrame.Active = true
+
+local UIStroke = Instance.new("UIStroke")
+UIStroke.Color = Color3.fromRGB(128, 0, 128)  -- Tím accent
+UIStroke.Thickness = 2
+UIStroke.Transparency = 0.5
+UIStroke.Parent = MainFrame
+
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 8)
+UICorner.Parent = MainFrame
+
+local TitleLabel = Instance.new("TextLabel")
+TitleLabel.Size = UDim2.new(1, 0, 0, 30)
+TitleLabel.BackgroundTransparency = 1
+TitleLabel.Text = "Player List"
+TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+TitleLabel.Font = Enum.Font.GothamBold
+TitleLabel.TextSize = 16
+TitleLabel.Parent = MainFrame
+
+local ScrollingFrame = Instance.new("ScrollingFrame")
+ScrollingFrame.Size = UDim2.new(1, 0, 1, -35)
+ScrollingFrame.Position = UDim2.new(0, 0, 0, 30)
+ScrollingFrame.BackgroundTransparency = 1
+ScrollingFrame.BorderSizePixel = 0
+ScrollingFrame.ScrollBarThickness = 4
+ScrollingFrame.ScrollBarImageColor3 = Color3.fromRGB(128, 0, 128)
+ScrollingFrame.Parent = MainFrame
+
+local UIListLayout = Instance.new("UIListLayout")
+UIListLayout.SortOrder = Enum.SortOrder.Name
+UIListLayout.Parent = ScrollingFrame
+
+-- Panel bên phải cho info và buttons
+local InfoPanel = Instance.new("Frame")
+InfoPanel.Size = UDim2.new(0, 250, 0, 300)
+InfoPanel.Position = UDim2.new(1, 10, 0, 0)
+InfoPanel.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+InfoPanel.BorderSizePixel = 0
+InfoPanel.Visible = false
+InfoPanel.Parent = MainFrame
+
+local UICornerInfo = Instance.new("UICorner")
+UICornerInfo.CornerRadius = UDim.new(0, 8)
+UICornerInfo.Parent = InfoPanel
+
+local UIStrokeInfo = Instance.new("UIStroke")
+UIStrokeInfo.Color = Color3.fromRGB(128, 0, 128)
+UIStrokeInfo.Thickness = 2
+UIStrokeInfo.Transparency = 0.5
+UIStrokeInfo.Parent = InfoPanel
+
+-- Buttons trong InfoPanel
+local ButtonFrame = Instance.new("Frame")
+ButtonFrame.Size = UDim2.new(1, 0, 0, 150)
+ButtonFrame.BackgroundTransparency = 1
+ButtonFrame.Parent = InfoPanel
+
+local SpectateButton = Instance.new("TextButton")
+SpectateButton.Size = UDim2.new(1, 0, 0, 30)
+SpectateButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+SpectateButton.Text = "Spectate: Off"
+SpectateButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+SpectateButton.Font = Enum.Font.Gotham
+SpectateButton.TextSize = 14
+SpectateButton.Parent = ButtonFrame
+
+local UICornerSpectate = Instance.new("UICorner")
+UICornerSpectate.CornerRadius = UDim.new(0, 6)
+UICornerSpectate.Parent = SpectateButton
+
+local GotoButton = Instance.new("TextButton")
+GotoButton.Size = UDim2.new(1, 0, 0, 30)
+GotoButton.Position = UDim2.new(0, 0, 0, 30)
+GotoButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+GotoButton.Text = "Go To"
+GotoButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+GotoButton.Font = Enum.Font.Gotham
+GotoButton.TextSize = 14
+GotoButton.Parent = ButtonFrame
+
+local UICornerGoto = Instance.new("UICorner")
+UICornerGoto.CornerRadius = UDim.new(0, 6)
+UICornerGoto.Parent = GotoButton
+
+local ViewInvButton = Instance.new("TextButton")
+ViewInvButton.Size = UDim2.new(1, 0, 0, 30)
+ViewInvButton.Position = UDim2.new(0, 0, 0, 60)
+ViewInvButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+ViewInvButton.Text = "View Inventory"
+ViewInvButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+ViewInvButton.Font = Enum.Font.Gotham
+ViewInvButton.TextSize = 14
+ViewInvButton.Parent = ButtonFrame
+
+local UICornerViewInv = Instance.new("UICorner")
+UICornerViewInv.CornerRadius = UDim.new(0, 6)
+UICornerViewInv.Parent = ViewInvButton
+
+local SetTargetButton = Instance.new("TextButton")
+SetTargetButton.Size = UDim2.new(1, 0, 0, 30)
+SetTargetButton.Position = UDim2.new(0, 0, 0, 90)
+SetTargetButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+SetTargetButton.Text = "Set Target"
+SetTargetButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+SetTargetButton.Font = Enum.Font.Gotham
+SetTargetButton.TextSize = 14
+SetTargetButton.Parent = ButtonFrame
+
+local UICornerSetTarget = Instance.new("UICorner")
+UICornerSetTarget.CornerRadius = UDim.new(0, 6)
+UICornerSetTarget.Parent = SetTargetButton
+
+local AutoKillButton = Instance.new("TextButton")
+AutoKillButton.Size = UDim2.new(1, 0, 0, 30)
+AutoKillButton.Position = UDim2.new(0, 0, 0, 120)
+AutoKillButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+AutoKillButton.Text = "Auto Kill: Off"
+AutoKillButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+AutoKillButton.Font = Enum.Font.Gotham
+AutoKillButton.TextSize = 14
+AutoKillButton.Parent = ButtonFrame
+
+local UICornerAutoKill = Instance.new("UICorner")
+UICornerAutoKill.CornerRadius = UDim.new(0, 6)
+UICornerAutoKill.Parent = AutoKillButton
+
+-- Info Frame dưới buttons
+local PlayerInfoFrame = Instance.new("Frame")
+PlayerInfoFrame.Size = UDim2.new(1, 0, 1, -80)
+PlayerInfoFrame.Position = UDim2.new(0, 0, 0, 150)
+PlayerInfoFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+PlayerInfoFrame.Parent = InfoPanel
+
+local UICornerPlayerInfo = Instance.new("UICorner")
+UICornerPlayerInfo.CornerRadius = UDim.new(0, 6)
+UICornerPlayerInfo.Parent = PlayerInfoFrame
+
+local AvatarImage = Instance.new("ImageLabel")
+AvatarImage.Size = UDim2.new(0, 80, 0, 80)
+AvatarImage.Position = UDim2.new(0.5, -40, 0, 10)
+AvatarImage.BackgroundTransparency = 1
+AvatarImage.Image = "rbxassetid://0"  -- Placeholder
+AvatarImage.Parent = PlayerInfoFrame
+
+local UICornerAvatar = Instance.new("UICorner")
+UICornerAvatar.CornerRadius = UDim.new(1, 0)  -- Circle
+UICornerAvatar.Parent = AvatarImage
+
+local DisplayNameLabel = Instance.new("TextLabel")
+DisplayNameLabel.Size = UDim2.new(1, 0, 0, 20)
+DisplayNameLabel.Position = UDim2.new(0, 0, 0, 100)
+DisplayNameLabel.BackgroundTransparency = 1
+DisplayNameLabel.Text = "DisplayName (@Username)"
+DisplayNameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+DisplayNameLabel.Font = Enum.Font.GothamBold
+DisplayNameLabel.TextSize = 14
+DisplayNameLabel.Parent = PlayerInfoFrame
+
+local HealthBarFrame = Instance.new("Frame")
+HealthBarFrame.Size = UDim2.new(0.9, 0, 0, 10)
+HealthBarFrame.Position = UDim2.new(0.05, 0, 0, 130)
+HealthBarFrame.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+HealthBarFrame.Parent = PlayerInfoFrame
+
+local UICornerHealthFrame = Instance.new("UICorner")
+UICornerHealthFrame.CornerRadius = UDim.new(0, 5)
+UICornerHealthFrame.Parent = HealthBarFrame
+
+local HealthBar = Instance.new("Frame")
+HealthBar.Size = UDim2.new(1, 0, 1, 0)
+HealthBar.BackgroundColor3 = Color3.fromRGB(0, 255, 0)  -- Default green
+HealthBar.Parent = HealthBarFrame
+
+local UICornerHealth = Instance.new("UICorner")
+UICornerHealth.CornerRadius = UDim.new(0, 5)
+UICornerHealth.Parent = HealthBar
+
+local HealthText = Instance.new("TextLabel")
+HealthText.Size = UDim2.new(1, 0, 0, 20)
+HealthText.Position = UDim2.new(0, 0, 0, 145)
+HealthText.BackgroundTransparency = 1
+HealthText.Text = "100/100"
+HealthText.TextColor3 = Color3.fromRGB(255, 255, 255)
+HealthText.Font = Enum.Font.Gotham
+HealthText.TextSize = 12
+HealthText.Parent = PlayerInfoFrame
+
+local AgeLabel = Instance.new("TextLabel")
+AgeLabel.Size = UDim2.new(1, 0, 0, 20)
+AgeLabel.Position = UDim2.new(0, 0, 0, 170)
+AgeLabel.BackgroundTransparency = 1
+AgeLabel.Text = "Age: 0 days"
+AgeLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+AgeLabel.Font = Enum.Font.Gotham
+AgeLabel.TextSize = 12
+AgeLabel.Parent = PlayerInfoFrame
+
+local DistanceLabel = Instance.new("TextLabel")
+DistanceLabel.Size = UDim2.new(1, 0, 0, 20)
+DistanceLabel.Position = UDim2.new(0, 0, 0, 190)
+DistanceLabel.BackgroundTransparency = 1
+DistanceLabel.Text = "Distance: 0 studs"
+DistanceLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+DistanceLabel.Font = Enum.Font.Gotham
+DistanceLabel.TextSize = 12
+DistanceLabel.Parent = PlayerInfoFrame
+
+-- Inventory Frame
+local InventoryFrame = Instance.new("Frame")
+InventoryFrame.Size = UDim2.new(0, 200, 0, 250)
+InventoryFrame.Position = UDim2.new(1, 10, 0, 0)
+InventoryFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+InventoryFrame.BorderSizePixel = 0
+InventoryFrame.Visible = false
+InventoryFrame.Parent = InfoPanel
+
+local UICornerInv = Instance.new("UICorner")
+UICornerInv.CornerRadius = UDim.new(0, 8)
+UICornerInv.Parent = InventoryFrame
+
+local UIStrokeInv = Instance.new("UIStroke")
+UIStrokeInv.Color = Color3.fromRGB(128, 0, 128)
+UIStrokeInv.Thickness = 2
+UIStrokeInv.Transparency = 0.5
+UIStrokeInv.Parent = InventoryFrame
+
+local InvScrolling = Instance.new("ScrollingFrame")
+InvScrolling.Size = UDim2.new(1, 0, 1, 0)
+InvScrolling.BackgroundTransparency = 1
+InvScrolling.ScrollBarThickness = 4
+InvScrolling.ScrollBarImageColor3 = Color3.fromRGB(128, 0, 128)
+InvScrolling.Parent = InventoryFrame
+
+local UIListLayoutInv = Instance.new("UIListLayout")
+UIListLayoutInv.Parent = InvScrolling
+
+-- Watermark
+local WatermarkFrame = Instance.new("Frame")
+WatermarkFrame.Size = UDim2.new(0, 200, 0, 30)
+WatermarkFrame.Position = UDim2.new(0, 0, 0, -40)
+WatermarkFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+WatermarkFrame.Parent = MainFrame
+
+local AccentLine = Instance.new("Frame")
+AccentLine.Size = UDim2.new(1, 0, 0, 2)
+AccentLine.BackgroundColor3 = Color3.fromRGB(128, 0, 128)
+AccentLine.Parent = WatermarkFrame
+
+local WatermarkText = Instance.new("TextLabel")
+WatermarkText.Size = UDim2.new(1, 0, 1, -2)
+WatermarkText.Position = UDim2.new(0, 0, 0, 2)
+WatermarkText.BackgroundTransparency = 1
+WatermarkText.Text = "matcha / 0 ms / 0 fps"
+WatermarkText.TextColor3 = Color3.fromRGB(255, 255, 255)
+WatermarkText.Font = Enum.Font.Gotham
+WatermarkText.TextSize = 12
+WatermarkText.Parent = WatermarkFrame
+
+-- Smooth Draggable
+local function makeSmoothDraggable(frame, speed)
+    speed = speed or 0.2
+    local dragging, dragInput, dragStart, startPos
+    local function update(input)
+        local delta = input.Position - dragStart
+        local goal = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        TweenService:Create(frame, TweenInfo.new(speed, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {Position = goal}):Play()
+    end
+    frame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = frame.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then dragging = false end
+            end)
+        end
+    end)
+    frame.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            dragInput = input
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then update(input) end
+    end)
+end
+
+makeSmoothDraggable(MainFrame)
+
+-- Variables
+local selectedPlayer = nil
+local spectating = false
+local guiVisible = true
+ScreenGui.Enabled = guiVisible
+local AutoKill = false
+
+-- Function to update player list
+local function updatePlayerList()
+    for _, child in ipairs(ScrollingFrame:GetChildren()) do
+        if child:IsA("TextButton") then
+            child:Destroy()
+        end
+    end
+    
+    local players = Players:GetPlayers()
+    table.sort(players, function(a, b) return a.Name < b.Name end)
+    
+    for _, plr in ipairs(players) do
+        if plr ~= lp then
+            local button = Instance.new("TextButton")
+            button.Size = UDim2.new(1, 0, 0, 30)
+            button.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+            button.Text = plr.DisplayName .. " (@" .. plr.Name .. ")"
+            button.TextColor3 = Color3.fromRGB(255, 255, 255)
+            button.Font = Enum.Font.Gotham
+            button.TextSize = 14
+            button.Parent = ScrollingFrame
+            
+            local UICornerBtn = Instance.new("UICorner")
+            UICornerBtn.CornerRadius = UDim.new(0, 4)
+            UICornerBtn.Parent = button
+            
+            button.MouseButton1Click:Connect(function()
+                if selectedPlayer == plr then
+                    selectedPlayer = nil
+                    InfoPanel.Visible = false
+                else
+                    selectedPlayer = plr
+                    InfoPanel.Visible = true
+                    updateInfoPanel()
+                end
+                updateHighlights()
+            end)
+        end
+    end
+    
+    ScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, #ScrollingFrame:GetChildren() * 30)
+end
+
+local function updateHighlights()
+    for _, button in ipairs(ScrollingFrame:GetChildren()) do
+        if button:IsA("TextButton") then
+            if selectedPlayer and button.Text:find(selectedPlayer.Name) then
+                button.BackgroundColor3 = Color3.fromRGB(60, 60, 60)  -- Đậm hơn
+            else
+                button.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+            end
+        end
+    end
+end
+
+local function getAccountAge(plr)
+    local age = plr.AccountAge
+    return math.floor(age) .. " days"
+end
+
+local function getDistance(plr)
+    if lp.Character and lp.Character:FindFirstChild("HumanoidRootPart") and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+        return math.floor((lp.Character.HumanoidRootPart.Position - plr.Character.HumanoidRootPart.Position).Magnitude) .. " studs"
+    end
+    return "N/A"
+end
+
+local function getHealthColor(healthPercent)
+    if healthPercent > 0.75 then
+        return Color3.fromRGB(0, 255, 0)  -- Xanh
+    elseif healthPercent > 0.5 then
+        return Color3.fromRGB(255, 255, 0)  -- Vàng
+    elseif healthPercent > 0.25 then
+        return Color3.fromRGB(255, 165, 0)  -- Cam
+    else
+        return Color3.fromRGB(255, 0, 0)  -- Đỏ
+    end
+end
+
+local function updateInfoPanel()
+    if not selectedPlayer then return end
+    
+    local thumb = Players:GetUserThumbnailAsync(selectedPlayer.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size150x150)
+    AvatarImage.Image = thumb
+    
+    DisplayNameLabel.Text = selectedPlayer.DisplayName .. " (@" .. selectedPlayer.Name .. ")"
+    
+    local hum = selectedPlayer.Character and selectedPlayer.Character:FindFirstChildOfClass("Humanoid")
+    local health = hum and hum.Health or 0
+    local maxHealth = hum and hum.MaxHealth or 100
+    HealthText.Text = math.floor(health) .. "/" .. maxHealth
+    
+    local healthPercent = health / maxHealth
+    HealthBar.Size = UDim2.new(healthPercent, 0, 1, 0)
+    HealthBar.BackgroundColor3 = getHealthColor(healthPercent)
+    
+    AgeLabel.Text = "Age: " .. getAccountAge(selectedPlayer)
+    DistanceLabel.Text = "Distance: " .. getDistance(selectedPlayer)
+    
+    SetTargetButton.Text = (CurrentTarget == selectedPlayer) and "Untarget" or "Set Target"
+    SpectateButton.Text = "Spectate: " .. (spectating and "On" or "Off")
+    AutoKillButton.Text = "Auto Kill: " .. (AutoKill and "On" or "Off")
+end
+
+local function updateInventory()
+    for _, child in ipairs(InvScrolling:GetChildren()) do
+        if child:IsA("TextLabel") then
+            child:Destroy()
+        end
+    end
+    
+    if not selectedPlayer or not selectedPlayer.Character then return end
+    
+    local backpack = selectedPlayer:FindFirstChildOfClass("Backpack")
+    local charTools = selectedPlayer.Character:GetChildren()
+    
+    local items = {}
+    if backpack then
+        for _, tool in ipairs(backpack:GetChildren()) do
+            if tool:IsA("Tool") then
+                table.insert(items, tool.Name)
+            end
+        end
+    end
+    for _, tool in ipairs(charTools) do
+        if tool:IsA("Tool") then
+            table.insert(items, tool.Name)
+        end
+    end
+    
+    for _, item in ipairs(items) do
+        local label = Instance.new("TextLabel")
+        label.Size = UDim2.new(1, 0, 0, 20)
+        label.BackgroundTransparency = 1
+        label.Text = "- " .. item
+        label.TextColor3 = Color3.fromRGB(255, 255, 255)
+        label.Font = Enum.Font.Gotham
+        label.TextSize = 12
+        label.Parent = InvScrolling
+    end
+    
+    InvScrolling.CanvasSize = UDim2.new(0, 0, 0, #InvScrolling:GetChildren() * 20)
+end
+
+-- Thêm listener để xử lý target chết/hồi sinh
+local function handleSpectateRespawn(plr)
+    if spectating and plr == selectedPlayer then
+        plr.CharacterAdded:Connect(function(newChar)
+            if spectating then
+                task.wait(0.1)  -- Đợi char load
+                workspace.CurrentCamera.CameraSubject = newChar:FindFirstChildOfClass("Humanoid")
+            end
+        end)
+    end
+end
+
+-- Sửa SpectateButton connection
+SpectateButton.MouseButton1Click:Connect(function()
+    spectating = not spectating
+    SpectateButton.Text = "Spectate: " .. (spectating and "On" or "Off")
+    if spectating and selectedPlayer and selectedPlayer.Character then
+        workspace.CurrentCamera.CameraSubject = selectedPlayer.Character:FindFirstChildOfClass("Humanoid")
+        handleSpectateRespawn(selectedPlayer)  -- Gắn listener respawn
+    else
+        workspace.CurrentCamera.CameraSubject = lp.Character and lp.Character:FindFirstChildOfClass("Humanoid")
+    end
+end)
+
+GotoButton.MouseButton1Click:Connect(function()
+    if selectedPlayer and selectedPlayer.Character and lp.Character then
+        lp.Character.HumanoidRootPart.CFrame = selectedPlayer.Character.HumanoidRootPart.CFrame + Vector3.new(0, 0, -3)
+    end
+end)
+
+ViewInvButton.MouseButton1Click:Connect(function()
+    InventoryFrame.Visible = not InventoryFrame.Visible
+    if InventoryFrame.Visible then
+        updateInventory()
+    end
+end)
+
+SetTargetButton.MouseButton1Click:Connect(function()
+    if CurrentTarget == selectedPlayer then
+        CurrentTarget = nil
+        SetTargetButton.Text = "Set Target"
+    else
+        CurrentTarget = selectedPlayer
+        SetTargetButton.Text = "Untarget"
+    end
+end)
+
+AutoKillButton.MouseButton1Click:Connect(function()
+    AutoKill = not AutoKill
+    AutoKillButton.Text = "Auto Kill: " .. (AutoKill and "On" or "Off")
+end)
+
+-- Toggle GUI
+UserInputService.InputBegan:Connect(function(input, gp)
+    if gp then return end
+    if input.KeyCode == Enum.KeyCode.V then
+        guiVisible = not guiVisible
+        ScreenGui.Enabled = guiVisible
+    end
+end)
+
+-- Update loops
+Players.PlayerAdded:Connect(updatePlayerList)
+Players.PlayerRemoving:Connect(function(plr)
+    if selectedPlayer == plr then
+        selectedPlayer = nil
+        InfoPanel.Visible = false
+    end
+    updatePlayerList()
+end)
+
+updatePlayerList()
+
+RunService.RenderStepped:Connect(function()
+    if selectedPlayer then
+        updateInfoPanel()
+    end
+    
+    -- Update watermark
+    local fps = math.floor(1 / RunService.RenderStepped:Wait())
+    local ping = math.floor(lp:GetNetworkPing() * 1000)
+    WatermarkText.Text = "matcha / " .. ping .. " ms / " .. fps .. " fps"
+end)
+
+-- AutoKill Logic
+RunService.Heartbeat:Connect(function(dt)
+    if AutoKill and CurrentTarget then
+        if CurrentTarget and CurrentTarget.Character and lp and lp.Character then
+            local humanoidRootPart = lp.Character:FindFirstChild("HumanoidRootPart")
+            local head = lp.Character:FindFirstChild("Head")
+            local tool = lp.Character:FindFirstChildOfClass("Tool")
+            local toolHandle = tool and tool:FindFirstChild("Handle")
+            local targetHRP = CurrentTarget.Character:FindFirstChild("HumanoidRootPart")
+            local targetHead = CurrentTarget.Character:FindFirstChild("Head")
+            local SavedPosition = lp.Character.HumanoidRootPart.CFrame
+            if humanoidRootPart and head and toolHandle and targetHRP and targetHead then
+                local be = CurrentTarget.Character:FindFirstChild("BodyEffects")
+                local ko = be and be:FindFirstChild("K.O") and be["K.O"].Value
+                if ko then
+                    if CurrentTarget.Character:FindFirstChild("UpperTorso") and CurrentTarget.Character:FindFirstChild("HumanoidRootPart") and CurrentTarget.Character:FindFirstChild("Humanoid") then
+                        humanoidRootPart.CFrame = CFrame.new(CurrentTarget.Character.UpperTorso.Position + Vector3.new(0, 3, 0))
+                        MainEvent:FireServer("Stomp")
+                    end
+                else
+                    if not CurrentTarget.Character:FindFirstChild("ForceField") then
+                        lp.Character.HumanoidRootPart.CFrame = CFrame.lookAt(targetHead.Position + Vector3.new(math.random(-15,15), math.random(-15,15), math.random(-15,15)), targetHead.Position)
+                        MainEvent:FireServer("ShootGun", toolHandle, toolHandle.Position, targetHead.Position, targetHead, Vector3.new(0, 1, 0))
+                    else
+                        lp.Character.HumanoidRootPart.CFrame += Vector3.new(math.random(-80000,80000), math.random(0,80000), math.random(-80000,80000))
+                        MainEvent:FireServer("Reload", tool)
+                    end
+                end
+                RunService:BindToRenderStep("RestoreCFrame", 199, function()
+                    lp.Character.HumanoidRootPart.CFrame = SavedPosition
+                    RunService:UnbindFromRenderStep("RestoreCFrame")
+                end)
+            end
+        end
+    end
+end)
+
+-- Handle respawn không mất GUI
+lp.CharacterAdded:Connect(function()
+    -- GUI ở CoreGui nên không mất
 end)
