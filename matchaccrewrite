@@ -1,0 +1,1190 @@
+local repo = 'https://raw.githubusercontent.com/Kazamatcha/library/refs/heads/main/'
+
+local Library = loadstring(game:HttpGet(repo .. 'Library.lua'))()
+local ThemeManager = loadstring(game:HttpGet(repo .. 'addons/ThemeManager.lua'))()
+local SaveManager = loadstring(game:HttpGet(repo .. 'addons/SaveManager.lua'))()
+local Options = Library.Options
+local Toggles = Library.Toggles
+
+Library.ShowToggleFrameInKeybinds = true
+Library.ShowCustomCursor = true
+Library.NotifySide = "Left"
+
+local Window = Library:CreateWindow({
+    Title = 'matcha.cc',
+    Center = true,
+    AutoShow = true,
+    Resizable = true,
+    ShowCustomCursor = true,
+    UnlockMouseWhileOpen = true,
+    NotifySide = "Left",
+    TabPadding = 8,
+    MenuFadeTime = 0.2
+})
+
+local Tabs = {
+    Main = Window:AddTab('Main'),
+    Visual = Window:AddTab('Visual'),
+    Character = Window:AddTab('Character'),
+    Misc = Window:AddTab('Misc'),
+    ['UI Settings'] = Window:AddTab('UI Settings'),
+}
+
+local matchacc = {
+    TargetAim = {
+        Enabled = false,
+        Target = "None",
+        AutoSelect = false,
+        AutoFire = false,
+        Strafe = false,
+        ToggleStrafe = false,
+        VisualizeStrafe = false,
+        VisualizeStrafeInlineColor = Color3.new(155/255, 125/255, 175/255),
+        VisualizeStrafeOutlineColor = Color3.new(155/255, 125/255, 175/255),
+        LineStrafe = false,
+        StrafeMethod = "Randomize",
+        StrafePrediction = 0.1,
+        Highlight = false,
+        HighlightFillColor = Color3.new(155/255, 125/255, 175/255),
+        HighlightOutlineColor = Color3.new(129/255, 105/255, 145/255),
+        Tracer = false,
+        TracerPosition = "Mouse",
+        TracerFillColor = Color3.new(155/255, 125/255, 175/255),
+        TracerOutlineColor = Color3.new(0, 0, 0),
+        LookAt = false,
+        SpectateTarget = false,
+        VoidResolver = false,
+        AutoStomp = false,
+    },
+    HitEffects = {
+        HitSounds = false,
+        HitSoundID = "rbxassetid://6534947588",
+        HitSoundVolume = 5,
+        HitNotifications = false,
+        HitNotificationsTime = 3,
+    },
+    Checks = {
+        Wall = false,
+        Forcefield = false,
+        Alive = false,
+        Team = false,
+    },
+    KillAura = {
+        Enabled = false,
+        Active = false,
+        Range = 250,
+        Silent = false,
+        Visualize = false,
+        StompAura = false,
+        Whitelist = {},
+    },
+}
+
+-- Desync Setback Part
+local desync_setback = Instance.new("Part")
+desync_setback.Name = "DesyncSetback"
+desync_setback.Size = Vector3.new(2, 2, 1)
+desync_setback.CanCollide = false
+desync_setback.Anchored = true
+desync_setback.Transparency = 1
+desync_setback.Parent = workspace
+
+-- BodyClone for Visualize
+local BodyClone = game:GetObjects("rbxassetid://8246626421")[1]
+BodyClone.Parent = workspace
+BodyClone.Humanoid:Destroy()
+BodyClone.Head.Face:Destroy()
+for _, v in pairs(BodyClone:GetDescendants()) do
+    if v:IsA("BasePart") or v:IsA("MeshPart") then
+        v.CanCollide = false
+        v.Transparency = 1
+    end
+end
+BodyClone.HumanoidRootPart.Transparency = 1
+BodyClone.HumanoidRootPart.Velocity = Vector3.zero
+BodyClone.HumanoidRootPart.CFrame = CFrame.new(9999, 9999, 9999)
+
+local BodyCloneHighlight = Instance.new("Highlight")
+BodyCloneHighlight.Enabled = false
+BodyCloneHighlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+BodyCloneHighlight.FillColor = Color3.fromRGB(0, 255, 0)
+BodyCloneHighlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+BodyCloneHighlight.FillTransparency = 0.3
+BodyCloneHighlight.OutlineTransparency = 0
+BodyCloneHighlight.Adornee = BodyClone
+BodyCloneHighlight.Parent = BodyClone
+
+local GlowLight = Instance.new("PointLight")
+GlowLight.Color = Color3.fromRGB(0, 255, 100)
+GlowLight.Brightness = 4
+GlowLight.Range = 40
+GlowLight.Parent = BodyClone.HumanoidRootPart
+
+-- Desync Line
+local DesyncLine = Drawing.new("Line")
+DesyncLine.Thickness = 1
+DesyncLine.Color = Color3.fromRGB(0, 255, 0)
+DesyncLine.Visible = false
+DesyncLine.Transparency = 1
+
+-- Tracer for TargetAim
+local tracerOutline = Drawing.new("Line")
+tracerOutline.Visible = false
+tracerOutline.Color = matchacc.TargetAim.TracerOutlineColor
+tracerOutline.Thickness = 4
+
+local tracer = Drawing.new("Line")
+tracer.Visible = false
+tracer.Color = matchacc.TargetAim.TracerFillColor
+tracer.Thickness = 2
+
+-- KillAura Tracer Part
+local ka_tracer = Instance.new("Part")
+ka_tracer.Size = Vector3.new(0.2, 0.2, 0.2)
+ka_tracer.Material = Enum.Material.Neon
+ka_tracer.Color = Color3.new(1, 0, 0)
+ka_tracer.Transparency = 1
+ka_tracer.Anchored = true
+ka_tracer.CanCollide = false
+ka_tracer.Parent = workspace
+
+-- Global Vars
+local players = game:GetService("Players")
+local localPlayer = players.LocalPlayer
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService('ReplicatedStorage')
+local UserInputService = game:GetService("UserInputService")
+local possibleRemotes = { "MAINEVENT", "MainEvent", "Remote", "Packages", "MainRemotes", "Bullets" }
+local function getMainRemote()
+    if ReplicatedStorage:FindFirstChild("MainEvent") then return ReplicatedStorage.MainEvent end
+    if ReplicatedStorage:FindFirstChild("MAINEVENT") then return ReplicatedStorage.MAINEVENT end
+    if ReplicatedStorage:FindFirstChild("Remote") then return ReplicatedStorage.Remote end
+    if ReplicatedStorage:FindFirstChild("Bullets") then return ReplicatedStorage.Bullets end
+    -- MainRemotes.MainRemoteEvent
+    local mainRemotes = ReplicatedStorage:FindFirstChild("MainRemotes")
+    if mainRemotes and mainRemotes:FindFirstChild("MainRemoteEvent") then return mainRemotes.MainRemoteEvent end
+    -- Packages.Knit.Services.ToolService.RE.UpdateAim
+    local packages = ReplicatedStorage:FindFirstChild("Packages")
+    if packages then
+        local knit = packages:FindFirstChild("Knit")
+        if knit and knit:FindFirstChild("Services") then
+            local toolService = knit.Services:FindFirstChild("ToolService")
+            if toolService and toolService:FindFirstChild("RE") then
+                local re = toolService.RE
+                if re:FindFirstChild("UpdateAim") then return re.UpdateAim end
+            end
+        end
+    end
+    -- fallback: không tìm thấy
+    return nil
+end
+
+local MainEvent = getMainRemote()
+local previousPositions = {}
+local customVelocities = {}
+local lastTarget = nil
+local t = 0
+local M1Down = false
+local lastHealth = nil
+local ka_lastHealth = {}
+local hitsounds = {
+    ["Bubble"] = "rbxassetid://6534947588",
+    ["Lazer"] = "rbxassetid://130791043",
+    ["Pick"] = "rbxassetid://1347140027",
+    ["Pop"] = "rbxassetid://198598793",
+    ["Rust"] = "rbxassetid://1255040462",
+    ["Sans"] = "rbxassetid://3188795283",
+    ["Fart"] = "rbxassetid://130833677",
+    ["Big"] = "rbxassetid://5332005053",
+    ["Vine"] = "rbxassetid://5332680810",
+    ["UwU"] = "rbxassetid://8679659744",
+    ["Bruh"] = "rbxassetid://4578740568",
+    ["Skeet"] = "rbxassetid://5633695679",
+    ["Neverlose"] = "rbxassetid://6534948092",
+    ["Fatality"] = "rbxassetid://6534947869",
+    ["Bonk"] = "rbxassetid://5766898159",
+    ["Minecraft"] = "rbxassetid://5869422451",
+    ["Gamesense"] = "rbxassetid://4817809188",
+    ["RIFK7"] = "rbxassetid://9102080552",
+    ["Bamboo"] = "rbxassetid://3769434519",
+    ["Crowbar"] = "rbxassetid://546410481",
+    ["Weeb"] = "rbxassetid://6442965016",
+    ["Beep"] = "rbxassetid://8177256015",
+    ["Bambi"] = "rbxassetid://8437203821",
+    ["Stone"] = "rbxassetid://3581383408",
+    ["Old Fatality"] = "rbxassetid://6607142036",
+    ["Click"] = "rbxassetid://8053704437",
+    ["Ding"] = "rbxassetid://7149516994",
+    ["Snow"] = "rbxassetid://6455527632",
+    ["Laser"] = "rbxassetid://7837461331",
+    ["Mario"] = "rbxassetid://2815207981",
+    ["Steve"] = "rbxassetid://4965083997",
+    ["Call of Duty"] = "rbxassetid://5952120301",
+    ["Bat"] = "rbxassetid://3333907347",
+    ["TF2 Critical"] = "rbxassetid://296102734",
+    ["Saber"] = "rbxassetid://8415678813",
+    ["Baimware"] = "rbxassetid://3124331820",
+    ["Osu"] = "rbxassetid://7149255551",
+    ["TF2"] = "rbxassetid://2868331684",
+    ["Slime"] = "rbxassetid://6916371803",
+    ["Among Us"] = "rbxassetid://5700183626",
+    ["One"] = "rbxassetid://7380502345"
+}
+
+local function isAlive(plr)
+    if not plr or not plr.Character then return false end
+    local hum = plr.Character:FindFirstChildOfClass("Humanoid")
+    if not hum or hum.Health <= 0 then
+        return false
+    end
+
+    local be = plr.Character:FindFirstChild("BodyEffects")
+    if be then
+        local ko = be:FindFirstChild("K.O")
+        local grabbed = be:FindFirstChild("GRABBING_CONSTRAINT")
+        if (ko and ko.Value) or (grabbed and grabbed.Value) then
+            return false
+        end
+    end
+
+    return true
+end
+
+local function KnockCheck(plr)
+    if plr and plr.Character and plr.Character:FindFirstChild("BodyEffects") then
+        local ko = plr.Character.BodyEffects:FindFirstChild("K.O")
+        return ko and ko.Value or false
+    end
+    return false
+end
+
+local function GetClosestCharacter()
+    local closestDist = math.huge
+    local closestPlayer = nil
+    local isMobile = UserInputService.TouchEnabled and not UserInputService.MouseEnabled
+    local mousePos = UserInputService:GetMouseLocation()
+
+    for _, player in pairs(players:GetPlayers()) do
+        if player ~= localPlayer and player.Character and player.Character:FindFirstChild("Head") then
+            if matchacc.Checks.Team and player.Team == localPlayer.Team then continue end
+            if matchacc.Checks.Forcefield and player.Character:FindFirstChild("ForceField") then continue end
+            if matchacc.Checks.Alive and not isAlive(player) then continue end
+
+            local headPos, onScreen = workspace.CurrentCamera:WorldToViewportPoint(player.Character.Head.Position)
+            local dist = (Vector2.new(headPos.X, headPos.Y) - mousePos).Magnitude if isMobile then dist = (player.Character.Head.Position - localPlayer.Character.Head.Position).Magnitude end
+
+            if onScreen and dist < closestDist then
+                if matchacc.Checks.Wall then
+                    local ray = Ray.new(workspace.CurrentCamera.CFrame.Position, player.Character.Head.Position - workspace.CurrentCamera.CFrame.Position)
+                    local hit = workspace:FindPartOnRayWithIgnoreList(ray, {localPlayer.Character})
+                    if hit and hit:IsDescendantOf(player.Character) then
+                        closestDist = dist
+                        closestPlayer = player
+                    end
+                else
+                    closestDist = dist
+                    closestPlayer = player
+                end
+            end
+        end
+    end
+    return closestPlayer
+end
+
+local function createHitSound()
+    local sound = Instance.new("Sound")
+    sound.Parent = localPlayer.Character.HumanoidRootPart
+    sound.SoundId = matchacc.HitEffects.HitSoundID
+    sound.Volume = matchacc.HitEffects.HitSoundVolume
+    sound:Play()
+    sound.Ended:Connect(function()
+        sound:Destroy()
+    end)
+end
+
+local function SetRigTransparency(clone, trans)
+    for _, v in pairs(clone:GetDescendants()) do
+        if v:IsA("BasePart") or v:IsA("MeshPart") then
+            v.Transparency = trans
+        end
+    end
+end
+
+local function SetRigCollisionFalse(clone)
+    for _, v in pairs(clone:GetDescendants()) do
+        if v:IsA("BasePart") or v:IsA("MeshPart") then
+            v.CanCollide = false
+        end
+    end
+end
+
+local function SetRigColor(clone, color)
+    for _, v in pairs(clone:GetDescendants()) do
+        if v:IsA("BasePart") or v:IsA("MeshPart") then
+            v.Color = color
+        end
+    end
+end
+
+-- UI Setup
+local MainTabBox = Tabs.Main:AddLeftTabbox()
+local TargetAimTab = MainTabBox:AddTab('Target aim')
+local ChecksTab = MainTabBox:AddTab('Checks')
+
+TargetAimTab:AddToggle('TargetAimEnabled', {
+    Text = 'Enabled',
+    Default = false,
+    Callback = function(Value)
+        matchacc.TargetAim.Enabled = Value
+        if not Value then
+            matchacc.TargetAim.Target = "None"
+            tracer.Visible = false
+            tracerOutline.Visible = false
+            for _, player in pairs(players:GetPlayers()) do
+                if player.Character and player.Character:FindFirstChild("Highlight") and player.Character.Highlight.FillColor == matchacc.TargetAim.HighlightFillColor then
+                    player.Character.Highlight:Destroy()
+                end
+            end
+            SetRigTransparency(BodyClone, 1)
+            DesyncLine.Visible = false
+            BodyCloneHighlight.Enabled = false
+            workspace.CurrentCamera.CameraSubject = localPlayer.Character.Humanoid
+        end
+    end
+}):AddKeyPicker('TargetAimKey', {
+    Default = 'Q',
+    Text = 'Target Aim',
+    Mode = 'Toggle',
+    Callback = function(Value)
+        if not matchacc.TargetAim.Enabled then return end
+        if Value then
+            local target = GetClosestCharacter()
+            if target then
+                matchacc.TargetAim.Target = target.Name
+            else
+                matchacc.TargetAim.Target = "None"
+            end
+        else
+            matchacc.TargetAim.Target = "None"
+            tracer.Visible = false
+            tracerOutline.Visible = false
+            for _, player in pairs(players:GetPlayers()) do
+                if player.Character and player.Character:FindFirstChild("Highlight") and player.Character.Highlight.FillColor == matchacc.TargetAim.HighlightFillColor then
+                    player.Character.Highlight:Destroy()
+                end
+            end
+            SetRigTransparency(BodyClone, 1)
+            DesyncLine.Visible = false
+            BodyCloneHighlight.Enabled = false
+        end
+    end
+})
+
+TargetAimTab:AddToggle('AutoSelect', {
+    Text = 'Auto Select',
+    Default = false,
+    Callback = function(Value)
+        matchacc.TargetAim.AutoSelect = Value
+        if Value then
+            RunService:BindToRenderStep("AutoSelect", 1, function()
+                local target = GetClosestCharacter()
+                if lastTarget and lastTarget ~= target and lastTarget.Character then
+                    local highlight = lastTarget.Character:FindFirstChild("Highlight")
+                    if highlight then
+                        highlight:Destroy()
+                    end
+                    tracer.Visible = false
+                    tracerOutline.Visible = false
+                end
+                if target then
+                    matchacc.TargetAim.Target = target.Name
+                else
+                    matchacc.TargetAim.Target = "None"
+                end
+                lastTarget = target
+            end)
+        else
+            RunService:UnbindFromRenderStep("AutoSelect")
+            if lastTarget and lastTarget.Character then
+                local highlight = lastTarget.Character:FindFirstChild("Highlight")
+                if highlight then
+                    highlight:Destroy()
+                end
+                tracer.Visible = false
+                tracerOutline.Visible = false
+            end
+            lastTarget = nil
+            for _, player in pairs(players:GetPlayers()) do
+                if player.Character and player.Character:FindFirstChild("Highlight") and player.Character.Highlight.FillColor == matchacc.TargetAim.HighlightFillColor then
+                    player.Character.Highlight:Destroy()
+                end
+            end
+        end
+    end
+})
+
+TargetAimTab:AddToggle('AutoFire', {
+    Text = 'Auto Fire',
+    Default = false,
+    Callback = function(Value)
+        matchacc.TargetAim.AutoFire = Value
+    end
+})
+
+TargetAimTab:AddToggle('Highlight', {
+    Text = 'Highlight',
+    Default = false,
+    Callback = function(Value)
+        matchacc.TargetAim.Highlight = Value
+        for _, player in pairs(players:GetPlayers()) do
+            if player.Character and player.Character:FindFirstChild("Highlight") and player.Character.Highlight.FillColor == matchacc.TargetAim.HighlightFillColor then
+                player.Character.Highlight:Destroy()
+            end
+        end
+    end
+}):AddColorPicker('HighlightFill', {
+    Default = matchacc.TargetAim.HighlightFillColor,
+    Title = 'Fill Color',
+    Callback = function(Value)
+        matchacc.TargetAim.HighlightFillColor = Value
+    end
+}):AddColorPicker('HighlightOutline', {
+    Default = matchacc.TargetAim.HighlightOutlineColor,
+    Title = 'Outline Color',
+    Callback = function(Value)
+        matchacc.TargetAim.HighlightOutlineColor = Value
+    end
+})
+
+TargetAimTab:AddToggle('Tracer', {
+    Text = 'Tracer',
+    Default = false,
+    Callback = function(Value)
+        matchacc.TargetAim.Tracer = Value
+        tracer.Visible = false
+        tracerOutline.Visible = false
+    end
+}):AddColorPicker('TracerFill', {
+    Default = matchacc.TargetAim.TracerFillColor,
+    Title = 'Fill Color',
+    Callback = function(Value)
+        matchacc.TargetAim.TracerFillColor = Value
+        tracer.Color = Value
+    end
+}):AddColorPicker('TracerOutline', {
+    Default = matchacc.TargetAim.TracerOutlineColor,
+    Title = 'Outline Color',
+    Callback = function(Value)
+        matchacc.TargetAim.TracerOutlineColor = Value
+        tracerOutline.Color = Value
+    end
+})
+
+TargetAimTab:AddDropdown('TracerPosition', {
+    Values = {'Mouse', 'Tool'},
+    Default = 1,
+    Multi = false,
+    Text = 'Tracer Position',
+    Callback = function(Value)
+        matchacc.TargetAim.TracerPosition = Value
+    end
+})
+
+TargetAimTab:AddToggle('LookAt', {
+    Text = 'Look At',
+    Default = false,
+    Callback = function(Value)
+        matchacc.TargetAim.LookAt = Value
+    end
+})
+
+TargetAimTab:AddToggle('ToggleStrafe', {
+    Text = 'Toggle Strafe',
+    Default = false,
+    Callback = function(Value)
+        matchacc.TargetAim.ToggleStrafe = Value
+    end
+}):AddKeyPicker('StrafeKey', {
+    Default = 'Z',
+    Text = 'Strafe',
+    Mode = 'Toggle',
+    Callback = function(Value)
+        if matchacc.TargetAim.ToggleStrafe then
+            matchacc.TargetAim.Strafe = Value
+        end
+    end
+})
+
+TargetAimTab:AddToggle('VisualizeStrafe', {
+    Text = 'Visualize Strafe',
+    Default = false,
+    Callback = function(Value)
+        matchacc.TargetAim.VisualizeStrafe = Value
+    end
+}):AddColorPicker('VisInline', {
+    Default = matchacc.TargetAim.VisualizeStrafeInlineColor,
+    Title = 'Inline Color',
+    Callback = function(Value)
+        matchacc.TargetAim.VisualizeStrafeInlineColor = Value
+        BodyCloneHighlight.FillColor = Value
+    end
+}):AddColorPicker('VisOutline', {
+    Default = matchacc.TargetAim.VisualizeStrafeOutlineColor,
+    Title = 'Outline Color',
+    Callback = function(Value)
+        matchacc.TargetAim.VisualizeStrafeOutlineColor = Value
+        BodyCloneHighlight.OutlineColor = Value
+    end
+})
+
+TargetAimTab:AddToggle('LineStrafe', {
+    Text = 'Line Strafe',
+    Default = false,
+    Callback = function(Value)
+        matchacc.TargetAim.LineStrafe = Value
+    end
+})
+
+TargetAimTab:AddDropdown('StrafeMethod', {
+    Values = {'Orbit', 'Randomize'},
+    Default = 2,
+    Multi = false,
+    Text = 'Strafe Method',
+    Callback = function(Value)
+        matchacc.TargetAim.StrafeMethod = Value
+    end
+})
+
+TargetAimTab:AddSlider('StrafePrediction', {
+    Text = 'Strafe Prediction',
+    Default = 0.1,
+    Min = 0,
+    Max = 1,
+    Rounding = 2,
+    Callback = function(Value)
+        matchacc.TargetAim.StrafePrediction = Value
+    end
+})
+
+TargetAimTab:AddToggle('AutoStomp', {
+    Text = 'Auto Stomp',
+    Default = false,
+    Callback = function(Value)
+        matchacc.TargetAim.AutoStomp = Value
+    end
+})
+
+TargetAimTab:AddToggle('VoidResolver', {
+    Text = 'Void Resolver',
+    Default = false,
+    Callback = function(Value)
+        matchacc.TargetAim.VoidResolver = Value
+    end
+})
+
+TargetAimTab:AddToggle('SpectateTarget', {
+    Text = 'Spectate Target',
+    Default = false,
+    Callback = function(Value)
+        matchacc.TargetAim.SpectateTarget = Value
+    end
+})
+
+local HitEffectsGroup = Tabs.Main:AddLeftGroupbox('Hit Effects')
+
+HitEffectsGroup:AddToggle('HitNotifications', {
+    Text = 'Hit Notifications',
+    Default = false,
+    Callback = function(Value)
+        matchacc.HitEffects.HitNotifications = Value
+    end
+})
+
+HitEffectsGroup:AddSlider('NotifyTime', {
+    Text = 'Notify Time',
+    Default = 3,
+    Min = 1,
+    Max = 10,
+    Rounding = 0,
+    Callback = function(Value)
+        matchacc.HitEffects.HitNotificationsTime = Value
+    end
+})
+
+HitEffectsGroup:AddToggle('HitSounds', {
+    Text = 'Hit Sounds',
+    Default = false,
+    Callback = function(Value)
+        matchacc.HitEffects.HitSounds = Value
+    end
+})
+
+--[[HitEffectsGroup:AddDropdown('HitSoundSelect', {
+    Values = table.keys(hitsounds),
+    Default = 1,
+    Multi = false,
+    Text = 'Hit Sound',
+    Callback = function(Value)
+        matchacc.HitEffects.HitSoundID = hitsounds[Value]
+    end
+})]]
+
+HitEffectsGroup:AddSlider('HitSoundVolume', {
+    Text = 'Volume',
+    Default = 5,
+    Min = 1,
+    Max = 10,
+    Rounding = 0,
+    Callback = function(Value)
+        matchacc.HitEffects.HitSoundVolume = Value
+    end
+})
+
+ChecksTab:AddToggle('CheckWall', {
+    Text = 'Check Wall',
+    Default = false,
+    Callback = function(Value)
+        matchacc.Checks.Wall = Value
+    end
+})
+
+ChecksTab:AddToggle('CheckForcefield', {
+    Text = 'Check Forcefield',
+    Default = false,
+    Callback = function(Value)
+        matchacc.Checks.Forcefield = Value
+    end
+})
+
+ChecksTab:AddToggle('CheckAlive', {
+    Text = 'Check Alive',
+    Default = false,
+    Callback = function(Value)
+        matchacc.Checks.Alive = Value
+    end
+})
+
+ChecksTab:AddToggle('CheckTeam', {
+    Text = 'Check Team',
+    Default = false,
+    Callback = function(Value)
+        matchacc.Checks.Team = Value
+    end
+})
+
+local KillAuraGroup = Tabs.Main:AddRightGroupbox('Kill Aura')
+
+KillAuraGroup:AddToggle('KillAuraEnabled', {
+    Text = 'Enabled',
+    Default = false,
+    Callback = function(Value)
+        matchacc.KillAura.Enabled = Value
+        if not Value then
+            matchacc.KillAura.Active = false
+            ka_tracer.Transparency = 1
+        end
+    end
+}):AddKeyPicker('KillAuraKey', {
+    Default = 'K',
+    Text = 'Kill Aura',
+    Mode = 'Toggle',
+    Callback = function(Value)
+        if matchacc.KillAura.Enabled then
+            matchacc.KillAura.Active = Value
+        end
+    end
+})
+
+KillAuraGroup:AddSlider('KillAuraRange', {
+    Text = 'Range',
+    Default = 250,
+    Min = 10,
+    Max = 250,
+    Rounding = 0,
+    Callback = function(Value)
+        matchacc.KillAura.Range = Value
+    end
+})
+
+KillAuraGroup:AddToggle('KillAuraSilent', {
+    Text = 'Silent',
+    Default = false,
+    Callback = function(Value)
+        matchacc.KillAura.Silent = Value
+    end
+})
+
+KillAuraGroup:AddToggle('KillAuraVisualize', {
+    Text = 'Visualize',
+    Default = false,
+    Callback = function(Value)
+        matchacc.KillAura.Visualize = Value
+    end
+}):AddColorPicker('KAVisColor', {
+    Default = Color3.new(1, 0, 0),
+    Title = 'Visualizer Color',
+    Callback = function(Value)
+        ka_tracer.Color = Value
+    end
+})
+
+KillAuraGroup:AddDropdown('KAWhitelist', {
+    SpecialType = 'Player',
+    ExcludeLocalPlayer = true,
+    Multi = true,
+    Text = 'Whitelist',
+    Callback = function(Value)
+        matchacc.KillAura.Whitelist = Value
+    end
+})
+
+KillAuraGroup:AddToggle('StompAura', {
+    Text = 'Stomp Aura',
+    Default = false,
+    Callback = function(Value)
+        matchacc.KillAura.StompAura = Value
+    end
+})
+
+if getnamecallmethod then 
+    local Meta = getrawmetatable(game)
+    local backupindex = Meta.__index
+    setreadonly(Meta, false)
+
+    Meta.__index = function(t, k)
+        if k:lower() == "hit" then
+            if matchacc.TargetAim.Enabled and matchacc.TargetAim.Target ~= "None" and localPlayer and localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                local TargetPlayer = players:FindFirstChild(matchacc.TargetAim.Target)
+                if TargetPlayer and TargetPlayer.Character and TargetPlayer.Character:FindFirstChild("Head") and not TargetPlayer.Character:FindFirstChild("ForceField") then
+                    if not KnockCheck(TargetPlayer) then
+                        return TargetPlayer.Character.Head.CFrame
+                    end
+                end
+            end
+        end
+        return backupindex(t, k)
+    end
+end
+if getnamecallmethod and game.GameId == 9825515356 then
+    local OldNamecall
+    OldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+        local args = {...}
+        local method = getnamecallmethod()
+
+        if method == "FireServer" and self.Name == "MainEvent" and args[1] == "Shoot" then
+            if matchacc.TargetAim.Enabled and matchacc.TargetAim.AutoFire and matchacc.TargetAim.Target ~= "None" and localPlayer and localPlayer.Character then
+                local TargetPlayer = players:FindFirstChild(matchacc.TargetAim.Target)
+                if TargetPlayer and TargetPlayer.Character and TargetPlayer.Character:FindFirstChild("Head") and not TargetPlayer.Character:FindFirstChild("ForceField") then
+                    if not KnockCheck(TargetPlayer) then
+                        local TargetPart = TargetPlayer.Character.Head
+                        if TargetPart and args[2] then
+                            for _, info in pairs(args[2][1]) do
+                                info["Instance"] = TargetPart
+                            end
+                            for _, info in pairs(args[2][2]) do
+                                info["thePart"] = TargetPart
+                                info["theOffset"] = CFrame.new()
+                            end
+                            return OldNamecall(self, unpack(args))
+                        end
+                    end
+                end
+            end
+        end
+
+        return OldNamecall(self, ...)
+    end)
+end
+-- Mouse1 Down Detect
+UserInputService.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        M1Down = true
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        M1Down = false
+    end
+end)
+
+-- Main Logic
+RunService.Heartbeat:Connect(function(dt)
+    local TargetPlayer = players:FindFirstChild(matchacc.TargetAim.Target)
+    local useDesync = matchacc.TargetAim.Strafe or matchacc.TargetAim.AutoStomp or matchacc.KillAura.Active or matchacc.KillAura.StompAura
+    local oldCFrame = localPlayer.Character.HumanoidRootPart.CFrame
+    local desyncCFrame = oldCFrame
+    local hrp = localPlayer.Character:FindFirstChild("HumanoidRootPart")
+    local Tool = localPlayer.Character:FindFirstChildOfClass("Tool")
+    local SavedPosition
+
+    if useDesync and hrp then
+        if matchacc.TargetAim.Strafe and matchacc.TargetAim.Target ~= "None" and TargetPlayer and TargetPlayer.Character and TargetPlayer.Character:FindFirstChild("Head") and Tool then
+            if not TargetPlayer.Character:FindFirstChild("ForceField") or Tool.Name == "[Rifle]" then
+                if not KnockCheck(TargetPlayer) and localPlayer.Character.BodyEffects.Reload.Value == false then
+                    if matchacc.TargetAim.VoidResolver and (TargetPlayer.Character.HumanoidRootPart.Position - Vector3.new(0, 0, 0)).Magnitude > 5000 then return end
+
+                    local currentPosition = TargetPlayer.Character.Head.Position
+                    local lastPosition = previousPositions[TargetPlayer] or currentPosition
+                    local estimatedVelocity = (currentPosition - lastPosition) / dt
+                    local alpha = 0.5
+                    customVelocities[TargetPlayer] = (customVelocities[TargetPlayer] or Vector3.zero) * alpha + estimatedVelocity * (1 - alpha)
+                    previousPositions[TargetPlayer] = currentPosition
+
+                    local PredictionValue = matchacc.TargetAim.StrafePrediction
+
+                    if matchacc.TargetAim.StrafeMethod == "Orbit" then
+                        desyncCFrame = CFrame.lookAt(currentPosition + (customVelocities[TargetPlayer] * PredictionValue) + Vector3.new(math.cos(tick()*10)*10, 0, math.sin(tick()*10)*10), currentPosition)
+                    elseif matchacc.TargetAim.StrafeMethod == "Randomize" then
+                        desyncCFrame = CFrame.lookAt(currentPosition + (customVelocities[TargetPlayer] * PredictionValue) + Vector3.new(math.random(-15,15), math.random(-15,15), math.random(-15,15)), currentPosition)
+                    end
+
+                    local PredictedAimingPosition = currentPosition + (customVelocities[TargetPlayer] * PredictionValue)
+
+                    local args = {
+                        [1] = "ShootGun",
+                        [2] = Tool.Handle,
+                        [3] = Tool.Handle.Position,
+                        [4] = PredictedAimingPosition,
+                        [5] = TargetPlayer.Character.Head,
+                        [6] = Vector3.new(0, 0, 0)
+                    }
+
+                    if matchacc.TargetAim.AutoFire then
+                        MainEvent:FireServer(unpack(args))
+                    elseif M1Down then
+                        MainEvent:FireServer(unpack(args))
+                    end
+                end
+            end
+        elseif matchacc.TargetAim.AutoStomp and TargetPlayer and KnockCheck(TargetPlayer) and localPlayer.Character.BodyEffects.Reload.Value == false then
+            local bodyEffects = TargetPlayer.Character:FindFirstChild("BodyEffects")
+            local isDead = bodyEffects and bodyEffects:FindFirstChild("SDeath") and bodyEffects.SDeath.Value
+            if isDead == false then
+                desyncCFrame = CFrame.new(TargetPlayer.Character.UpperTorso.Position + Vector3.new(0, 3, 0))
+
+                if matchacc.HitEffects.HitNotifications then
+                    if tick() - t >= 3 then
+                        t = tick()
+                        Library:Notify("Matcha.cc - Attempted to Stomp Target: " .. TargetPlayer.Name, matchacc.HitEffects.HitNotificationsTime)
+                    end
+                end
+
+                MainEvent:FireServer("Stomp")
+            end
+        elseif matchacc.KillAura.StompAura then
+            local shortestDistance = math.huge
+            local stompTarget
+            for _, player in pairs(players:GetPlayers()) do
+                if player ~= localPlayer and player.Character and player.Character:FindFirstChild("Head") and KnockCheck(player) and not player.Character:FindFirstChild("ForceField") then
+                    local distance = (player.Character.HumanoidRootPart.Position - hrp.Position).Magnitude
+                    if distance <= matchacc.KillAura.Range and distance < shortestDistance then
+                        shortestDistance = distance
+                        stompTarget = player
+                    end
+                end
+            end
+            if stompTarget then
+                local bodyEffects = stompTarget.Character:FindFirstChild("BodyEffects")
+                local isDead = bodyEffects and bodyEffects:FindFirstChild("SDeath") and bodyEffects.SDeath.Value
+                if isDead == false then
+                    desyncCFrame = CFrame.new(stompTarget.Character.UpperTorso.Position + Vector3.new(0, 3, 0))
+                    MainEvent:FireServer("Stomp")
+                end
+            end
+        elseif matchacc.KillAura.Active and matchacc.KillAura.Enabled and Tool and Tool:FindFirstChild("Handle") then
+            if localPlayer.Character.BodyEffects:FindFirstChild("K.O") and not localPlayer.Character.BodyEffects["K.O"].Value then
+                local closest = math.huge
+                local ka_target = nil
+                for _, player in pairs(players:GetPlayers()) do
+                    if player ~= localPlayer and not matchacc.KillAura.Whitelist[player.Name] and player.Character and player.Character:FindFirstChild("Head") and not player.Character:FindFirstChild("GRABBING_CONSTRAINT") then
+                        if player.Character.BodyEffects:FindFirstChild("K.O") and not player.Character.BodyEffects["K.O"].Value then
+                            local dist = (hrp.Position - player.Character.Head.Position).Magnitude
+                            if dist < closest and dist <= matchacc.KillAura.Range then
+                                closest = dist
+                                ka_target = player
+                            end
+                        end
+                    end
+                end
+                if ka_target and ka_target.Character and ka_target.Character:FindFirstChild("Head") then
+                    desyncCFrame = CFrame.lookAt(hrp.Position, ka_target.Character.Head.Position)
+                    if matchacc.KillAura.Visualize then
+                        ka_tracer.Transparency = 0
+                        ka_tracer.Size = Vector3.new(0.2, 0.2, (hrp.Position - ka_target.Character.Head.Position).Magnitude)
+                        ka_tracer.CFrame = CFrame.lookAt(hrp.Position, ka_target.Character.Head.Position) * CFrame.new(0, 0, -ka_tracer.Size.Z / 2)
+                    else
+                        ka_tracer.Transparency = 1
+                    end
+
+                    local humanoid = ka_target.Character:FindFirstChild("Humanoid")
+                    if humanoid then
+                        if not ka_lastHealth[ka_target.Name] then
+                            ka_lastHealth[ka_target.Name] = humanoid.Health
+                        end
+                        if humanoid.Health < ka_lastHealth[ka_target.Name] then
+                            createHitSound()
+                        end
+                        ka_lastHealth[ka_target.Name] = humanoid.Health
+                    end
+
+                    local offset = matchacc.KillAura.Silent and Vector3.new(0, -12, 0) or Vector3.new(0, 0, 0)
+                    MainEvent:FireServer(
+                        "ShootGun",
+                        Tool:FindFirstChild("Handle"),
+                        Tool:FindFirstChild("Handle").CFrame.Position + offset,
+                        ka_target.Character.Head.Position + offset,
+                        ka_target.Character.Head,
+                        Vector3.new(0, 0, -1)
+                    )
+                else
+                    ka_tracer.Transparency = 1
+                end
+            end
+        end
+
+        hrp.CFrame = desyncCFrame
+        if matchacc.TargetAim.Strafe and not matchacc.TargetAim.SpectateTarget then
+            workspace.CurrentCamera.CameraSubject = desync_setback
+        end
+        RunService.RenderStepped:Wait()
+        desync_setback.CFrame = oldCFrame * CFrame.new(0, hrp.Size.Y/2 + 0.5, 0)
+        hrp.CFrame = oldCFrame
+
+        if matchacc.TargetAim.VisualizeStrafe then
+            BodyClone:SetPrimaryPartCFrame(desyncCFrame)
+            BodyCloneHighlight.Enabled = true
+            SetRigTransparency(BodyClone, 0)
+            SetRigColor(BodyClone, matchacc.TargetAim.VisualizeStrafeInlineColor)
+            BodyCloneHighlight.FillColor = matchacc.TargetAim.VisualizeStrafeInlineColor
+            BodyCloneHighlight.OutlineColor = matchacc.TargetAim.VisualizeStrafeOutlineColor
+        else
+            BodyCloneHighlight.Enabled = false
+            BodyClone:SetPrimaryPartCFrame(CFrame.new(9999, 9999, 9999))
+            SetRigTransparency(BodyClone, 1)
+        end
+
+        if matchacc.TargetAim.LineStrafe and matchacc.TargetAim.VisualizeStrafe then
+            local rootPos = hrp.Position
+            local clonePos = BodyClone.HumanoidRootPart.Position
+            local screen1, onScreen1 = workspace.CurrentCamera:WorldToViewportPoint(rootPos)
+            local screen2, onScreen2 = workspace.CurrentCamera:WorldToViewportPoint(clonePos)
+            if onScreen1 and onScreen2 then
+                DesyncLine.From = Vector2.new(screen1.X, screen1.Y)
+                DesyncLine.To = Vector2.new(screen2.X, screen2.Y)
+                DesyncLine.Color = BodyCloneHighlight.FillColor
+                DesyncLine.Visible = true
+            else
+                DesyncLine.Visible = false
+            end
+        else
+            DesyncLine.Visible = false
+        end
+    else
+        BodyClone:SetPrimaryPartCFrame(CFrame.new(9999, 9999, 9999))
+        BodyCloneHighlight.Enabled = false
+        DesyncLine.Visible = false
+        ka_tracer.Transparency = 1
+        workspace.CurrentCamera.CameraSubject = localPlayer.Character.Humanoid
+    end
+
+    if matchacc.TargetAim.Enabled and matchacc.TargetAim.Target ~= "None" and TargetPlayer and TargetPlayer.Character and TargetPlayer.Character:FindFirstChild("Head") and not KnockCheck(TargetPlayer) then
+        local tool = localPlayer.Character:FindFirstChildOfClass("Tool")
+        if tool and (not TargetPlayer.Character:FindFirstChild("ForceField") or tool.Name == "[Rifle]") then
+            if matchacc.TargetAim.AutoFire then
+                if game.PlaceId == 9825515356 then
+                    local args = {
+                        "Shoot",
+                        {
+                            {
+                                [1] = {
+                                    ["Instance"] = TargetPlayer.Character.Head,
+                                    ["Normal"] = Vector3.new(0.9937344193458557, 0.10944880545139313, -0.022651424631476402),
+                                    ["Position"] = Vector3.new(-141.78562927246094, 33.89368438720703, -365.6424865722656)
+                                },
+                                [2] = {
+                                    ["Instance"] = TargetPlayer.Character.Head,
+                                    ["Normal"] = Vector3.new(0.9937344193458557, 0.10944880545139313, -0.022651424631476402),
+                                    ["Position"] = Vector3.new(-141.78562927246094, 33.89368438720703, -365.6424865722656)
+                                },
+                                [3] = {
+                                    ["Instance"] = TargetPlayer.Character.Head,
+                                    ["Normal"] = Vector3.new(0.9937343597412109, 0.10944879800081253, -0.022651422768831253),
+                                    ["Position"] = TargetPlayer.Character.Head.Position 
+                                },
+                                [4] = {
+                                    ["Instance"] = TargetPlayer.Character.Head,
+                                    ["Normal"] = Vector3.new(0.9937344193458557, 0.10944880545139313, -0.022651424631476402),
+                                    ["Position"] = TargetPlayer.Character.Head.Position 
+                                },
+                                [5] = {
+                                    ["Instance"] = TargetPlayer.Character.Head,
+                                    ["Normal"] = Vector3.new(0.9937344193458557, 0.10944880545139313, -0.022651424631476402),
+                                    ["Position"] = Vector3.new(-141.79481506347656, 34.033607482910156, -365.369384765625)
+                                }
+                            },
+                            {
+                                [1] = {
+                                    ["thePart"] = TargetPlayer.Character.Head,
+                                    ["theOffset"] = CFrame.new(0, 0, 0)
+                                },
+                                [2] = {
+                                    ["thePart"] = TargetPlayer.Character.Head,
+                                    ["theOffset"] = CFrame.new(0, 0, 0)
+                                },
+                                [3] = {
+                                    ["thePart"] = TargetPlayer.Character.Head,
+                                    ["theOffset"] = CFrame.new(0, 0, 0)
+                                },
+                                [4] = {
+                                    ["thePart"] = TargetPlayer.Character.Head,
+                                    ["theOffset"] = CFrame.new(0, 0, 0)
+                                },
+                                [5] = {
+                                    ["thePart"] = TargetPlayer.Character.Head,
+                                    ["theOffset"] = CFrame.new(0, 0, 0)
+                                }
+                            },
+                            localPlayer.Character.Head.Position,
+                            localPlayer.Character.Head.Position,
+                            workspace:GetServerTimeNow()
+                        }
+                    }
+                    MainEvent:FireServer(unpack(args))
+                else
+                    local args = {
+                        [1] = "ShootGun",
+                        [2] = tool.Handle,
+                        [3] = tool.Handle.Position,
+                        [4] = TargetPlayer.Character.Head.Position,
+                        [5] = TargetPlayer.Character.Head,
+                        [6] = Vector3.new(0, 0, 0)
+                    }
+                    MainEvent:FireServer(unpack(args))
+                end
+            elseif M1Down then
+                local args = {
+                    [1] = "ShootGun",
+                    [2] = tool.Handle,
+                    [3] = tool.Handle.Position,
+                    [4] = TargetPlayer.Character.Head.Position,
+                    [5] = TargetPlayer.Character.Head,
+                    [6] = Vector3.new(0, 0, 0)
+                }
+                MainEvent:FireServer(unpack(args))
+            end
+        end
+    end
+
+    if matchacc.TargetAim.Enabled and matchacc.TargetAim.Target ~= "None" then
+        local TargetPlayer = players:FindFirstChild(matchacc.TargetAim.Target)
+        
+        if TargetPlayer and TargetPlayer.Character and TargetPlayer.Character:FindFirstChild("Humanoid") and TargetPlayer.Character:FindFirstChild("Head") and not TargetPlayer.Character:FindFirstChild("ForceField") then
+            local humanoid = TargetPlayer.Character:FindFirstChild("Humanoid")
+            
+            if humanoid then
+                local currentHealth = math.round(humanoid.Health)
+                
+                if lastHealth == nil or matchacc.TargetAim.Target ~= lastTarget then
+                    lastHealth = currentHealth
+                end
+
+                if currentHealth < lastHealth then
+                    if matchacc.HitEffects.HitNotifications then
+                        Library:Notify("Matcha.cc - Target Hit: " .. TargetPlayer.Name .. " - Health: " .. currentHealth, matchacc.HitEffects.HitNotificationsTime)
+                    end
+
+                    if matchacc.HitEffects.HitSounds then
+                        createHitSound()
+                    end
+                end
+
+                lastHealth = currentHealth
+                lastTarget = matchacc.TargetAim.Target
+            end
+        end
+    end
+
+    if matchacc.TargetAim.Enabled and matchacc.TargetAim.Target ~= "None" and TargetPlayer and TargetPlayer.Character and TargetPlayer.Character:FindFirstChild("Head") then
+        if matchacc.TargetAim.Highlight then
+            if not TargetPlayer.Character:FindFirstChild("Highlight") then
+                local Highlight = Instance.new("Highlight")
+                Highlight.Parent = TargetPlayer.Character
+            end
+            TargetPlayer.Character.Highlight.FillColor = matchacc.TargetAim.HighlightFillColor
+            TargetPlayer.Character.Highlight.OutlineColor = matchacc.TargetAim.HighlightOutlineColor
+        end
+
+        if matchacc.TargetAim.LookAt then
+            localPlayer.Character.Humanoid.AutoRotate = false
+            localPlayer.Character.HumanoidRootPart.CFrame = CFrame.lookAt(localPlayer.Character.HumanoidRootPart.Position, Vector3.new(TargetPlayer.Character.HumanoidRootPart.Position.X, localPlayer.Character.HumanoidRootPart.Position.Y, TargetPlayer.Character.HumanoidRootPart.Position.Z))
+        else
+            localPlayer.Character.Humanoid.AutoRotate = true
+        end
+
+        if matchacc.TargetAim.Tracer then
+            local mouseScreenPosition = UserInputService:GetMouseLocation()
+            local head = TargetPlayer.Character:FindFirstChild("Head")
+            local humanoidRootPart = TargetPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if head and humanoidRootPart then
+                local headScreenPosition, onScreen = workspace.CurrentCamera:WorldToViewportPoint(head.Position)
+                if onScreen then
+                    local adjustedMousePosition = Vector2.new(mouseScreenPosition.X, mouseScreenPosition.Y)
+                    local tool = localPlayer.Character:FindFirstChildOfClass("Tool")
+                    if matchacc.TargetAim.TracerPosition == "Tool" and tool and tool:FindFirstChild("Handle") then
+                        local pos = workspace.CurrentCamera:WorldToViewportPoint(tool.Handle.Position)
+                        tracer.From = Vector2.new(pos.X, pos.Y)
+                        tracerOutline.From = Vector2.new(pos.X, pos.Y)
+                    else
+                        tracer.From = adjustedMousePosition
+                        tracerOutline.From = adjustedMousePosition
+                    end           
+                    tracer.To = Vector2.new(headScreenPosition.X, headScreenPosition.Y)
+                    tracerOutline.To = Vector2.new(headScreenPosition.X, headScreenPosition.Y)
+                    tracerOutline.Visible = true
+                    tracer.Visible = true
+                    tracerOutline.Color = matchacc.TargetAim.TracerOutlineColor
+                    tracer.Color = matchacc.TargetAim.TracerFillColor
+                else
+                    tracer.Visible = false
+                    tracerOutline.Visible = false
+                end
+            end
+        end
+
+        if matchacc.TargetAim.SpectateTarget then
+            workspace.CurrentCamera.CameraSubject = TargetPlayer.Character.Humanoid
+        else
+            workspace.CurrentCamera.CameraSubject = localPlayer.Character.Humanoid
+        end
+    else
+        localPlayer.Character.Humanoid.AutoRotate = true
+        tracer.Visible = false
+        tracerOutline.Visible = false
+        workspace.CurrentCamera.CameraSubject = localPlayer.Character.Humanoid
+    end
+end)
+
+-- UI Settings Setup
+local MenuGroup = Tabs['UI Settings']:AddLeftGroupbox('Menu')
+MenuGroup:AddToggle("KeybindMenuOpen", { Default = Library.KeybindFrame.Visible, Text = "Open Keybind Menu", Callback = function(value) Library.KeybindFrame.Visible = value end})
+MenuGroup:AddToggle("ShowCustomCursor", {Text = "Custom Cursor", Default = true, Callback = function(Value) Library.ShowCustomCursor = Value end})
+MenuGroup:AddDivider()
+MenuGroup:AddLabel("Menu bind"):AddKeyPicker("MenuKeybind", { Default = "RightShift", NoUI = true, Text = "Menu keybind" })
+MenuGroup:AddButton("Unload", function() Library:Unload() end)
+
+Library.ToggleKeybind = Options.MenuKeybind
+
+ThemeManager:SetLibrary(Library)
+SaveManager:SetLibrary(Library)
+
+SaveManager:IgnoreThemeSettings()
+SaveManager:SetIgnoreIndexes({ 'MenuKeybind' })
+
+ThemeManager:SetFolder('MyScriptHub')
+SaveManager:SetFolder('MyScriptHub/specific-game')
+
+SaveManager:BuildConfigSection(Tabs['UI Settings'])
+ThemeManager:ApplyToTab(Tabs['UI Settings'])
+
+SaveManager:LoadAutoloadConfig()
