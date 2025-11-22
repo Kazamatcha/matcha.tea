@@ -549,7 +549,6 @@ WatermarkText.Font = Enum.Font.Gotham
 WatermarkText.TextSize = 12
 WatermarkText.Parent = WatermarkFrame
 
--- Smooth Draggable
 local function makeSmoothDraggable(frame, speed)
     speed = speed or 0.2
     local dragging, dragInput, dragStart, startPos
@@ -569,9 +568,7 @@ local function makeSmoothDraggable(frame, speed)
         end
     end)
     frame.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-            dragInput = input
-        end
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then dragInput = input end
     end)
     UserInputService.InputChanged:Connect(function(input)
         if input == dragInput and dragging then update(input) end
